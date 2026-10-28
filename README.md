@@ -34,6 +34,7 @@ The no-native-features default has **no third-party Rust dependencies** and buil
 
 - [Architecture and micro-interface](docs/ARCHITECTURE.md)
 - [Phased roadmap and evidence gates](docs/ROADMAP.md)
+- [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
