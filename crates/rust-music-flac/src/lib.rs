@@ -11,8 +11,12 @@
 use rust_music_core::{AudioFormat, Decoder, MusicError, PcmBlock, Result};
 use std::io::{self, Read};
 
+mod md5;
+use md5::Md5;
+
 const MAX_METADATA_BLOCKS: usize = 128;
 const MAX_METADATA_BYTES: u32 = 16 * 1024 * 1024;
+const MAX_TOTAL_METADATA_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_RICE_UNARY: u64 = 1 << 20;
 
@@ -72,6 +76,7 @@ fn read_metadata<R: Read>(reader: &mut R) -> Result<StreamInfo> {
     if &magic != b"fLaC" { return Err(MusicError::Invalid("missing native FLAC marker")); }
     let mut info = None;
     let mut last = false;
+    let mut metadata_bytes = 0u64;
     for index in 0..MAX_METADATA_BLOCKS {
         let mut hdr = [0; 4];
         reader.read_exact(&mut hdr)?;
@@ -80,6 +85,10 @@ fn read_metadata<R: Read>(reader: &mut R) -> Result<StreamInfo> {
         let length = be24(&hdr[1..]);
         if kind == 127 { return Err(MusicError::Invalid("reserved metadata type")); }
         if length > MAX_METADATA_BYTES { return Err(MusicError::Limit("metadata block exceeds configured bound")); }
+        metadata_bytes += u64::from(length) + 4;
+        if metadata_bytes > MAX_TOTAL_METADATA_BYTES {
+            return Err(MusicError::Limit("aggregate metadata exceeds configured bound"));
+        }
         if index == 0 {
             if kind != 0 || length != 34 { return Err(MusicError::Invalid("first FLAC block must be STREAMINFO(34)")); }
             let mut raw = [0u8; 34];
@@ -207,7 +216,9 @@ fn utf8_number<R: Read>(reader: &mut Bits<R>) -> Result<u64> {
         if b & 0xc0 != 0x80 { return Err(MusicError::Invalid("bad FLAC number continuation")); }
         value = (value << 6) | u64::from(b & 0x3f);
     }
-    let minimum = 1u64 << (5 * follow + 1);
+    // Two-byte UTF-8 starts at 0x80; higher widths start at 2^(5*n+1).
+    // Reject overlong number encodings even when the header CRC is valid.
+    let minimum = 1u64 << (if follow == 1 { 7 } else { 5 * follow + 1 });
     if value < minimum || value >= (1u64 << 36) {
         return Err(MusicError::Invalid("noncanonical or oversized FLAC number"));
     }
@@ -268,7 +279,6 @@ fn residual<R: Read>(b: &mut Bits<R>, block: usize, order: usize) -> Result<Vec<
             let width = b.bits(5)? as u8;
             for _ in 0..count {
                 let value = if width == 0 { 0 } else { b.signed(width)? };
-                if value <= -(1i64 << 31) { return Err(MusicError::Invalid("oversized escaped residual")); }
                 out.push(value);
             }
         } else {
@@ -276,7 +286,11 @@ fn residual<R: Read>(b: &mut Bits<R>, block: usize, order: usize) -> Result<Vec<
                 let quotient = b.zeros_until_one(MAX_RICE_UNARY)?;
                 let rem = b.bits(param)?;
                 let folded = (quotient << param) | rem;
-                if folded > 0xffff_fffe { return Err(MusicError::Invalid("Rice residual outside signed-31 bound")); }
+                // RFC 9639 9.2.7 excludes i32::MIN (-2^31) even though it
+                // can be represented as a folded u32::MAX value.
+                if folded >= u64::from(u32::MAX) {
+                    return Err(MusicError::Invalid("FLAC residual outside allowed signed-32 range"));
+                }
                 let signed = ((folded >> 1) as i64) ^ (-((folded & 1) as i64));
                 out.push(signed);
             }
@@ -357,14 +371,42 @@ pub struct FlacDecoder<R: Read + Send> {
     reader: Bits<R>,
     info: StreamInfo,
     decoded_frames: u64,
+    frame_index: u64,
+    blocking_strategy: Option<bool>,
+    pcm_md5: Option<Md5>,
     finished: bool,
 }
 impl<R: Read + Send> FlacDecoder<R> {
     pub fn new(mut input: R) -> Result<Self> {
         let info = read_metadata(&mut input)?;
-        Ok(Self { reader: Bits::new(input), info, decoded_frames: 0, finished: false })
+        let pcm_md5 = (info.pcm_md5 != [0; 16]).then(Md5::new);
+        Ok(Self {
+            reader: Bits::new(input), info, decoded_frames: 0,
+            frame_index: 0, blocking_strategy: None, pcm_md5, finished: false,
+        })
     }
     pub fn stream_info(&self) -> &StreamInfo { &self.info }
+
+    fn update_pcm_md5(&mut self, interleaved: &[i32]) {
+        if let Some(digest) = self.pcm_md5.as_mut() {
+            // RFC 9639: signed, sign-extended to whole bytes, little-endian,
+            // interleaved sample by sample. This is independent of WAVE's
+            // unsigned 8-bit representation.
+            let bytes_per_sample = usize::from(self.info.format.bits_per_sample).div_ceil(8);
+            let mut buffer = [0u8; 4096];
+            let mut used = 0;
+            for sample in interleaved {
+                if used + bytes_per_sample > buffer.len() {
+                    digest.update(&buffer[..used]);
+                    used = 0;
+                }
+                buffer[used..used + bytes_per_sample]
+                    .copy_from_slice(&sample.to_le_bytes()[..bytes_per_sample]);
+                used += bytes_per_sample;
+            }
+            digest.update(&buffer[..used]);
+        }
+    }
 
     pub fn next_frame(&mut self) -> Result<Option<PcmBlock>> {
         if self.finished { return Ok(None); }
@@ -373,10 +415,15 @@ impl<R: Read + Send> FlacDecoder<R> {
         let first = match b.byte_opt()? {
             Some(x) => x,
             None => {
-                self.finished = true;
                 if self.info.total_samples != 0 && self.info.total_samples != self.decoded_frames {
                     return Err(MusicError::Invalid("FLAC decoded sample count mismatches STREAMINFO"));
                 }
+                if let Some(digest) = &self.pcm_md5 {
+                    if digest.clone().finish() != self.info.pcm_md5 {
+                        return Err(MusicError::Invalid("FLAC decoded PCM MD5 mismatches STREAMINFO"));
+                    }
+                }
+                self.finished = true;
                 return Ok(None);
             }
         };
@@ -391,7 +438,15 @@ impl<R: Read + Send> FlacDecoder<R> {
         let channels = if channel_mode < 8 { channel_mode + 1 } else if channel_mode <= 10 { 2 }
             else { return Err(MusicError::Invalid("reserved FLAC channel assignment")); };
         let bit_depth = sample_width((channel_depth >> 1) & 7, self.info.format.bits_per_sample)?;
-        let _number = utf8_number(b)?;
+        let variable_blocking = second & 1 == 1;
+        if self.blocking_strategy.is_some_and(|old| old != variable_blocking) {
+            return Err(MusicError::Invalid("FLAC blocking strategy changed mid-stream"));
+        }
+        let number = utf8_number(b)?;
+        let expected_number = if variable_blocking { self.decoded_frames } else { self.frame_index };
+        if number != expected_number {
+            return Err(MusicError::Invalid("non-sequential FLAC frame/sample number"));
+        }
         let size = block_size(block_rate >> 4, b)?;
         let rate = sample_rate(block_rate & 15, b, self.info.format.sample_rate)?;
         if size == 0 || size > usize::from(self.info.max_block_size) {
@@ -440,6 +495,10 @@ impl<R: Read + Send> FlacDecoder<R> {
         if self.info.total_samples != 0 && self.decoded_frames > self.info.total_samples {
             return Err(MusicError::Invalid("FLAC decoded samples exceed STREAMINFO total"));
         }
+        self.frame_index = self.frame_index.checked_add(1)
+            .ok_or(MusicError::Limit("FLAC frame index overflow"))?;
+        self.blocking_strategy = Some(variable_blocking);
+        self.update_pcm_md5(&interleaved);
         Ok(Some(PcmBlock::new(self.info.format, interleaved)?))
     }
 }
@@ -515,5 +574,46 @@ mod tests {
         add_frame(&mut f, 0, &[0x10, 0, 0x3f, 0xff, 0xc0]);
         let mut d = FlacDecoder::new(Cursor::new(f)).unwrap();
         assert_eq!(d.next_frame().unwrap().unwrap().samples, vec![0;16]);
+    }
+
+    #[test]
+    fn pcm_md5_matches_reference_for_interleaved_stereo() {
+        let mut file = fixture_header(2, 16);
+        file[26..42].copy_from_slice(&[
+            0x0a, 0x89, 0x86, 0xce, 0xdc, 0x70, 0x17, 0x84,
+            0x51, 0x9a, 0xc2, 0x58, 0x34, 0xc9, 0x23, 0x5f,
+        ]);
+        add_frame(&mut file, 8, &[0, 0x03, 0xe8, 0, 0x00, 0xfa, 0x00]);
+        let mut decoder = FlacDecoder::new(Cursor::new(file.clone())).unwrap();
+        assert_eq!(decoder.next_frame().unwrap().unwrap().samples, [1000, 500].repeat(16));
+        assert_eq!(decoder.next_frame().unwrap(), None);
+        // STREAMINFO is outside the frame CRC domain: corruption is only
+        // detectable with a full-stream decoded-PCM MD5 comparison.
+        file[26] ^= 1;
+        let mut corrupt = FlacDecoder::new(Cursor::new(file)).unwrap();
+        assert!(corrupt.next_frame().unwrap().is_some());
+        assert!(matches!(corrupt.next_frame(), Err(MusicError::Invalid(
+            "FLAC decoded PCM MD5 mismatches STREAMINFO"
+        ))));
+    }
+
+    #[test]
+    fn repeated_frame_number_is_not_accepted() {
+        let mut file = fixture_header(1, 32);
+        add_frame(&mut file, 0, &[0, 0, 1]);
+        add_frame(&mut file, 0, &[0, 0, 2]);
+        let mut decoder = FlacDecoder::new(Cursor::new(file)).unwrap();
+        assert_eq!(decoder.next_frame().unwrap().unwrap().samples, vec![1; 16]);
+        assert!(matches!(decoder.next_frame(), Err(MusicError::Invalid(
+            "non-sequential FLAC frame/sample number"
+        ))));
+    }
+
+    #[test]
+    fn rejects_overlong_frame_number_encoding() {
+        let mut decoder = Bits::new(Cursor::new(vec![0xc1, 0x80]));
+        assert!(utf8_number(&mut decoder).is_err());
+        let mut canonical = Bits::new(Cursor::new(vec![0xc2, 0x80]));
+        assert_eq!(utf8_number(&mut canonical).unwrap(), 128);
     }
 }

@@ -37,7 +37,7 @@ Project claims are not a hardware benchmark; status is recorded in the registry.
 | **RUST-002** | Preserve integer samples and explicit sample format; do not silently apply floats, DSP, gain or resampling. | G1 | implemented | LIT-001, LIT-014 | golden integer PCM bit patterns match source |
 | **RUST-003** | Bound metadata, block sizes, allocation, Rice unary and file chunk scanning. | G2 | implemented | LIT-001, LIT-002 | malformed and oversize inputs fail with typed errors |
 | **RUST-004** | Check frame header CRC8 and full-frame CRC16 before writing PCM. | G2 | implemented | LIT-001, LIT-002 | corruption test rejects changed CRC |
-| **RUST-005** | Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest. | G2 | planned | LIT-001, LIT-002, LIT-003 | complete IETF conformance corpus and golden MD5 comparison |
+| **RUST-005** | Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest. | G2 | implemented | LIT-001, LIT-002, LIT-003 | unit checksum vectors plus full-file reference PCM/MD5 parity on GitHub Actions |
 | **RUST-006** | Constructors, metadata scanning and module registration never autoplay or open output devices. | G1 | implemented | LIT-006, LIT-017 | player state tests: Ready does not call sink.open |
 | **RUST-007** | Rust Boy coordinates active TV, RADIO and MUSIC audio ownership; one active sink at a time. | G5 | planned | LIT-006, LIT-017 | integration tests demonstrate only one device owner |
 | **RUST-008** | Do not label an output bit-perfect until hardware format/rate/channel path is verified. | G3 | planned | LIT-010, LIT-011, LIT-012, LIT-014 | record exact device format and loopback sample comparison |

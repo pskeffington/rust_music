@@ -289,13 +289,13 @@
       "title": "FLAC MD5",
       "rule": "Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest.",
       "gate": "G2",
-      "status": "planned",
+      "status": "implemented",
       "evidence_ids": [
         "LIT-001",
         "LIT-002",
         "LIT-003"
       ],
-      "acceptance": "complete IETF conformance corpus and golden MD5 comparison"
+      "acceptance": "unit checksum vectors plus full-file reference PCM/MD5 parity on GitHub Actions"
     },
     {
       "id": "RUST-006",

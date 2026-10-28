@@ -39,7 +39,9 @@ Decoder blocks preserve original signed sample values. 8-bit unsigned WAVE is no
 - Frame header CRC8, frame footer CRC16 and zero pad validation; stereo assignment modes and up to eight channels.
 - Rice-4/Rice-5, escaped residuals, constant/verbatim, fixed order 0-4, LPC order 1-32, wasted bits.
 - Bounded 8 MiB frame, 16 MiB metadata block, 128 metadata headers, 1 Mi unary cap; invalid input errors instead of silent fallback.
-- Source `total_samples` checked at EOF; STREAMINFO full-file decoded-PCM MD5 and seektable random access remain outstanding gates.
+- Source `total_samples` and sequential frame/sample numbers checked; nonzero STREAMINFO MD5 is verified against the complete signed interleaved decoded PCM at EOF. An all-zero STREAMINFO MD5 means **unknown**, not verified. Seektable random access remains an outstanding gate.
+- STREAMINFO's MD5 detects accidental mismatch, not malicious tampering or provenance. CRC16 protects each frame before samples are offered to the sink; complete-file MD5 validation only occurs at EOF, so physical playback may already have started before a file-level mismatch is discovered. A strict host should preflight the full file before granting audio focus.
+- Metadata is bounded both per-block (16 MiB) and in aggregate (64 MiB). Frame/sample number continuity and canonical encoded numbers are checked.
 - No Ogg FLAC mapping at this stage; no MP4/M4A or ALAC marked supported.
 
 ## Output adapters and capability honesty

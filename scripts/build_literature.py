@@ -40,7 +40,7 @@ STANDARD_DATA = [
     ("Integer PCM", "Preserve integer samples and explicit sample format; do not silently apply floats, DSP, gain or resampling.", "G1", "implemented", [1, 14], "golden integer PCM bit patterns match source"),
     ("Bounded parsing", "Bound metadata, block sizes, allocation, Rice unary and file chunk scanning.", "G2", "implemented", [1, 2], "malformed and oversize inputs fail with typed errors"),
     ("FLAC CRC", "Check frame header CRC8 and full-frame CRC16 before writing PCM.", "G2", "implemented", [1, 2], "corruption test rejects changed CRC"),
-    ("FLAC MD5", "Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest.", "G2", "planned", [1, 2, 3], "complete IETF conformance corpus and golden MD5 comparison"),
+    ("FLAC MD5", "Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest.", "G2", "implemented", [1, 2, 3], "unit checksum vectors plus full-file reference PCM/MD5 parity on GitHub Actions"),
     ("Explicit audio start", "Constructors, metadata scanning and module registration never autoplay or open output devices.", "G1", "implemented", [6, 17], "player state tests: Ready does not call sink.open"),
     ("Single output focus", "Rust Boy coordinates active TV, RADIO and MUSIC audio ownership; one active sink at a time.", "G5", "planned", [6, 17], "integration tests demonstrate only one device owner"),
     ("Native output negotiation", "Do not label an output bit-perfect until hardware format/rate/channel path is verified.", "G3", "planned", [10, 11, 12, 14], "record exact device format and loopback sample comparison"),

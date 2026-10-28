@@ -6,7 +6,7 @@ All runtime codecs are ours: we do not embed Symphonia, Claxon, FFmpeg, libFLAC,
 
 ## Implemented foundation
 
-- **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, all stereo decorrelation assignments. Corpus parity is **not yet certified**.
+- **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, stereo decorrelation, frame-number continuity, full-file decoded PCM MD5 when provided. Corpus parity is **not yet certified**.
 - **WAVE PCM decoder**: 8/16/24/32-bit RIFF PCM with bounded streaming.
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and Linux ALSA (`alsa-output`) adapters. Neither is yet hardware validated as bit-perfect.
@@ -18,6 +18,8 @@ All runtime codecs are ours: we do not embed Symphonia, Claxon, FFmpeg, libFLAC,
 ```sh
 cargo test --workspace
 python3 scripts/check_literature.py
+python3 scripts/test_flac_reference.py --fixtures-only  # reference fixtures; cargo not needed
+python3 scripts/test_flac_reference.py                  # Rust decoder parity; needs cargo
 cargo run -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
 # macOS native output (experimental):
@@ -37,3 +39,5 @@ The no-native-features default has **no third-party Rust dependencies** and buil
 - [Machine registry](docs/literature-index.json)
 
 **Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. `FLAC -> WAV` parity and physical sample-path testing are separate gates. ALAC/M4A, AIFF, Ogg FLAC, Windows WASAPI, and Android AAudio are not yet supported.
+
+**Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 initially reported `startup_failure` with no jobs scheduled; Rust compilation and the full differential suite remain unverified until a runner successfully executes them.
