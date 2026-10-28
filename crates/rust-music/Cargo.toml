@@ -1,0 +1,19 @@
+[package]
+name = "rust-music"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+native-macos = ["dep:rust-music-native", "rust-music-native/macos"]
+native-alsa = ["dep:rust-music-native", "rust-music-native/alsa"]
+
+[dependencies]
+rust-music-core = { path = "../rust-music-core" }
+rust-music-flac = { path = "../rust-music-flac" }
+rust-music-wave = { path = "../rust-music-wave" }
+rust-music-engine = { path = "../rust-music-engine" }
+rust-music-native = { path = "../rust-music-native", optional = true }

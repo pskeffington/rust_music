@@ -1,0 +1,411 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-28",
+  "canonical_matrix": "docs/LITERATURE_MATRIX.md",
+  "canonical_index": "docs/LITERATURE_INDEX.md",
+  "categories": {
+    "standards": "Codec, container, and native API standards",
+    "reference-codecs": "Comparison decoders and conformance tools (never dependencies)",
+    "reference-players": "Comparable music players and product architecture",
+    "engineering": "Rust code quality, portability, and security",
+    "host-integration": "Embedding boundary with Rust Boy and sibling modules"
+  },
+  "sources": [
+    {
+      "id": "LIT-001",
+      "title": "RFC 9639: FLAC",
+      "category": "standards",
+      "url": "https://www.rfc-editor.org/rfc/rfc9639.html",
+      "evidence_level": "official-spec",
+      "priority": "high",
+      "decision": "Implement native FLAC frames, metadata, CRC, Rice, fixed and LPC, channel reconstruction.",
+      "validation": "Decode/CRC tests and IETF corpus; verify PCM against reference.",
+      "gate": "G2",
+      "license_note": "IETF standards text; write our own decoder",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-002",
+      "title": "IETF FLAC decoder testbench",
+      "category": "reference-codecs",
+      "url": "https://github.com/ietf-wg-cellar/flac-test-files",
+      "evidence_level": "official-test-corpus",
+      "priority": "high",
+      "decision": "Use subset/uncommon/faulty cases, including rejection and hang-resistance.",
+      "validation": "Run testbench, compare PCM/STREAMINFO MD5 and record pass counts.",
+      "gate": "G2",
+      "license_note": "CC0 test corpus; fixture provenance tracked",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-003",
+      "title": "Xiph FLAC reference",
+      "category": "reference-codecs",
+      "url": "https://github.com/xiph/flac",
+      "evidence_level": "reference-implementation",
+      "priority": "high",
+      "decision": "Differential oracle only; do not bundle or copy decoder code.",
+      "validation": "Compare PCM and error behavior with pinned reference version.",
+      "gate": "G2",
+      "license_note": "Reference libraries BSD-like; tools GPL; no code reuse",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-004",
+      "title": "Claxon pure Rust FLAC",
+      "category": "reference-codecs",
+      "url": "https://github.com/ruuda/claxon",
+      "evidence_level": "project-readme",
+      "priority": "high",
+      "decision": "Study how small a lossless Rust decoder can be; compare performance methodology.",
+      "validation": "Benchmark decoded samples/s on same hardware with a documented corpus.",
+      "gate": "G2",
+      "license_note": "Apache-2.0; architecture only; do not copy",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-005",
+      "title": "Symphonia audio",
+      "category": "reference-codecs",
+      "url": "https://github.com/pdeljanov/Symphonia",
+      "evidence_level": "project-readme",
+      "priority": "medium",
+      "decision": "Feature-controlled decoder comparison; explicitly excluded from runtime.",
+      "validation": "No Symphonia dependency in cargo metadata or lockfile.",
+      "gate": "G1",
+      "license_note": "Open source; design reference, not a dependency",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-006",
+      "title": "Music Player Daemon",
+      "category": "reference-players",
+      "url": "https://github.com/MusicPlayerDaemon/MPD",
+      "evidence_level": "project-readme",
+      "priority": "high",
+      "decision": "Separate codec, music database, control, and physical outputs.",
+      "validation": "Each module builds without UI or native audio libs.",
+      "gate": "G1",
+      "license_note": "GPL project; do not transplant code",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-007",
+      "title": "Termusic",
+      "category": "reference-players",
+      "url": "https://github.com/tramhao/termusic",
+      "evidence_level": "project-readme",
+      "priority": "medium",
+      "decision": "Study keyboard-first playlists and compact status, not dependency surface.",
+      "validation": "Micro controls tested at small display sizes.",
+      "gate": "G5",
+      "license_note": "Mixed MIT/GPL code; behavior-only study",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-008",
+      "title": "Firefly TUI music player",
+      "category": "reference-players",
+      "url": "https://github.com/ly-ns0/firefly",
+      "evidence_level": "project-readme",
+      "priority": "medium",
+      "decision": "Contrast compact transport controls and library paths.",
+      "validation": "Compare startup/memory with equivalent local file library.",
+      "gate": "G5",
+      "license_note": "Review upstream license; no code reuse",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-009",
+      "title": "Apple ALAC reference and cookie",
+      "category": "standards",
+      "url": "https://github.com/macosforge/alac",
+      "evidence_level": "official-project",
+      "priority": "high",
+      "decision": "Design independent ALAC prediction and CAF/MP4 demux; do not link or copy the reference.",
+      "validation": "Differential ALAC PCM golden vectors and malformed MP4 atoms.",
+      "gate": "G4",
+      "license_note": "Apache-2.0 reference; independent implementation planned",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-010",
+      "title": "Apple AudioQueueNewOutput",
+      "category": "standards",
+      "url": "https://developer.apple.com/documentation/audiotoolbox/audioqueuenewoutput",
+      "evidence_level": "official-api",
+      "priority": "high",
+      "decision": "Thin native PCM output ABI; decode on worker, not playback callback.",
+      "validation": "macOS signed PCM format negotiation, device swap and drain tests.",
+      "gate": "G3",
+      "license_note": "OS API; adapter code owned by Rust Music",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-011",
+      "title": "Windows WASAPI",
+      "category": "standards",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/coreaudio/wasapi",
+      "evidence_level": "official-api",
+      "priority": "high",
+      "decision": "Thin Windows audio endpoint adapter with no resampling surprises.",
+      "validation": "WASAPI shared/exclusive bit-match acceptance on device.",
+      "gate": "G3",
+      "license_note": "OS API; adapter planned",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-012",
+      "title": "WASAPI exclusive streams",
+      "category": "standards",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams",
+      "evidence_level": "official-api",
+      "priority": "medium",
+      "decision": "Prefer capability negotiation, warn before exclusive device seizure.",
+      "validation": "Windows format capability and system-audio behavior tests.",
+      "gate": "G3",
+      "license_note": "Official platform documentation",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-013",
+      "title": "Android NDK AAudio",
+      "category": "standards",
+      "url": "https://developer.android.com/ndk/guides/audio/aaudio/aaudio",
+      "evidence_level": "official-api",
+      "priority": "high",
+      "decision": "Thin Android output ABI for deployable micro player.",
+      "validation": "Actual Android 26+ format, focus, standby and output tests.",
+      "gate": "G5",
+      "license_note": "Android native API; adapter planned",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-014",
+      "title": "MPD ALSA output guidance",
+      "category": "engineering",
+      "url": "https://mpd.readthedocs.io/en/stable/plugins.html",
+      "evidence_level": "official-project",
+      "priority": "high",
+      "decision": "Avoid implicit dmix/resample for strict audio; request direct hw device explicitly.",
+      "validation": "Linux ALSA direct-device format/no-resample field verification.",
+      "gate": "G3",
+      "license_note": "Documentation/behavior reference",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-015",
+      "title": "Rust API Guidelines",
+      "category": "engineering",
+      "url": "https://rust-lang.github.io/api-guidelines/",
+      "evidence_level": "official-guide",
+      "priority": "high",
+      "decision": "Typed errors and portable Read-driven decoders with explicit no-panics.",
+      "validation": "Fmt/clippy/test plus public rustdoc review.",
+      "gate": "G0",
+      "license_note": "Guidance, not a runtime dependency",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-016",
+      "title": "Rust cargo features",
+      "category": "engineering",
+      "url": "https://doc.rust-lang.org/cargo/reference/features.html",
+      "evidence_level": "official-guide",
+      "priority": "medium",
+      "decision": "Keep optional OS backends gated and dependency-free core default.",
+      "validation": "Cargo tree and MSRV target matrices.",
+      "gate": "G0",
+      "license_note": "Official Rust documentation",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-017",
+      "title": "Rust Radio standalone embedding",
+      "category": "host-integration",
+      "url": "https://github.com/pskeffington/rust_radio/blob/main/docs/EMBEDDING.md",
+      "evidence_level": "host-contract",
+      "priority": "high",
+      "decision": "Reuse module shape: independent lib, explicit Play, host-owned storage and output focus.",
+      "validation": "Rust Boy adapter can load and unload without second audio stream.",
+      "gate": "G5",
+      "license_note": "Sibling repository interface reference only",
+      "dependency_policy": "reference-only"
+    }
+  ],
+  "standards": [
+    {
+      "id": "RUST-001",
+      "title": "Independent codecs",
+      "rule": "No runtime decoder deps: do not link FLAC/ALAC, Symphonia, Claxon, FFmpeg, or libFLAC.",
+      "gate": "G0",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-001",
+        "LIT-003",
+        "LIT-004",
+        "LIT-005"
+      ],
+      "acceptance": "cargo metadata proves decoder dependency closure is internal only"
+    },
+    {
+      "id": "RUST-002",
+      "title": "Integer PCM",
+      "rule": "Preserve integer samples and explicit sample format; do not silently apply floats, DSP, gain or resampling.",
+      "gate": "G1",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-001",
+        "LIT-014"
+      ],
+      "acceptance": "golden integer PCM bit patterns match source"
+    },
+    {
+      "id": "RUST-003",
+      "title": "Bounded parsing",
+      "rule": "Bound metadata, block sizes, allocation, Rice unary and file chunk scanning.",
+      "gate": "G2",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-001",
+        "LIT-002"
+      ],
+      "acceptance": "malformed and oversize inputs fail with typed errors"
+    },
+    {
+      "id": "RUST-004",
+      "title": "FLAC CRC",
+      "rule": "Check frame header CRC8 and full-frame CRC16 before writing PCM.",
+      "gate": "G2",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-001",
+        "LIT-002"
+      ],
+      "acceptance": "corruption test rejects changed CRC"
+    },
+    {
+      "id": "RUST-005",
+      "title": "FLAC MD5",
+      "rule": "Verify decoded PCM STREAMINFO MD5 across the complete file; distinguish zero digest.",
+      "gate": "G2",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-001",
+        "LIT-002",
+        "LIT-003"
+      ],
+      "acceptance": "complete IETF conformance corpus and golden MD5 comparison"
+    },
+    {
+      "id": "RUST-006",
+      "title": "Explicit audio start",
+      "rule": "Constructors, metadata scanning and module registration never autoplay or open output devices.",
+      "gate": "G1",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-006",
+        "LIT-017"
+      ],
+      "acceptance": "player state tests: Ready does not call sink.open"
+    },
+    {
+      "id": "RUST-007",
+      "title": "Single output focus",
+      "rule": "Rust Boy coordinates active TV, RADIO and MUSIC audio ownership; one active sink at a time.",
+      "gate": "G5",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-006",
+        "LIT-017"
+      ],
+      "acceptance": "integration tests demonstrate only one device owner"
+    },
+    {
+      "id": "RUST-008",
+      "title": "Native output negotiation",
+      "rule": "Do not label an output bit-perfect until hardware format/rate/channel path is verified.",
+      "gate": "G3",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-010",
+        "LIT-011",
+        "LIT-012",
+        "LIT-014"
+      ],
+      "acceptance": "record exact device format and loopback sample comparison"
+    },
+    {
+      "id": "RUST-009",
+      "title": "No callback allocations",
+      "rule": "Audio callback is nonblocking, allocation-free, and free of filesystem work.",
+      "gate": "G3",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-010",
+        "LIT-013"
+      ],
+      "acceptance": "stress callback and underrun/fault insertion"
+    },
+    {
+      "id": "RUST-010",
+      "title": "No unexpected IO",
+      "rule": "Track selection and indexing never trigger network calls or scanning unrelated roots.",
+      "gate": "G5",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-006",
+        "LIT-017"
+      ],
+      "acceptance": "air-gapped tests and bounded explicit library scan"
+    },
+    {
+      "id": "RUST-011",
+      "title": "Corpus differential",
+      "rule": "Test valid/uncommon/faulty FLAC and compare output to pinned reference.",
+      "gate": "G2",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-002",
+        "LIT-003"
+      ],
+      "acceptance": "corpus report with SHA, exact fixture counts and outcomes"
+    },
+    {
+      "id": "RUST-012",
+      "title": "Portability",
+      "rule": "Pure headless core compiles independent of macOS/Windows/Linux/Android OS backends.",
+      "gate": "G0",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-010",
+        "LIT-011",
+        "LIT-013",
+        "LIT-016"
+      ],
+      "acceptance": "cross-target no-default-feature check"
+    },
+    {
+      "id": "RUST-013",
+      "title": "Machine index",
+      "rule": "Every source and standard is uniquely identified with evidence and validation gates.",
+      "gate": "G0",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-015"
+      ],
+      "acceptance": "scripts/check_literature.py succeeds offline"
+    },
+    {
+      "id": "RUST-014",
+      "title": "ALAC truthfulness",
+      "rule": "Do not mark ALAC as supported until demux and decoder pass corpus comparison.",
+      "gate": "G4",
+      "status": "planned",
+      "evidence_ids": [
+        "LIT-009"
+      ],
+      "acceptance": "ALAC source/PCM signed comparison with golden tests"
+    }
+  ]
+}

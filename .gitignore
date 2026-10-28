@@ -1,0 +1,8 @@
+/target
+.DS_Store
+*.pcm
+*.raw
+*.flac
+*.wav
+!tests/fixtures/*.flac
+!tests/fixtures/*.wav

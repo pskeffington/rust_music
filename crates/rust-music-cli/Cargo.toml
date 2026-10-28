@@ -1,0 +1,15 @@
+[package]
+name = "rust-music-cli"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+macos-output = ["rust-music/native-macos"]
+alsa-output = ["rust-music/native-alsa"]
+
+[dependencies]
+rust-music = { path = "../rust-music" }

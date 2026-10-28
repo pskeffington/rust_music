@@ -1,0 +1,54 @@
+name: rust_music quality and lossless conformance
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Validate research index
+        run: python3 scripts/check_literature.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+  macos-native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check own macOS native output adapter
+        run: cargo check -p rust-music-cli --features macos-output
+  alsa-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Check own Linux native output adapter
+        run: cargo check -p rust-music-cli --features alsa-output
+  windows-core:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Portable decoder/core tests
+        run: cargo test --workspace
+  flac-differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Reference FLAC encoder (test-only)
+        run: sudo apt-get update && sudo apt-get install -y flac
+      - name: Independent decoder PCM parity
+        run: python3 scripts/test_flac_reference.py

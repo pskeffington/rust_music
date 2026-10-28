@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/rust-music-core",
+  "crates/rust-music-flac",
+  "crates/rust-music-wave",
+  "crates/rust-music-engine",
+  "crates/rust-music-native",
+  "crates/rust-music",
+  "crates/rust-music-cli",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/pskeffington/rust_music"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
