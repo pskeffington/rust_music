@@ -270,6 +270,19 @@
       "gate": "G12",
       "license_note": "Format documentation; all decoder code remains original Rust",
       "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-021",
+      "title": "WavPack 5 porting guide",
+      "category": "standards",
+      "url": "https://www.wavpack.com/WavPack5PortingGuide.pdf",
+      "evidence_level": "official-guide",
+      "priority": "high",
+      "decision": "Distinguish legacy-compatible stream 0x407 from the WavPack 5 stream 0x410 when interpreting extended header fields.",
+      "validation": "Boundary tests keep 0x407 fields 32-bit and parse 0x410 upper bytes; decoder support remains unadmitted.",
+      "gate": "G12",
+      "license_note": "Official format guide; all decoder code remains original Rust",
+      "dependency_policy": "reference-only"
     }
   ],
   "standards": [

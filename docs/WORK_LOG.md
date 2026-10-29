@@ -401,10 +401,11 @@ and validated `.wvc` pairing are still missing. RM-014 remains planned.
 ## 2026-10-29 — RM-014 version-aware WavPack framing
 
 Corrected the bounded WavPack header parser to treat reserved upper bytes as
-unused before stream version `0x407`, use 40-bit fields from `0x407` onward,
-and expose `total_samples` only on a block whose sample index is zero. This
-matches the official v4/v5 format description. Added regression cases for
-version `0x406`, the `0x407` transition, upper-byte values, and later blocks.
+unused before stream version `0x410`, use 40-bit fields from `0x410` onward,
+and expose `total_samples` only on a block whose sample index is zero. Added
+regression cases for the legacy `0x40f` and new-stream `0x410` boundary,
+upper-byte values, and later blocks. The `0x410` threshold is confirmed by the
+official porting guide: `0x407` is the legacy-compatible stream version.
 This is parser correctness evidence only; WavPack remains unregistered because
 entropy decoding, reconstruction, CRC parity, and hybrid correction pairing
 remain absent.
@@ -415,7 +416,20 @@ remain absent.
   dependency edges, warnings-denied Clippy, workspace tests, release build, and
   macOS feature check passed.
 - `git diff --check`: **pass**.
-- Official format reference: [WavPack 4 & 5 Binary File / Block Format](https://www.wavpack.com/WavPack5FileFormat.pdf).
+- Official references: [WavPack 4 & 5 Binary File / Block Format](https://www.wavpack.com/WavPack5FileFormat.pdf) and [WavPack 5 Porting Guide](https://www.wavpack.com/WavPack5PortingGuide.pdf).
+
+The first implementation mistakenly treated `0x407` as the new-stream
+threshold. Review of the official porting guide clarified that `0x407` is the
+legacy-compatible stream and `0x410` is the WavPack 5 stream; the parser and
+boundary tests were corrected before any WavPack decoder admission.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 8/8 unit
+  tests, including both `0x407` and `0x40f` legacy cases plus `0x410` 40-bit
+  fields.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 crates, 29 path-only edges,
+  warnings-denied Clippy, workspace tests, release build, and macOS feature
+  check passed.
+- The official WavPack 5 Porting Guide is now indexed as LIT-021.
 
 ## 2026-10-29 — G5 catalog replacement lifecycle regression
 

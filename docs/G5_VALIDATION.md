@@ -5,7 +5,7 @@ Recorded 2026-10-29. Local workspace build, Clippy, tests and release build pass
 | Check | Result | Evidence / reproducible command |
 | --- | --- | --- |
 | Workspace closure | PASS (static and offline audit) | 16 Cargo workspace crates; 29 internal path edges; no registry/Git crates |
-| Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (20 sources, 16 rules, exact generated markdown parity) |
+| Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (21 sources, 16 rules, exact generated markdown parity) |
 | Reference FLAC fixture validity | PASS (reference-only) | `python3 scripts/test_flac_reference.py --fixtures-only` (seven FLAC files, 8/16/24/32-bit mono/stereo/six-channel, reference MD5) |
 | Bounded library tests | PASS | Local `sh scripts/offline-gate.sh`; symlink avoidance, scan limits, stable ordering |
 | Host slot and exclusive focus tests | PASS (mock focus) | Local `sh scripts/offline-gate.sh`; no autoplay, EOF/Stop/Drop release, denial before output, device-open/write failures, suspend, and catalog replacement release the host lease |

@@ -12,6 +12,7 @@ Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature
 - **LIT-013** [Android NDK AAudio](https://developer.android.com/ndk/guides/audio/aaudio/aaudio) - Thin Android output ABI for deployable micro player. Gate G5.
 - **LIT-018** [Linux ALSA kernel PCM UAPI](https://github.com/torvalds/linux/blob/master/include/uapi/sound/asound.h) - Use local Rust ioctl structs against /dev/snd device nodes, not the libasound sound library or a daemon. Gate G3.
 - **LIT-020** [WavPack 4 and 5 binary file/block format](https://www.wavpack.com/WavPack5FileFormat.pdf) - Use the block header and metadata layout to implement bounded, original WavPack parsing; accept only independently verified lossless profiles. Gate G12.
+- **LIT-021** [WavPack 5 porting guide](https://www.wavpack.com/WavPack5PortingGuide.pdf) - Distinguish legacy-compatible stream 0x407 from the WavPack 5 stream 0x410 when interpreting extended header fields. Gate G12.
 
 ## Comparison decoders and conformance tools (never dependencies)
 

@@ -71,7 +71,7 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 4. Hardware output negotiation, anti-resampling checks, bit-perfect DAC loopback and shared Radio/TV focus.
 5. Add WavPack lossless, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests. RF64/ds64 source support exists, with broad real-file and hardware acceptance still open.
 
-WavPack's official block-format document is indexed as [LIT-020](literature-index.json). `rust-music-wavpack` currently contains only bounded v4/v5 block/header and metadata framing code. It is not a decoder and is not registered by the public facade. Do not mark WavPack supported until original entropy/sample decoding, CRC validation, independent PCM parity, and hybrid correction-file pairing all pass.
+WavPack's official block-format and v5 porting documents are indexed as [LIT-020](literature-index.json) and [LIT-021](literature-index.json). The v5 guide distinguishes legacy-compatible stream `0x407` from new stream `0x410`; the framing parser applies 40-bit upper header fields only at `0x410`. `rust-music-wavpack` currently contains only bounded v4/v5 block/header and metadata framing code. It is not a decoder and is not registered by the public facade. Do not mark WavPack supported until original entropy/sample decoding, CRC validation, independent PCM parity, and hybrid correction-file pairing all pass.
 
 ## Standards used for the format policy (research only)
 

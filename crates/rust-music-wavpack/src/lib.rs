@@ -51,9 +51,9 @@ impl BlockHeader {
         }
         let total_low = u32::from_le_bytes(bytes[12..16].try_into().unwrap());
         let block_index_low = u32::from_le_bytes(bytes[16..20].try_into().unwrap());
-        // The upper index and length bytes are defined for the WavPack 5
-        // stream format (0x407 and later). Earlier versions reserved them.
-        let (total_samples, block_index) = if version >= 0x407 {
+        // Version 0x407 is the legacy-compatible stream. WavPack 5's newer
+        // stream format starts at 0x410 and defines the upper 40-bit fields.
+        let (total_samples, block_index) = if version >= 0x410 {
             (
                 if block_index_low == 0 && total_low != u32::MAX {
                     Some((u64::from(bytes[11]) << 32) | u64::from(total_low))
@@ -260,12 +260,23 @@ mod tests {
     }
 
     #[test]
-    fn v4_uses_32_bit_lengths_and_indices_only() {
+    fn legacy_stream_uses_32_bit_lengths_and_indices_only() {
         let mut bytes = block(128, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
-        bytes[8..10].copy_from_slice(&0x406u16.to_le_bytes());
+        bytes[8..10].copy_from_slice(&0x40fu16.to_le_bytes());
         bytes[10] = 7;
         bytes[11] = 9;
         bytes[12..16].copy_from_slice(&10_000u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, Some(10_000));
+        assert_eq!(header.block_index, 0);
+
+        bytes[16..20].copy_from_slice(&25u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, None);
+        assert_eq!(header.block_index, 25);
+
+        bytes[8..10].copy_from_slice(&0x407u16.to_le_bytes());
+        bytes[16..20].copy_from_slice(&0u32.to_le_bytes());
         let header = BlockHeader::parse(&bytes).unwrap();
         assert_eq!(header.total_samples, Some(10_000));
         assert_eq!(header.block_index, 0);
@@ -279,7 +290,7 @@ mod tests {
     #[test]
     fn v5_uses_40_bit_fields_and_only_first_block_has_total_length() {
         let mut bytes = block(128, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
-        bytes[8..10].copy_from_slice(&0x407u16.to_le_bytes());
+        bytes[8..10].copy_from_slice(&0x410u16.to_le_bytes());
         bytes[10] = 2;
         bytes[11] = 3;
         bytes[12..16].copy_from_slice(&10_000u32.to_le_bytes());
