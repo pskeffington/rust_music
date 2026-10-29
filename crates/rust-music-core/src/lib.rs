@@ -53,6 +53,11 @@ impl AudioFormat {
         if !(1..=1_048_575).contains(&sample_rate) { return Err(MusicError::Unsupported("invalid sample rate")); }
         Ok(Self { sample_rate, channels, bits_per_sample })
     }
+    /// Listening policy only, separate from decoder test-vector support.
+    /// Lossless CD-quality (16-bit / 44.1 kHz) is the playback floor.
+    pub fn meets_audiophile_floor(self) -> bool {
+        self.bits_per_sample >= 16 && self.sample_rate >= 44_100
+    }
 }
 
 /// Exact integer samples in interleaved frame order: L, R, L, R, ...
@@ -114,6 +119,13 @@ mod tests {
         assert!(AudioFormat::new(0, 2, 16).is_err());
         assert!(AudioFormat::new(44_100, 2, 33).is_err());
         assert!(AudioFormat::new(192_000, 2, 32).is_ok());
+    }
+    #[test]
+    fn audiophile_floor_accepts_cd_and_hires_but_not_low_rate_pcm() {
+        assert!(AudioFormat::new(44_100, 2, 16).unwrap().meets_audiophile_floor());
+        assert!(AudioFormat::new(192_000, 2, 24).unwrap().meets_audiophile_floor());
+        assert!(!AudioFormat::new(48_000, 1, 8).unwrap().meets_audiophile_floor());
+        assert!(!AudioFormat::new(32_000, 2, 24).unwrap().meets_audiophile_floor());
     }
     #[test]
     fn null_sink_checks_format_and_frame_count() {
