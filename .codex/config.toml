@@ -1,0 +1,5 @@
+# Project-scoped Codex specialists; no model pin, MCP server, or network requirement.
+# These are development assistants, NOT runtime dependencies.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
