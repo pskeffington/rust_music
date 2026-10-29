@@ -8,6 +8,7 @@ name = "rust-music"
 version = "0.1.0"
 dependencies = [
  "rust-music-aiff",
+ "rust-music-caf",
  "rust-music-core",
  "rust-music-engine",
  "rust-music-flac",
@@ -33,6 +34,14 @@ dependencies = [
 [[package]]
 name = "rust-music-audit"
 version = "0.1.0"
+
+[[package]]
+name = "rust-music-caf"
+version = "0.1.0"
+dependencies = [
+ "rust-music-alac",
+ "rust-music-core",
+]
 
 [[package]]
 name = "rust-music-cli"

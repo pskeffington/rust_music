@@ -31,15 +31,15 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 - `codec_engineer` handles own FLAC/WAVE/AIFF and future ALAC/CAF/MP4/WavPack decoders, with `safety_reviewer` inspecting codec confusion and bounds.
 - `audio_backend` owns native PCM output and the physical evidence ladder; `host_integrator` owns the music socket, library and panel. Each must separately verify source ABI vs actual hardware behavior.
 - `index_curator` reconciles evidence and routing, but **must not** promote gate outcomes just because a source commit landed.
-- Current evidence: `RM-001` and `RM-002` are done. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on external hardware/host work; under this goal, sibling repositories stay read-only. `RM-008` is the next planned P1 implementation task whose prerequisites are satisfied. ALAC remains unsupported until its decoder and parity gates pass.
+- Current evidence: `RM-001`, `RM-002`, and `RM-008` through `RM-010` have source/build/parity evidence recorded in the roadmap. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on device/host integration; under this goal, sibling repositories stay read-only. Broad ALAC admission remains open pending real-world corpus coverage.
 
 ## Codex kickoff prompt
 
 ```text
 Read AGENTS.md and docs/roadmap-index.json. Select the highest-priority
 planned task whose prerequisites are complete; verify the current status
-before starting. As of 2026-10-29, RM-001 and RM-002 are done and RM-008 is
-the next planned P1 task. Preserve local edits, use one writer per overlapping
+before starting. As of 2026-10-29, RM-001, RM-002 and RM-008 through RM-010 are
+done; verify remaining host/hardware tasks before choosing work. Preserve local edits, use one writer per overlapping
 scope, request a read-only safety review for product changes, record exact
 commands/exit status, update the roadmap only for evidence actually observed,
 and keep PR #1 draft and unmerged.

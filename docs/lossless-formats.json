@@ -104,15 +104,17 @@
       ],
       "container": "CAF",
       "accepted_codecs": [
-        "ALAC",
-        "integer linear PCM"
+        "ALAC (mono/stereo)",
+        "signed integer LPCM (mono/stereo)"
       ],
-      "stage": "planned",
-      "verification": "not-implemented",
+      "stage": "native-source-implemented",
+      "verification": "ffmpeg-generated-caf-exact-pcm-5-of-5-lpcm16-24-32-alac16-24; custom-channel-layouts-other-codecs-and-malformed-bounds-rejected; broad-corpus-pending",
       "gate": "G11",
       "refuse_codecs": [
         "AAC",
-        "ADPCM"
+        "ADPCM",
+        "floating-point PCM",
+        "unsupported channel layouts"
       ]
     },
     {

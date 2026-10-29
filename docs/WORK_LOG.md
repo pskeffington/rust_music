@@ -188,3 +188,39 @@ directories now use process-local atomic IDs and retry if already present.
 RM-009 is complete for its bounded acceptance. RM-010 CAF parsing, production
 format corpus checks, host integration, distinct-module registration/input,
 and physical audio acceptance are still outstanding.
+
+## 2026-10-29 — RM-010 CAF ALAC/LPCM demux and module catalog integration
+
+Added the local `rust-music-caf` decoder crate and wired CAF signature sniffing
+through the facade, bounded local library catalog, and 1 KiB panel's format
+label. The decoder accepts signed mono/stereo LPCM at 8/16/24/32 bits (the
+8-bit path is decoder-only under the playback floor), both sample byte orders,
+packed 24-bit and CAF's high-aligned 24-bit-in-32 storage. It accepts ALAC with
+the bare 24-byte cookie or CAF's validated `frma`/`alac` atom wrapper and
+bounded `pakt` packet-size descriptions. Unknown-sized `data` is accepted only
+as the terminal chunk. Unsupported codecs, float PCM, explicit custom channel
+maps, mismatched layouts, multichannel LPCM and malformed bounds fail closed;
+no AudioToolbox/OS decoder fallback exists.
+
+The accepted channel-map surface is intentionally limited to mono and standard
+stereo/headphone tags because Rust Music's PCM/host contract does not yet carry
+multichannel speaker mapping. A read-only `safety_reviewer` found the initial
+implementation skipped CAF `chan` maps; the parser now verifies standard
+mono/stereo tags and rejects unsupported maps and multichannel PCM. A second
+read-only pass confirmed the fix, including three-channel LPCM with no layout.
+
+Independent synthetic CAFs were generated locally with FFmpeg from deterministic
+PCM; the optional oracle/encoder script then compared Rust CLI output bytes to
+the original PCM. FFmpeg is test tooling only and is not a runtime dependency.
+
+- `cargo test --locked --offline -p rust-music-caf -p rust-music-library -p rust-music-panel -p rust-music`: **exit 0**; CAF crate 9/9, library 3/3, panel 5/5, facade 4/4.
+- `python3 scripts/test_caf_reference.py`: **exit 0**, 5/5 exact PCM vectors: LPCM 16/24/32-bit and ALAC 16/24-bit.
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 local crates, 28 path-only edges, zero registry/Git crates, zero third-party system links, one OS framework link; fmt, warnings-denied Clippy, workspace tests, release build and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, `cargo fmt --all -- --check`, and `git diff --check`: **pass**.
+
+The crate tests also cover chunk/packet limits, exact sample-rate parsing,
+standard layout validation, wrong codecs, float refusal, malformed negative
+chunk sizes, all truncated prefixes, and terminal unknown-sized `data`. CAF
+generated parity is not real-world corpus, host-focus or hardware acceptance;
+those remain open alongside broad M4A/ALAC corpus evidence and Rust_Boy/Pip-Boy
+audio-focus/input integration. The sibling repo was not modified.

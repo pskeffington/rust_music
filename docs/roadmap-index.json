@@ -228,7 +228,7 @@
       "title": "ALAC decoder and M4A/CAF demultiplexers",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Raw ALAC 16/24/32-bit and stereo-matrix parity plus strict generated 24-bit M4A parity and AAC/DRM denial pass; CAF demux and broader real-world M4A corpus remain before broad format admission",
+      "next_evidence": "Raw ALAC parity, M4A AAC/DRM denial, and five generated CAF ALAC/LPCM parity vectors pass; broader real-world ALAC corpus evidence remains before broad format admission",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -436,19 +436,20 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "planned",
+      "status": "done",
       "depends_on": [
         "RM-008"
       ],
       "focus_paths": [
         "docs/lossless-formats.json",
-        "crates/rust-music/src/lib.rs"
+        "crates/rust-music/src/lib.rs",
+        "crates/rust-music-caf/src/lib.rs",
+        "crates/rust-music-library/src/lib.rs",
+        "crates/rust-music-panel/src/lib.rs"
       ],
-      "create_paths": [
-        "crates/rust-music-caf/"
-      ],
-      "acceptance": "CAF descriptor, magic cookie, sample and chunk bounds verified with ALAC/PCM golden tests; no AudioToolbox decoder fallback",
-      "blocker": "Raw decoder and independent packet parity are complete; implement bounded CAF ALAC/integer-PCM demux without OS codec fallback"
+      "create_paths": [],
+      "acceptance": "CAF descriptor, magic cookie, sample and chunk bounds verified with ALAC/LPCM golden tests; facade/catalog recognize CAF and panel labels it; no AudioToolbox decoder fallback",
+      "blocker": "Bounded CAF ALAC and signed mono/stereo LPCM acceptance passed: generated FFmpeg CAF vectors match exact PCM (LPCM 16/24/32-bit and ALAC 16/24-bit), lossy/unsupported codecs and channel layouts fail closed, truncation prefixes reject, and CAF is content-sniffed by facade and library. Broad real-world CAF/ALAC corpus and host/output validation remain open"
     },
     {
       "id": "RM-011",

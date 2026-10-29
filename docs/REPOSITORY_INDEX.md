@@ -28,14 +28,15 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | AIFF/AIFF-C signed PCM | `crates/rust-music-aiff/` | `codec_engineer` | G10 |
 | ALAC raw-packet decoder and synthetic vectors | `crates/rust-music-alac/`, `crates/rust-music-alac/tests/fixtures/` | `codec_engineer` | G11 (16/24/32-bit plus stereo-matrix parity; not admitted; malformed coverage and demux remain) |
 | M4A/MP4 ALAC-only demux and synthetic files | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/` | `codec_engineer` | G11 / RM-009 (bounded profile; generated 24-bit parity; AAC/DRM denial; broader corpus and CAF remain) |
+| CAF ALAC and LPCM demux | `crates/rust-music-caf/`, `scripts/test_caf_reference.py` | `codec_engineer` | G11 / RM-010 (bounded mono/stereo profile; generated ALAC 16/24 and LPCM 16/24/32 exact PCM parity; custom layouts/codecs denied) |
 | Playback state/progress | `crates/rust-music-engine/` | `codec_engineer` | G1 / G9 |
 | OS DAC adapters | `crates/rust-music-native/` | `audio_backend` | G3 |
-| Public facade, sniffing | `crates/rust-music/` | serial handoff | G1 / G10 |
-| CLI / acceptance harness | `crates/rust-music-cli/` | serial handoff | G7 / G8 / G10 |
+| Public facade, sniffing | `crates/rust-music/` | serial handoff | G1 / G10 / G11 |
+| CLI / acceptance harness | `crates/rust-music-cli/`, `scripts/test_caf_reference.py` | serial handoff | G7 / G8 / G10 / G11 |
 | Workspace dependency auditor | `crates/rust-music-audit/` | `gate_verifier` reviews | G0 |
-| Directory scanner | `crates/rust-music-library/` | `host_integrator` | G5 |
+| Directory scanner | `crates/rust-music-library/` | `host_integrator` | G5 / G11 |
 | Music socket and audio lease | `crates/rust-music-host/` | `host_integrator` | G5 |
-| Fixed 1 KiB screen | `crates/rust-music-panel/` | `host_integrator` | G6 / G9 |
+| Fixed 1 KiB screen | `crates/rust-music-panel/` | `host_integrator` | G6 / G9 / G11 (CAF format label) |
 | Roadmap and Codex role index | `docs/roadmap-index.json` | `index_curator` | G0 |
 | Independent literature registry | `docs/literature-index.json` | `index_curator` | G0 |
 | Supported/denied format registry | `docs/lossless-formats.json` | serial handoff | G10 / G11 |
@@ -60,6 +61,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 python3 scripts/check_roadmap_index.py
 python3 scripts/check_literature.py
 sh scripts/offline-gate.sh
+python3 scripts/test_caf_reference.py
 python3 scripts/test_aiff_reference.py
 python3 scripts/test_wave_reference.py
 python3 scripts/test_flac_user_corpus.py --mode rust --require-complete "$PRIVATE_FLAC_DIRECTORY"

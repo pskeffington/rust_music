@@ -8,6 +8,7 @@ use std::{
 };
 
 pub use rust_music_aiff::AiffDecoder;
+pub use rust_music_caf::CafDecoder;
 pub use rust_music_core::{AudioFormat, Decoder, MusicError, NullSink, PcmBlock, PcmSink, Result};
 pub use rust_music_engine::{PlaybackSnapshot, PlaybackState, Player};
 pub use rust_music_flac::{FlacDecoder, StreamInfo};
@@ -27,11 +28,13 @@ pub fn open_file(path: impl AsRef<Path>) -> Result<Box<dyn Decoder>> {
         && (&head[8..12] == b"AIFF" || &head[8..12] == b"AIFC")
     {
         Ok(Box::new(AiffDecoder::new(input)?))
+    } else if head.starts_with(b"caff") {
+        Ok(Box::new(CafDecoder::new(input)?))
     } else if head.len() >= 8 && &head[4..8] == b"ftyp" {
         Ok(Box::new(Mp4AlacDecoder::new(input)?))
     } else {
         Err(MusicError::Unsupported(
-            "audiophile-only input: native FLAC, integer PCM WAV, uncompressed AIFF/AIFF-C or supported ALAC M4A",
+            "audiophile-only input: native FLAC, integer PCM WAV, uncompressed AIFF/AIFF-C, supported CAF, or ALAC M4A",
         ))
     }
 }
@@ -83,6 +86,25 @@ mod tests {
         }
     }
 
+    fn synthetic_caf_pcm() -> Vec<u8> {
+        let mut bytes = b"caff\x00\x01\x00\x00".to_vec();
+        let mut description = 44_100f64.to_bits().to_be_bytes().to_vec();
+        description.extend_from_slice(b"lpcm");
+        description.extend_from_slice(&0u32.to_be_bytes());
+        description.extend_from_slice(&2u32.to_be_bytes());
+        description.extend_from_slice(&1u32.to_be_bytes());
+        description.extend_from_slice(&1u32.to_be_bytes());
+        description.extend_from_slice(&16u32.to_be_bytes());
+        bytes.extend_from_slice(b"desc");
+        bytes.extend_from_slice(&(description.len() as i64).to_be_bytes());
+        bytes.extend_from_slice(&description);
+        let data = [0, 0, 0, 0, 0x80, 0, 0x7f, 0xff];
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&(data.len() as i64).to_be_bytes());
+        bytes.extend_from_slice(&data);
+        bytes
+    }
+
     #[test]
     fn rejects_unsupported_signatures_by_content_even_with_flac_suffix() {
         let temp = Temp::new();
@@ -124,5 +146,18 @@ mod tests {
             "../../rust-music-mp4/tests/fixtures/generated_aac.m4a"
         ));
         assert!(matches!(open_file(path), Err(MusicError::Unsupported(_))));
+    }
+
+    #[test]
+    fn opens_caf_by_content_even_with_a_different_extension() {
+        let temp = Temp::new();
+        let path = temp.write_named(&synthetic_caf_pcm());
+        let mut decoder = open_file(path).unwrap();
+        assert_eq!(decoder.format(), AudioFormat::new(44_100, 1, 16).unwrap());
+        assert_eq!(
+            decoder.next_block().unwrap().unwrap().samples,
+            [i16::MIN as i32, i16::MAX as i32]
+        );
+        assert!(decoder.next_block().unwrap().is_none());
     }
 }

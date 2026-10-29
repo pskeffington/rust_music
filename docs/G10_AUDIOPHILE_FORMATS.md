@@ -18,7 +18,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
 | .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
 | .m4a | ALAC | Bounded M4A/MP4 profile passes generated 24-bit exact PCM parity; raw packets separately pass generated 16/24/32-bit and stereo-matrix parity. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broad real-world M4A corpus and CAF remain open; do not claim general ALAC production admission | AAC in identical container prohibited |
-| .caf | ALAC or verified integer PCM | Planned | Reject other CAF codecs |
+| .caf | ALAC or signed integer LPCM | Bounded profile passes generated FFmpeg-encoded CAF parity: ALAC 16/24-bit and LPCM 16/24/32-bit; strict cookie, packet-table, chunk-bound and codec checks; no OS decoder fallback. Broad real-world CAF corpus and host/output validation remain open | Mono/stereo only; reject AAC, ADPCM, float PCM and unsupported channel layouts |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
 | RF64/BWF .wav | Extended large-file PCM | Planned | ds64 and exact bounds required |
 | .oga / .ogg | Ogg FLAC mapping | Later | Reject Vorbis and Opus |
@@ -44,6 +44,7 @@ Python-stdlib-only generated reference vectors cover uncompressed AIFF and AIFF-
 
     python3 scripts/test_aiff_reference.py --fixtures-only
     python3 scripts/test_aiff_reference.py
+    python3 scripts/test_caf_reference.py
     sh scripts/offline-gate.sh
     python3 scripts/test_flac_user_corpus.py --mode rust --require-complete /private/music
 
@@ -64,8 +65,7 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 
 ## Next priorities
 
-1. Own CAF ALAC/lpcm demux, no OS codec fallback.
-2. Expand ALAC/M4A parity over independently generated depths and a real-world corpus; retain strict AAC/DRM denial.
+1. Expand ALAC parity over independently generated depths and a real-world M4A/CAF corpus; retain strict AAC/DRM denial.
 3. Bounded metadata, safe cover art exclusion from the tiny framebuffer, exact seek.
 4. Hardware output negotiation, anti-resampling checks, bit-perfect DAC loopback and shared Radio/TV focus.
 5. Add WavPack lossless, RF64, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests.
@@ -76,6 +76,7 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 - McGill AIFF/AIFF-C format survey: https://www-mmsp.ece.mcgill.ca/MMSP/Documents/AudioFormats/AIFF/AIFF.html
 - IETF RFC 9639 FLAC: https://www.rfc-editor.org/rfc/rfc9639
 - Apple CAF specification: https://developer.apple.com/library/archive/documentation/MusicAudio/Reference/CAFSpec/CAF_spec/CAF_spec.html
+- Apple Core Audio channel-layout tags: https://developer.apple.com/documentation/coreaudiotypes/audio-channel-layout-tags
 - Apple Audio File Types: https://developer.apple.com/documentation/audiotoolbox/1576497-audio-file-types
 - WavPack lossless/hybrid rules: https://www.wavpack.com/wavpack_doc.html
 

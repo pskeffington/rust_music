@@ -25,4 +25,17 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 
 ## Latest verified checkpoint (2026-10-29)
 
-The PR head `b8c7de527fa3c0cfb95a33000a3e71f51df842e5` plus the current local worktree changes passed `sh scripts/offline-gate.sh` on Rust/Cargo 1.99.1/macOS. The gate passed the 12-crate/21-edge dependency audit, rustfmt, Clippy with warnings denied, workspace tests, release build and macOS feature check. Generated FLAC/WAVE/AIFF PCM parity passes are recorded in their gate ledgers. The host regression verifies that a sink-open failure releases the host focus lease. On 2026-10-29, all six supplied private FLAC files passed combined reference and native Rust validation; their recordings remain outside Git. Actual shared Rust_Boy/Pip-Boy focus and panel integration, and physical output, remain unverified; keep PR #1 draft.
+Branch `build/native-codecs-g0`, latest recorded local commit `ac36449` plus
+the current RM-010 worktree changes. Rust/Cargo 1.99.1/macOS:
+`sh scripts/offline-gate.sh` exited 0 on 15 local crates and 28 path-only
+edges, with zero registry/Git crates and zero third-party system links. Fmt,
+warnings-denied Clippy, workspace tests, release build and macOS feature check
+passed. The optional `python3 scripts/test_caf_reference.py` exited 0 on five
+FFmpeg-generated exact-PCM vectors (CAF LPCM 16/24/32 and ALAC 16/24); this
+does not make FFmpeg a runtime dependency. Roadmap/literature validators and
+`git diff --check` pass. Generated FLAC/WAVE/AIFF parity and six private FLAC
+reference/native parity remain recorded in their ledgers; private audio stays
+outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual
+Rust_Boy/Pip-Boy shared focus and input routing, physical panel/output and
+device acceptance remain unverified. Keep PR #1 draft and do not modify sibling
+repositories under the current goal.

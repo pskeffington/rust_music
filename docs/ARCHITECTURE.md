@@ -14,15 +14,16 @@ rust-music-flac        native RFC 9639 decoder: STREAMINFO, CRC, fixed/LPC, Rice
 rust-music-aiff        native uncompressed AIFF / PCM AIFF-C FORM + COMM + SSND reader
 rust-music-alac        bounded ALAC cookie/raw-packet decoder; generated 16/24/32-bit and stereo-matrix compressed PCM parity, no container demux; ALAC remains unadmitted
 rust-music-mp4         bounded M4A/MP4 ALAC-only demux; generated 24-bit M4A parity; AAC/DRM and unsupported layouts fail closed
+rust-music-caf         bounded CAF ALAC and signed mono/stereo LPCM demux; generated CAF/ALAC and PCM parity, unsupported codec/layout fails closed
 rust-music-wave        native PCM RIFF/WAVE parser and bounded frame decoder
 rust-music-engine      explicit Load -> Ready -> Play -> Step -> Finish/Stop state machine
 rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shims
 rust-music             public façade: content sniffing + host integration exports
 rust-music-cli         scan / inspect / PCM WAVE export / PBM preview / optional output
 rust-music-audit       offline dependency and native-link policy checks
-rust-music-library     explicit bounded local directory scan
+rust-music-library     explicit bounded local directory scan for FLAC/WAVE/AIFF/CAF signatures
 rust-music-host        exclusive host audio lease and pop-in control API
-rust-music-panel       128x64 1-bit local glyph renderer and button mapping
+rust-music-panel       128x64 1-bit local glyph renderer and button mapping, including CAF label
 ```
 
 **State:** `load()` never auto-opens an output device. `play()` must only occur after Rust_Boy grants audio focus; `step()` must execute off the UI thread. Music and Radio/TV must not claim devices simultaneously. The shell has one slot for a Music module; there are no menu sidebars, background scanners, or network requirements.
@@ -32,7 +33,7 @@ rust-music-panel       128x64 1-bit local glyph renderer and button mapping
 ```text
 explicit local File open
   -> bounded container parser
-  -> own FLAC/WAVE/AIFF/ALAC-M4A decoder on non-real-time worker
+  -> own FLAC/WAVE/AIFF/ALAC-M4A/CAF decoder on non-real-time worker
   -> interleaved signed i32 exact integer PCM blocks
   -> optional local output sink (platform API, no codec)
   -> hardware / USB DAC
@@ -49,7 +50,7 @@ Decoder blocks preserve original signed sample values. 8-bit unsigned WAVE is no
 - Source `total_samples` and sequential frame/sample numbers checked; nonzero STREAMINFO MD5 is verified against the complete signed interleaved decoded PCM at EOF. An all-zero STREAMINFO MD5 means **unknown**, not verified. Seektable random access remains an outstanding gate.
 - STREAMINFO's MD5 detects accidental mismatch, not malicious tampering or provenance. CRC16 protects each frame before samples are offered to the sink; complete-file MD5 validation only occurs at EOF, so physical playback may already have started before a file-level mismatch is discovered. A strict host should preflight the full file before granting audio focus.
 - Metadata is bounded both per-block (16 MiB) and in aggregate (64 MiB). Frame/sample number continuity and canonical encoded numbers are checked.
-- No Ogg FLAC mapping. The narrow generated M4A/ALAC profile is implemented, but broad ALAC format admission awaits real-world corpus coverage and CAF demux.
+- No Ogg FLAC mapping. Generated ALAC M4A and CAF paths are implemented; broad ALAC admission awaits real-world corpus coverage. CAF currently supports signed mono/stereo LPCM and ALAC, with unsupported channel layouts rejected.
 
 ## Audiophile-only input policy (G10)
 

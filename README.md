@@ -25,10 +25,10 @@ unverified.
 - **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, stereo decorrelation, frame-number continuity, full-file decoded PCM MD5 when provided. Seven generated CLI vectors and six private real-world tracks pass native PCM/integrity checks; the private corpus remains outside Git.
 - **WAVE PCM decoder**: strict RIFF boundaries, odd-chunk padding, 8/16/24/32-bit integer PCM, and PCM WAVE_FORMAT_EXTENSIBLE (including 24-bit samples stored left-aligned in 32-bit containers); six generated native CLI vectors pass exact PCM parity.
 - **AIFF / AIFF-C integer PCM decoder (G10)**: locally authored crate with strict FORM/COMM/SSND bounds, exact 80-bit sample rate and 8/16/24/32-bit PCM, plus signed NONE/twos/sowt; local native CLI PCM parity 7/7 and offline workspace gate pass; hardware validation remains pending.
-- **Audiophile-only playback**: lossless native decoders; minimum playable 16-bit / 44.1 kHz. Lower-resolution inputs remain usable only in decoder conformance tests and are rejected before native DAC activation. MP3, AAC, Opus, Vorbis and other lossy codecs are excluded. A bounded ALAC M4A profile passes generated 24-bit parity and rejects AAC/DRM; broader M4A corpus, CAF and production admission remain open.
+- **Audiophile-only playback**: lossless native decoders; minimum playable 16-bit / 44.1 kHz. Lower-resolution inputs remain usable only in decoder conformance tests and are rejected before native DAC activation. MP3, AAC, Opus, Vorbis and other lossy codecs are excluded. Bounded ALAC M4A and CAF profiles pass generated exact PCM parity; AAC/DRM, unsupported codecs and custom CAF channel layouts fail closed. Broader real-world ALAC corpus coverage and production admission remain open.
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and *direct Linux ALSA kernel ioctl* (`alsa-output`) adapters. No libasound, mixer plugin, or audio server. Neither is yet hardware validated as bit-perfect.
-- **Local music library**: bounded, explicit directory scan; FLAC/WAV/AIFF signature detection, stable filename ordering, symlink rejection and no background scanner.
+- **Local music library**: bounded, explicit directory scan; FLAC/WAV/AIFF/CAF signature detection, stable filename ordering, symlink rejection and no background scanner.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
 - **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
@@ -51,6 +51,7 @@ python3 scripts/test_wave_reference.py --fixtures-only  # OPTIONAL, stdlib-only 
 python3 scripts/test_wave_reference.py                  # OPTIONAL, full WAVE PCM round-trip; needs cargo
 python3 scripts/test_aiff_reference.py --fixtures-only  # OPTIONAL, stdlib-only AIFF/AIFF-C vectors
 python3 scripts/test_aiff_reference.py                  # OPTIONAL, Rust native AIFF PCM parity; needs cargo
+python3 scripts/test_caf_reference.py                   # OPTIONAL, FFmpeg-generated CAF PCM parity; needs ffmpeg + cargo
 cargo run --locked --offline -p rust-music-cli -- scan ~/Music
 cargo run --locked --offline -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run --locked --offline -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
@@ -60,7 +61,7 @@ cargo run --locked --offline -p rust-music-cli --features macos-output -- play ~
 cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/Music/track.flac hw:0,0
 ```
 
-All **14 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE and AIFF vectors and six private real-world FLAC tracks pass native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
+All **15 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF and CAF vectors and six private real-world FLAC tracks pass native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
 
 ## Module and research guide
 
@@ -88,7 +89,7 @@ All **14 workspace crates** are locally authored and have zero third-party Cargo
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
 
-**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. Generated `FLAC -> WAV`, WAVE and AIFF parity and physical sample-path testing are separate gates. ALAC/M4A, CAF, RF64, Ogg FLAC, WavPack, native DSD, Windows WASAPI, and Android AAudio are not yet supported. The local offline gate and six private FLAC decoder parity checks pass; host arbitration and physical DAC acceptance remain open. A filename extension is never proof of losslessness; the scanner only makes a provisional signature-based catalog and the player enforces codec/quality checks before playback.
+**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. Generated `FLAC -> WAV`, WAVE, AIFF and bounded M4A/CAF PCM parity and physical sample-path testing are separate gates. Broad ALAC admission, RF64, Ogg FLAC, WavPack, native DSD, Windows WASAPI, and Android AAudio remain unsupported. The local offline gate and six private FLAC decoder parity checks pass; host arbitration and physical DAC acceptance remain open. A filename extension is never proof of losslessness; the scanner only makes a provisional signature-based catalog and the player enforces codec/quality checks before playback.
 
 **Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 previously reported `startup_failure` with no jobs scheduled. The local offline build and generated-vector PCM parity pass; all six private tracks passed the combined reference/native PCM corpus run. No current CI result, host integration, or physical bit-perfect output is inferred.
 
