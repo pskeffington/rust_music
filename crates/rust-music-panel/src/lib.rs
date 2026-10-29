@@ -170,6 +170,9 @@ pub fn render(view: PanelView<'_>) -> MonoFrame {
         Some(AudioContainer::Caf) => {
             frame.text(99, 28, "CAF", 3);
         }
+        Some(AudioContainer::Mp4) => {
+            frame.text(99, 28, "M4A", 3);
+        }
         None => {}
     }
     // Show exact sample-derived elapsed/duration clocks only when declared.
@@ -371,11 +374,19 @@ mod tests {
         status.has_audio_focus = true;
         status.selection = Some(usize::MAX);
         status.tracks = usize::MAX;
-        let frame = render(PanelView {
+        let view = PanelView {
             status,
             title: Some(&"A".repeat(200)),
-            container: Some(AudioContainer::Flac),
-        });
+            container: Some(AudioContainer::Mp4),
+        };
+        let frame = render(view);
+        assert_ne!(
+            frame,
+            render(PanelView {
+                container: None,
+                ..view
+            })
+        );
         assert_eq!(frame.pixels().len(), BYTES);
     }
 

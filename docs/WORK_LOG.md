@@ -246,3 +246,31 @@ shared Radio/TV/Music focus arbiter.
 
 Pip-Boy adapter registration, user-authorized playback intents, shared focus,
 worker scheduling, actual display wiring, and hardware audio remain unverified.
+
+## 2026-10-29 — RM-017 M4A catalog ingestion and Internet Archive ALAC corpus
+
+Added `.m4a` and `.mp4` extension plus `ftyp` signature recognition to the
+bounded library scanner, and an `M4A` label to the fixed panel. Container
+cataloging is intentionally separate from codec admission: the facade still
+opens only its supported ALAC profile and refuses AAC. Added two small M4A
+files from Internet Archive's `musopen-chopin` item; the item page records
+CC0 1.0 and Musopen's Chopin campaign FAQ independently states CC0 for its
+commissioned recordings. Source URL, file names, observed streams, and SHA-256
+hashes are kept beside the fixtures. No unrelated or user-supplied recordings
+were added.
+
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, exact PCM parity on both
+  Archive.org M4As: stereo 24-bit/48 kHz and stereo 16-bit/44.1 kHz. The
+  harness verifies fixture hashes/codecs, exercises `.m4a` scanner ingestion,
+  and confirms its AAC negative fixture fails decoder admission. FFmpeg and
+  ffprobe are local test tools only.
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 workspace crates, 28 local
+  dependency edges, zero registry/Git dependencies, formatting, warnings-denied
+  Clippy, all workspace tests, optimized build and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, `cargo fmt --all -- --check`, and
+  `git diff --check`: **pass**.
+
+This is two samples from one collection, not broad independent-encoder ALAC
+coverage. CAF real-world corpus, Pip-Boy host registration/shared audio focus,
+panel hardware, and physical DAC acceptance remain open.

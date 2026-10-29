@@ -83,14 +83,15 @@
     {
       "id": "alac-m4a",
       "extensions": [
-        ".m4a"
+        ".m4a",
+        ".mp4"
       ],
       "container": "MP4/M4A",
       "accepted_codecs": [
         "ALAC"
       ],
       "stage": "native-source-implemented",
-      "verification": "generated-m4a-alac-24bit-exact-pcm-parity; aac-drm-wrong-codec-external-reference-and-malformed-bounds-rejected; broad-corpus-and-caf-pending",
+      "verification": "generated-m4a-alac-24bit-and-internet-archive-16bit-44k1-plus-24bit-48k-exact-pcm-parity; m4a-mp4-ftyp-library-ingestion; aac-drm-wrong-codec-external-reference-and-malformed-bounds-rejected; broader-corpus-and-caf-pending",
       "gate": "G11",
       "refuse_codecs": [
         "AAC",

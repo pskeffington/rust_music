@@ -27,12 +27,12 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | WAVE integer PCM and RIFF | `crates/rust-music-wave/` | `codec_engineer` | G7 |
 | AIFF/AIFF-C signed PCM | `crates/rust-music-aiff/` | `codec_engineer` | G10 |
 | ALAC raw-packet decoder and synthetic vectors | `crates/rust-music-alac/`, `crates/rust-music-alac/tests/fixtures/` | `codec_engineer` | G11 (16/24/32-bit plus stereo-matrix parity; not admitted; malformed coverage and demux remain) |
-| M4A/MP4 ALAC-only demux and synthetic files | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/` | `codec_engineer` | G11 / RM-009 (bounded profile; generated 24-bit parity; AAC/DRM denial; broader corpus and CAF remain) |
+| M4A/MP4 ALAC-only demux and corpus | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/`, `scripts/test_m4a_corpus.py` | `codec_engineer` | G11 / RM-009, RM-017 (bounded demux; generated and CC0 corpus parity; AAC/DRM denial) |
 | CAF ALAC and LPCM demux | `crates/rust-music-caf/`, `scripts/test_caf_reference.py` | `codec_engineer` | G11 / RM-010 (bounded mono/stereo profile; generated ALAC 16/24 and LPCM 16/24/32 exact PCM parity; custom layouts/codecs denied) |
 | Playback state/progress | `crates/rust-music-engine/` | `codec_engineer` | G1 / G9 |
 | OS DAC adapters | `crates/rust-music-native/` | `audio_backend` | G3 |
 | Public facade, sniffing | `crates/rust-music/` | serial handoff | G1 / G10 / G11 |
-| CLI / acceptance harness | `crates/rust-music-cli/`, `scripts/test_caf_reference.py` | serial handoff | G7 / G8 / G10 / G11 |
+| CLI / acceptance harness | `crates/rust-music-cli/`, `scripts/test_caf_reference.py`, `scripts/test_m4a_corpus.py` | serial handoff | G7 / G8 / G10 / G11 |
 | Workspace dependency auditor | `crates/rust-music-audit/` | `gate_verifier` reviews | G0 |
 | Directory scanner | `crates/rust-music-library/` | `host_integrator` | G5 / G11 |
 | Music socket and audio lease | `crates/rust-music-host/` | `host_integrator` | G5 |

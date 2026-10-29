@@ -31,7 +31,7 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 - `codec_engineer` handles own FLAC/WAVE/AIFF and future ALAC/CAF/MP4/WavPack decoders, with `safety_reviewer` inspecting codec confusion and bounds.
 - `audio_backend` owns native PCM output and the physical evidence ladder; `host_integrator` owns the music socket, library and panel. Each must separately verify source ABI vs actual hardware behavior.
 - `index_curator` reconciles evidence and routing, but **must not** promote gate outcomes just because a source commit landed.
-- Current evidence: `RM-001`, `RM-002`, and `RM-008` through `RM-010` have source/build/parity evidence recorded in the roadmap. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on device/host integration; under this goal, sibling repositories stay read-only. Broad ALAC admission remains open pending real-world corpus coverage.
+- Current evidence: `RM-001`, `RM-002`, and `RM-008` through `RM-010`, plus `RM-017` M4A ingestion/upstream corpus parity, have source/build/parity evidence recorded in the roadmap. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on device/host integration; under this goal, sibling repositories stay read-only. Broad ALAC admission remains open pending wider real-world source/encoder coverage.
 
 ## Codex kickoff prompt
 

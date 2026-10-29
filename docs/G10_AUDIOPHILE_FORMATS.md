@@ -17,7 +17,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Six generated native CLI vectors pass PCM parity; physical output pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
 | .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
 | .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
-| .m4a | ALAC | Bounded M4A/MP4 profile passes generated 24-bit exact PCM parity; raw packets separately pass generated 16/24/32-bit and stereo-matrix parity. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broad real-world M4A corpus and CAF remain open; do not claim general ALAC production admission | AAC in identical container prohibited |
+| .m4a / .mp4 | MP4 containing ALAC | Bounded profile passes generated parity and two Internet Archive CC0 M4A files (16-bit/44.1 kHz and 24-bit/48 kHz) with exact PCM parity against FFmpeg; scanner indexes `.m4a`/`.mp4` by `ftyp`, while codec admission stays in the decoder. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broader ALAC/CAF corpus remains open | AAC in identical container prohibited |
 | .caf | ALAC or signed integer LPCM | Bounded profile passes generated FFmpeg-encoded CAF parity: ALAC 16/24-bit and LPCM 16/24/32-bit; strict cookie, packet-table, chunk-bound and codec checks; no OS decoder fallback. Broad real-world CAF corpus and host/output validation remain open | Mono/stereo only; reject AAC, ADPCM, float PCM and unsupported channel layouts |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
 | RF64/BWF .wav | Extended large-file PCM | Planned | ds64 and exact bounds required |
@@ -45,6 +45,7 @@ Python-stdlib-only generated reference vectors cover uncompressed AIFF and AIFF-
     python3 scripts/test_aiff_reference.py --fixtures-only
     python3 scripts/test_aiff_reference.py
     python3 scripts/test_caf_reference.py
+    python3 scripts/test_m4a_corpus.py
     sh scripts/offline-gate.sh
     python3 scripts/test_flac_user_corpus.py --mode rust --require-complete /private/music
 

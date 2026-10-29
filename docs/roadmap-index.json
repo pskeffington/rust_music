@@ -228,7 +228,7 @@
       "title": "ALAC decoder and M4A/CAF demultiplexers",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Raw ALAC parity, M4A AAC/DRM denial, and five generated CAF ALAC/LPCM parity vectors pass; broader real-world ALAC corpus evidence remains before broad format admission",
+      "next_evidence": "Raw ALAC parity, generated M4A parity plus two Internet Archive ALAC corpus cases, M4A scanner ingestion/AAC denial, and five generated CAF ALAC/LPCM parity vectors pass; broader ALAC source/encoder, CAF, and host/output validation remain",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -565,6 +565,28 @@
       "create_paths": [],
       "acceptance": "python3 scripts/check_roadmap_index.py and python3 scripts/check_literature.py pass offline without extra Python packages",
       "blocker": "None; roadmap, literature and format registries pass their offline consistency checks"
+    },
+    {
+      "id": "RM-017",
+      "gate": "G11",
+      "title": "Index M4A/MP4 in library and validate Archive.org ALAC corpus",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "done",
+      "depends_on": [
+        "RM-009"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/src/lib.rs",
+        "crates/rust-music-panel/src/lib.rs",
+        "crates/rust-music-mp4/tests/fixtures/upstream/README.md",
+        "scripts/test_m4a_corpus.py",
+        "docs/lossless-formats.json"
+      ],
+      "create_paths": [],
+      "acceptance": "Bounded library scan recognizes .m4a/.mp4 by ftyp and panel labels M4A; two licensed Archive.org ALAC fixtures at 16/44.1 and 24/48 pass exact PCM parity against FFmpeg; AAC remains rejected; fixture hashes and license provenance are recorded",
+      "blocker": "Acceptance passed locally: two Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (16-bit/44.1 kHz and 24-bit/48 kHz); scan ingests MP4-family containers and AAC decoder refusal passed. Wider independent source/encoder coverage remains an ALAC admission qualification"
     }
   ]
 }

@@ -21,9 +21,9 @@ rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shim
 rust-music             public façade: content sniffing + host integration exports
 rust-music-cli         scan / inspect / PCM WAVE export / PBM preview / optional output
 rust-music-audit       offline dependency and native-link policy checks
-rust-music-library     explicit bounded local directory scan for FLAC/WAVE/AIFF/CAF signatures
+rust-music-library     explicit bounded local directory scan for FLAC/WAVE/AIFF/CAF/MP4 signatures
 rust-music-host        exclusive host audio lease and pop-in control API
-rust-music-panel       128x64 1-bit local glyph renderer and button mapping, including CAF label
+rust-music-panel       128x64 1-bit local glyph renderer and button mapping, including CAF/M4A labels
 ```
 
 **State:** `load()` never auto-opens an output device. `play()` must only occur after Rust_Boy grants audio focus; `step()` must execute off the UI thread. Music and Radio/TV must not claim devices simultaneously. The shell has one slot for a Music module; there are no menu sidebars, background scanners, or network requirements.

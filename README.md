@@ -28,10 +28,10 @@ unverified.
 - **Audiophile-only playback**: lossless native decoders; minimum playable 16-bit / 44.1 kHz. Lower-resolution inputs remain usable only in decoder conformance tests and are rejected before native DAC activation. MP3, AAC, Opus, Vorbis and other lossy codecs are excluded. Bounded ALAC M4A and CAF profiles pass generated exact PCM parity; AAC/DRM, unsupported codecs and custom CAF channel layouts fail closed. Broader real-world ALAC corpus coverage and production admission remain open.
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and *direct Linux ALSA kernel ioctl* (`alsa-output`) adapters. No libasound, mixer plugin, or audio server. Neither is yet hardware validated as bit-perfect.
-- **Local music library**: bounded, explicit directory scan; FLAC/WAV/AIFF/CAF signature detection, stable filename ordering, symlink rejection and no background scanner.
+- **Local music library**: bounded, explicit directory scan; FLAC/WAV/AIFF/CAF/M4A/MP4 signature detection, stable filename ordering, symlink rejection and no background scanner. MP4-family container detection does not imply codec admission; AAC remains rejected by the decoder.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
-- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
+- **Development CLI**: bounded library scan, inspect full-file decode, lossless source to WAV, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
@@ -52,6 +52,7 @@ python3 scripts/test_wave_reference.py                  # OPTIONAL, full WAVE PC
 python3 scripts/test_aiff_reference.py --fixtures-only  # OPTIONAL, stdlib-only AIFF/AIFF-C vectors
 python3 scripts/test_aiff_reference.py                  # OPTIONAL, Rust native AIFF PCM parity; needs cargo
 python3 scripts/test_caf_reference.py                   # OPTIONAL, FFmpeg-generated CAF PCM parity; needs ffmpeg + cargo
+python3 scripts/test_m4a_corpus.py                      # OPTIONAL, CC0 ALAC M4A corpus parity/ingestion; needs ffmpeg + ffprobe + cargo
 cargo run --locked --offline -p rust-music-cli -- scan ~/Music
 cargo run --locked --offline -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run --locked --offline -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
