@@ -11,6 +11,7 @@ Check each gate with an actual assertion, report or hardware test. A repository 
 | **G4** Expanded lossless | Own AIFF/ALAC + MP4/M4A or CAF demux, RF64, optional seek support; extend G7 PCM-WAVE work | independent PCM golden parity + malformed chunk tests | Planned |
 | **G5** Rust_Boy micro integration | app slot, commands, playlist/index, compact CRT panel and host audio-focus arbiter; WASAPI/AAudio ports | drop-in install/unload; cross-module exclusive audio focus; Android/Windows targets | Source slot and G6 bitmap panel implemented; host deployment, real arbitration and other OS ports unverified |
 | **G6** Tiny display | locally authored 1 KiB micro-panel | deterministic bitmap render and hardware host display | Source implemented; integration pending |
+| **G8** Real-world FLAC corpus | Six private files, public hash-only vectors, exact reference PCM parity, offline own-decoder replay | 6/6 FLAC/FFmpeg parity verified; Rust CLI parity blocked by absent cargo |
 | **G7** Strict WAV PCM interoperability | RIFF bound checks, odd padding, extensible PCM and exact export | offline WAV reference vectors, real Cargo PCM parity, hardware follow-up | Source implemented; six fixtures pass; Cargo and hardware pending |
 
 ## Immediate priorities
@@ -46,3 +47,7 @@ All Cargo dependencies must be local path edges. No third-party native sound lib
 ## G7 addendum - strict WAV and extensible PCM
 
 See [G7 conformance ledger](G7_RIFF_CONFORMANCE.md). Legacy PCM and WAVE_FORMAT_EXTENSIBLE PCM now have source implementations with declared RIFF bounds and pad validation. Six stdlib reference fixtures passed; compiled decoder parity, Rustfmt/Clippy and physical DAC validation remain pending. RF64 and exact speaker-mask routing are separate future gates.
+
+## G8 addendum - user-provided FLAC regression
+
+See [G8 corpus ledger](G8_REALWORLD_FLAC_CORPUS.md). Six real 44.1kHz/16-bit stereo FLAC files with SEEKTABLE, VORBIS_COMMENT and PICTURE metadata passed reference checksum and PCM parity. No recordings are committed. Running `scripts/test_flac_user_corpus.py --mode rust` on a provisioned offline Rust toolchain is an explicit acceptance requirement; reference-only results do not certify the internal decoder.

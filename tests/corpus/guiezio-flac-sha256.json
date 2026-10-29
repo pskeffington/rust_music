@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-29",
+  "license_note": "Private user-supplied recordings; audio content not redistributed. Only non-reconstructive integrity digests and technical descriptors are stored.",
+  "pcm_encoding": "signed little-endian interleaved 16-bit PCM (s16le)",
+  "cases": [
+    {
+      "id": "L1",
+      "flac_sha256": "33b14cfa0b65461ebbeb9b0199833087723c23a610c34c33dda9f21b65351555",
+      "flac_size_bytes": 3836026,
+      "pcm_s16le_sha256": "c80fb05179c0f6aee3112cb3a6943725c67aedb11a5875516bfdad39ec70b509",
+      "pcm_bytes": 11927964,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 2981991,
+      "streaminfo_pcm_md5": "78414bead5ab54256ec949331b86b9f8",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "L2",
+      "flac_sha256": "21371c1aa2fe137233d24bf7b5dc64e27f42b8c18f817b7fef30c1b086bbde82",
+      "flac_size_bytes": 11239886,
+      "pcm_s16le_sha256": "c929ad44c1a029675750f68c73d9b9b35458334f5e80210a6bee0accf7174ced",
+      "pcm_bytes": 24925392,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 6231348,
+      "streaminfo_pcm_md5": "dfb43e4c8d8478b021e475624456b0c8",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "L3",
+      "flac_sha256": "47370ef0d1c2117bc8839f4c533674fb741fd5528c1142362c5894052194c05d",
+      "flac_size_bytes": 3482121,
+      "pcm_s16le_sha256": "57f581bfc98b6f77f942377aa0aafae2fd64682bf5d1f1713e0f9167e1fecebb",
+      "pcm_bytes": 7770096,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 1942524,
+      "streaminfo_pcm_md5": "b41ed3a0ff225ff06fc70d9358417ec6",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "G4",
+      "flac_sha256": "6dd7b61cf99a72a2698fd19260b339979acf6412e94708f313d870a62b808cfa",
+      "flac_size_bytes": 15801340,
+      "pcm_s16le_sha256": "64a920a6e2a093baaef276969eac103ef431439a185c4bf438a35ab5871734eb",
+      "pcm_bytes": 34160244,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 8540061,
+      "streaminfo_pcm_md5": "de0e0884180dbe2ccece0dd881f087e6",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "G5",
+      "flac_sha256": "f704b3b63120489c66565093f6d7b24656fca061d6267adb98632b21e9b80de7",
+      "flac_size_bytes": 5130940,
+      "pcm_s16le_sha256": "64b2a2d133368da1629ad13c01ff68926db1cb32961b45ecfc07ddc8a97795cc",
+      "pcm_bytes": 12814892,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 3203723,
+      "streaminfo_pcm_md5": "17b07f393e54981369373b992aa3b406",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "G6",
+      "flac_sha256": "314671c24439a3e603f645ffd3543fecb41282e03edc530fd33b950493457c96",
+      "flac_size_bytes": 5975108,
+      "pcm_s16le_sha256": "d785d87f5490d8114addd4dc8cb8f90617805656ad1f68fd32ee4ff23540d1f1",
+      "pcm_bytes": 17646680,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "bits_per_sample": 16,
+      "total_samples_per_channel": 4411670,
+      "streaminfo_pcm_md5": "9e1fadb45eeae8e46132ad6ca8cebd23",
+      "metadata_types": [
+        0,
+        3,
+        4,
+        6
+      ]
+    }
+  ]
+}

@@ -41,6 +41,8 @@ cargo test --locked --offline --workspace
 python3 scripts/check_literature.py  # optional research maintenance
 python3 scripts/test_flac_reference.py --fixtures-only  # OPTIONAL external reference validation
 python3 scripts/test_flac_reference.py                  # OPTIONAL differential oracle, needs flac + cargo
+python3 scripts/test_flac_user_corpus.py --mode oracle --require-complete /private/music  # OPTIONAL private real-audio oracle
+python3 scripts/test_flac_user_corpus.py --mode rust --require-complete /private/music    # OFFLINE own decoder parity; needs cargo
 python3 scripts/test_wave_reference.py --fixtures-only  # OPTIONAL, stdlib-only WAVE fixtures
 python3 scripts/test_wave_reference.py                  # OPTIONAL, full WAVE PCM round-trip; needs cargo
 cargo run --locked --offline -p rust-music-cli -- scan ~/Music
@@ -64,6 +66,7 @@ All **11 workspace crates** are locally authored and have zero third-party Cargo
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
 - [G6 independent micro panel, controls, and validation](docs/G6_MICRO_PANEL.md)
 - [G7 strict RIFF/WAVE PCM implementation and validation ledger](docs/G7_RIFF_CONFORMANCE.md)
+- [G8 real-world FLAC corpus (checksums only; private audio not committed)](docs/G8_REALWORLD_FLAC_CORPUS.md)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
