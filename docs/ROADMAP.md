@@ -14,6 +14,8 @@ Check each gate with an actual assertion, report or hardware test. A repository 
 | **G8** Real-world FLAC corpus | Six private files, public hash-only vectors, exact reference PCM parity, offline own-decoder replay | 6/6 FLAC/FFmpeg parity verified; Rust CLI parity blocked by absent cargo |
 | **G7** Strict WAV PCM interoperability | RIFF bound checks, odd padding, extensible PCM and exact export | offline WAV reference vectors, real Cargo PCM parity, hardware follow-up | Source implemented; six fixtures pass; Cargo and hardware pending |
 
+| **G9** Exact sample-derived timing | Declared PCM frame count, playback progress, compact micro-screen clock | Offline compilation/tests + corpus parity + display review | Source implemented; compilation and physical screen unverified |
+
 ## Immediate priorities
 
 1. Run `sh scripts/offline-gate.sh` on an offline Rust 1.85+ machine (cargo/rustfmt/clippy preinstalled). The optional GitHub job must use an operator-owned offline runner. Prior hosted CI runs had `startup_failure`; no compilation result can be inferred.
