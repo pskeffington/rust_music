@@ -274,3 +274,18 @@ were added.
 This is two samples from one collection, not broad independent-encoder ALAC
 coverage. CAF real-world corpus, Pip-Boy host registration/shared audio focus,
 panel hardware, and physical DAC acceptance remain open.
+
+## 2026-10-29 — RM-017 Archive.org corpus expansion
+
+Expanded the checked-in M4A corpus from two to four CC0 tracks by adding two
+small ALAC files from the same Internet Archive `musopen-chopin` collection.
+The provenance ledger records the upstream names, observed codec profiles,
+and hashes. The corpus now exercises one 24-bit/48 kHz stream and three
+16-bit/44.1 kHz streams; all four remain from one source/encoder collection,
+so this adds real-world sample/table coverage without claiming independent
+encoder compatibility.
+
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, 4/4 exact PCM parity cases;
+  M4A ingestion and AAC decode refusal pass.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
