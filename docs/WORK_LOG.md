@@ -4,6 +4,27 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-29 — RM-014 bounded entropy word sequencing
+
+Added a stateful bounded WavPack mono/stereo word stage around the existing
+median residual decoder. It resolves the paired unary-count state, bounded
+escape prefixes, interleaved channel sequence, and zero-run reset. Per-word
+and whole-frame-batch failures restore decoder state and bit cursor; frame
+requests above the block limit fail before allocation. Synthetic tests cover
+mono pair behavior, zero-run continuation, escape counts, rollback, and
+stereo interleave with distinct channel medians. The existing FFmpeg
+synthetic mono block now traverses exactly all 882 residual words. This is
+residual-stream traversal only: no real stereo stream, decorrelation,
+reconstructed PCM, audio CRC or PCM parity is asserted, and WavPack remains
+unregistered.
+
+**Observed checks:** `cargo test --locked --offline -p rust-music-wavpack`
+passed 27/27. The full `sh scripts/offline-gate.sh` exited 0 across 16 local
+crates and 29 path-only edges. Roadmap and literature validators and
+`git diff --check` passed. Read-only review confirmed the stereo/interleave
+and multi-frame rollback findings were closed, while confirming this remains
+residual-level evidence only.
+
 ## 2026-10-29 — RM-014 median-zone and residual primitives
 
 Added `MedianChannel`, which selects the recursive Golomb interval from an

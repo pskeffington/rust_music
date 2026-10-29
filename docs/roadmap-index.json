@@ -529,7 +529,7 @@
       ],
       "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "Bounded block framing, entropy-variable parsing, adjusted-binary vectors, adaptive median-zone selection, and atomic single-residual decoding now exist, but the crate is not exposed by the facade. Unary/pair/run sequencing, sample reconstruction/CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
+      "blocker": "Bounded block framing, entropy-variable parsing, adjusted-binary vectors, adaptive median-zone selection, and bounded mono/stereo residual word sequencing now exist; one FFmpeg-generated mono fixture traverses all declared residuals and a distinct-median stereo vector exercises channel interleave. The crate is not exposed by the facade. Real stereo residual evidence, decorrelation/sample reconstruction, CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
     },
     {
       "id": "RM-015",

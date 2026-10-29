@@ -313,6 +313,172 @@ impl MedianChannel {
     }
 }
 
+/// Stateful entropy word decoder for a WavPack mono/stereo block.
+/// De-correlation and block CRC validation are separate decoder stages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WordDecoder {
+    channels: u8,
+    medians: [MedianChannel; 2],
+    holding_one: bool,
+    holding_zero: bool,
+    zeros_remaining: u32,
+    decoded_words: u32,
+}
+
+impl WordDecoder {
+    pub fn new(entropy: EntropyVariables) -> Result<Self> {
+        if !(1..=2).contains(&entropy.channels) {
+            return Err(MusicError::Unsupported(
+                "WavPack word decoder requires mono or stereo",
+            ));
+        }
+        Ok(Self {
+            channels: entropy.channels,
+            medians: [
+                MedianChannel::new(entropy.medians[0]),
+                MedianChannel::new(entropy.medians[1]),
+            ],
+            holding_one: false,
+            holding_zero: false,
+            zeros_remaining: 0,
+            decoded_words: 0,
+        })
+    }
+
+    /// Decode exactly `frame_count` interleaved residual frames, bounded by
+    /// the block-header sample limit. This stage does not reconstruct PCM.
+    pub fn decode_frames(
+        &mut self,
+        bits: &mut BitReader<'_>,
+        frame_count: u32,
+    ) -> Result<Vec<i32>> {
+        if frame_count > MAX_BLOCK_SAMPLES {
+            return Err(MusicError::Limit(
+                "WavPack word frame count exceeds block limit",
+            ));
+        }
+        let word_count = usize::try_from(frame_count)
+            .ok()
+            .and_then(|frames| frames.checked_mul(usize::from(self.channels)))
+            .ok_or(MusicError::Limit("WavPack word count overflows"))?;
+        let original = *self;
+        let original_bit_offset = bits.bit_offset;
+        let mut words = Vec::with_capacity(word_count);
+        for _ in 0..word_count {
+            match self.decode_word(bits) {
+                Ok(word) => words.push(word),
+                Err(error) => {
+                    *self = original;
+                    bits.bit_offset = original_bit_offset;
+                    return Err(error);
+                }
+            }
+        }
+        Ok(words)
+    }
+
+    pub fn decoded_words(&self) -> u32 {
+        self.decoded_words
+    }
+
+    fn decode_word(&mut self, bits: &mut BitReader<'_>) -> Result<i32> {
+        let original = *self;
+        let original_bit_offset = bits.bit_offset;
+        let decoded = self.decode_word_inner(bits);
+        match decoded {
+            Ok(word) => {
+                if let Some(next) = self.decoded_words.checked_add(1) {
+                    self.decoded_words = next;
+                    Ok(word)
+                } else {
+                    *self = original;
+                    bits.bit_offset = original_bit_offset;
+                    Err(MusicError::Limit("WavPack decoded word count overflows"))
+                }
+            }
+            Err(error) => {
+                *self = original;
+                bits.bit_offset = original_bit_offset;
+                Err(error)
+            }
+        }
+    }
+
+    fn decode_word_inner(&mut self, bits: &mut BitReader<'_>) -> Result<i32> {
+        let channel = (self.decoded_words % u32::from(self.channels)) as usize;
+        if !self.holding_zero
+            && !self.holding_one
+            && self
+                .medians
+                .iter()
+                .take(usize::from(self.channels))
+                .all(|median| median.values[0] & !1 == 0)
+        {
+            if self.zeros_remaining != 0 {
+                self.zeros_remaining -= 1;
+                if self.zeros_remaining != 0 {
+                    return Ok(0);
+                }
+            } else {
+                let run_length = read_zero_run(bits)?;
+                if run_length != 0 {
+                    self.zeros_remaining = run_length;
+                    self.medians = [MedianChannel::new([0; 3]); 2];
+                    return Ok(0);
+                }
+            }
+        }
+
+        let ones_count = if self.holding_zero {
+            self.holding_zero = false;
+            0
+        } else {
+            let encoded_count = read_encoded_ones_count(bits)?;
+            let ones_count = if self.holding_one {
+                self.holding_one = encoded_count & 1 != 0;
+                (encoded_count >> 1) + 1
+            } else {
+                self.holding_one = encoded_count & 1 != 0;
+                encoded_count >> 1
+            };
+            self.holding_zero = !self.holding_one;
+            ones_count
+        };
+
+        self.medians[channel].decode_residual(bits, ones_count)
+    }
+}
+
+fn read_zero_run(bits: &mut BitReader<'_>) -> Result<u32> {
+    let prefix = bits.read_unary_ones(32)?;
+    if prefix < 2 {
+        Ok(prefix)
+    } else {
+        let width = (prefix - 1) as u8;
+        let suffix = bits.read_bits(width)?;
+        Ok((1u32 << width) | suffix)
+    }
+}
+
+fn read_encoded_ones_count(bits: &mut BitReader<'_>) -> Result<u32> {
+    const MAX_UNARY_PREFIX: u32 = 16;
+    let prefix = bits.read_unary_ones(MAX_UNARY_PREFIX)?;
+    if prefix < MAX_UNARY_PREFIX {
+        Ok(prefix)
+    } else {
+        let escape = bits.read_unary_ones(32)?;
+        let count = if escape < 2 {
+            escape
+        } else {
+            let width = (escape - 1) as u8;
+            (1u32 << width) | bits.read_bits(width)?
+        };
+        count
+            .checked_add(MAX_UNARY_PREFIX)
+            .ok_or(MusicError::Limit("WavPack escaped unary count overflows"))
+    }
+}
+
 /// Iterate through every metadata sub-block in one complete WavPack block.
 /// The iterator borrows the input and does not allocate or retain payloads.
 pub struct MetadataIter<'a> {
@@ -670,6 +836,13 @@ mod tests {
         let entropy = parse_entropy_variables(metadata[3].data, 1).unwrap();
         assert_eq!(entropy.channels, 1);
         assert_eq!(entropy.medians, [[79, 62, 229], [0; 3]]);
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        let mut bits = BitReader::new(metadata[4].data);
+        let residuals = decoder
+            .decode_frames(&mut bits, header.block_samples)
+            .unwrap();
+        assert_eq!(residuals.len(), header.block_samples as usize);
+        assert_eq!(decoder.decoded_words(), header.block_samples);
     }
 
     fn sequence_header(index: u32, samples: u32, total: u32, flags: u32) -> BlockHeader {
@@ -942,6 +1115,77 @@ mod tests {
             Err(MusicError::Limit("WavPack entropy median update overflows"))
         ));
         assert_eq!(medians, original);
+    }
+
+    #[test]
+    fn word_decoder_translates_paired_unary_counts_and_decodes_mono_words() {
+        let entropy = parse_entropy_variables(&[0x4e, 0x07, 0xf4, 0x06, 0xd8, 0x08], 1).unwrap();
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        let encoded = stream_bits("0000000");
+        let mut bits = BitReader::new(&encoded);
+        assert_eq!(decoder.decode_frames(&mut bits, 2).unwrap(), [0, 0]);
+        assert_eq!(decoder.decoded_words(), 2);
+        assert!(decoder
+            .decode_frames(&mut bits, MAX_BLOCK_SAMPLES + 1)
+            .is_err());
+    }
+
+    #[test]
+    fn word_decoder_interleaves_stereo_channels_with_separate_medians() {
+        let entropy = EntropyVariables {
+            medians: [[79, 62, 229], [160, 96, 512]],
+            channels: 2,
+        };
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        // Channel 1's first word is 5; subsequent words exercise the shared
+        // paired-unary state while the channels adapt different medians.
+        let encoded = stream_bits("0000101001100000000");
+        let mut bits = BitReader::new(&encoded);
+        assert_eq!(decoder.decode_frames(&mut bits, 2).unwrap(), [0, 5, 5, 0]);
+    }
+
+    #[test]
+    fn word_decoder_frame_failure_rolls_back_prior_words_in_the_call() {
+        let entropy = parse_entropy_variables(&[0x4e, 0x07, 0xf4, 0x06, 0xd8, 0x08], 1).unwrap();
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        let original = decoder;
+        let encoded = stream_bits("11100000");
+        let mut bits = BitReader::new(&encoded);
+        bits.read_bits(3).unwrap();
+        assert!(decoder.decode_frames(&mut bits, 2).is_err());
+        assert_eq!(decoder, original);
+        assert_eq!(bits.remaining_bits(), 5);
+    }
+
+    #[test]
+    fn word_decoder_handles_zero_runs_and_resumes_word_stream() {
+        let entropy = EntropyVariables {
+            medians: [[0; 3]; 2],
+            channels: 1,
+        };
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        let encoded = stream_bits("110100");
+        let mut bits = BitReader::new(&encoded);
+        assert_eq!(decoder.decode_frames(&mut bits, 3).unwrap(), [0, 0, 0]);
+        assert_eq!(decoder.decode_frames(&mut bits, 1).unwrap(), [0]);
+    }
+
+    #[test]
+    fn word_decoder_escape_prefix_and_truncation_are_bounded_and_atomic() {
+        let escaped = format!("{}01101", "1".repeat(16));
+        let escaped = stream_bits(&escaped);
+        let mut bits = BitReader::new(&escaped);
+        assert_eq!(read_encoded_ones_count(&mut bits).unwrap(), 19);
+
+        let entropy = parse_entropy_variables(&[0x4e, 0x07, 0xf4, 0x06, 0xd8, 0x08], 1).unwrap();
+        let mut decoder = WordDecoder::new(entropy).unwrap();
+        let original = decoder;
+        let encoded = stream_bits("00000011");
+        let mut bits = BitReader::new(&encoded);
+        bits.read_bits(6).unwrap();
+        assert!(decoder.decode_frames(&mut bits, 1).is_err());
+        assert_eq!(decoder, original);
+        assert_eq!(bits.remaining_bits(), 2);
     }
 
     #[test]
