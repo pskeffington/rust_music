@@ -11,6 +11,7 @@ The source tree is MIT licensed. Specifications and comparison projects are cite
 ```text
 rust-music-core        integer PCM, decoder/sink traits, typed errors, null test sink
 rust-music-flac        native RFC 9639 decoder: STREAMINFO, CRC, fixed/LPC, Rice, channel stereo
+rust-music-aiff        native uncompressed AIFF / PCM AIFF-C FORM + COMM + SSND reader
 rust-music-wave        native PCM RIFF/WAVE parser and bounded frame decoder
 rust-music-engine      explicit Load -> Ready -> Play -> Step -> Finish/Stop state machine
 rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shims
@@ -29,7 +30,7 @@ rust-music-panel       128x64 1-bit local glyph renderer and button mapping
 ```text
 explicit local File open
   -> bounded container parser
-  -> own FLAC/WAVE decoder on non-real-time worker
+  -> own FLAC/WAVE/AIFF decoder on non-real-time worker
   -> interleaved signed i32 exact integer PCM blocks
   -> optional local output sink (platform API, no codec)
   -> hardware / USB DAC
@@ -47,6 +48,12 @@ Decoder blocks preserve original signed sample values. 8-bit unsigned WAVE is no
 - STREAMINFO's MD5 detects accidental mismatch, not malicious tampering or provenance. CRC16 protects each frame before samples are offered to the sink; complete-file MD5 validation only occurs at EOF, so physical playback may already have started before a file-level mismatch is discovered. A strict host should preflight the full file before granting audio focus.
 - Metadata is bounded both per-block (16 MiB) and in aggregate (64 MiB). Frame/sample number continuity and canonical encoded numbers are checked.
 - No Ogg FLAC mapping at this stage; no MP4/M4A or ALAC marked supported.
+
+## Audiophile-only input policy (G10)
+
+The playback engine admits only lossless PCM sources meeting a minimum of **16 bits / 44,100 Hz**, checked before opening an output device. The lower-resolution 8-bit/low-rate decoder tests are intentionally retained as conformance vectors but cannot pass Player::load. Codec detection follows file content, not extensions; M4A/MP4 AAC is not accepted as ALAC. No upsampling or conversion is claimed to restore fidelity. Source quality and hardware bit-perfect output remain separate concerns.
+
+Native AIFF and uncompressed AIFF-C integer PCM are now implemented in an independent, bounded module, with 80-bit exact integer-Hz clock parsing and strict SSND frame-count validation. Decoder compilation and differential parity remain pending, and the library's signature-only scan is provisional. See [G10 format policy](G10_AUDIOPHILE_FORMATS.md).
 
 ## Output adapters and capability honesty
 
@@ -73,6 +80,7 @@ are **not** represented until supported by actual parsers and tests.
 - Streaming, DRM, licensed-store media, ads, or trackers.
 - Automatic network library scanning, microphone permissions, and cloud account code.
 - Synthetic upsampling, equalization, gain correction or crossfade in strict listening mode.
+- Lossy decoder stacks or fallback transcoding (MP3/AAC/Opus/Vorbis).
 - Native encoding of new FLAC or ALAC files; decoding is first priority.
 
 ## Local-only build and FFI policy
