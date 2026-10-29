@@ -14,7 +14,7 @@ The `rust-music-host` crate is a **standalone, framework-free interface** for lo
 
 Implement `AudioFocus` in **Rust_Boy's shared, single-owner audio arbiter**. `try_acquire_music()` must return an exclusive `Box<dyn AudioLease>` only when TV, Radio and every other output module are not using the device. A lease's `Drop` must release the shared claim, even after errors, dropped modules, or interrupted playback. Do not implement a private arbiter in the music module: it would not protect Radio or TV.
 
-The music slot retains the lease until `Stop`, track selection, EOF, output failure or module Drop. Repeated `Play` while already playing does nothing (it does not create a second stream). A denied focus request leaves the loaded decoder in `Ready` for a later explicit Play.
+The music slot retains the lease until `Stop`, track selection, EOF, output failure or module Drop. Repeated `Play` while already playing does nothing (it does not create a second stream). A denied focus request leaves the loaded decoder in `Ready` for a later explicit Play. Lossy or unsupported inputs, and PCM below 16-bit/44.1 kHz, are rejected during decoder initialization/Player::load before taking the audio-focus lease or opening a DAC. The signature-only music catalog is provisional.
 
 ### Example host contract (schematic Rust)
 
