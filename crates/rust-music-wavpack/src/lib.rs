@@ -10,6 +10,7 @@ pub const MAX_BLOCK_BYTES: usize = 1024 * 1024;
 pub const MAX_BLOCK_SAMPLES: u32 = 131_072;
 const HEADER_BYTES: usize = 32;
 const MAX_BIT_READ: u8 = 32;
+const EXP2_1_256_Q32: u64 = 4_306_612_134;
 
 const FLAG_MONO: u32 = 1 << 2;
 const FLAG_HYBRID: u32 = 1 << 3;
@@ -137,6 +138,59 @@ pub struct MetadataBlock<'a> {
     pub id: u8,
     pub optional: bool,
     pub data: &'a [u8],
+}
+
+/// Initial median values carried by WavPack's entropy-variable metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntropyVariables {
+    /// Three adaptive median partitions for each encoded channel.
+    pub medians: [[u32; 3]; 2],
+    pub channels: u8,
+}
+
+/// Parse the mandatory 6-byte mono or 12-byte stereo entropy metadata.
+/// The signed-log representation is expanded with fixed-point integer math.
+pub fn parse_entropy_variables(data: &[u8], channels: u8) -> Result<EntropyVariables> {
+    let expected = match channels {
+        1 => 6,
+        2 => 12,
+        _ => {
+            return Err(MusicError::Unsupported(
+                "WavPack entropy requires mono or stereo",
+            ))
+        }
+    };
+    if data.len() != expected {
+        return Err(MusicError::Invalid(
+            "WavPack entropy-variable metadata has the wrong length",
+        ));
+    }
+    let mut medians = [[0; 3]; 2];
+    for (index, chunk) in data.chunks_exact(2).enumerate() {
+        let encoded = u16::from_le_bytes([chunk[0], chunk[1]]);
+        medians[index / 3][index % 3] = expand_log_median(encoded)?;
+    }
+    Ok(EntropyVariables { medians, channels })
+}
+
+fn expand_log_median(encoded: u16) -> Result<u32> {
+    let exponent = u32::from(encoded >> 8);
+    if exponent > 31 {
+        return Err(MusicError::Limit(
+            "WavPack entropy median exceeds 32-bit decoder range",
+        ));
+    }
+    let mut fraction = 1u128 << 32;
+    for _ in 0..u32::from(encoded as u8) {
+        fraction = (fraction * u128::from(EXP2_1_256_Q32) + (1u128 << 31)) >> 32;
+    }
+    let base = ((fraction + (1u128 << 23)) >> 24) as u32;
+    let value = if exponent <= 9 {
+        base >> (9 - exponent)
+    } else {
+        base.wrapping_shl(exponent - 9)
+    };
+    Ok(value)
 }
 
 /// Iterate through every metadata sub-block in one complete WavPack block.
@@ -447,6 +501,10 @@ mod tests {
             [2, 3, 4, 5, 10]
         );
         assert!(metadata.iter().all(|entry| !entry.optional));
+
+        let entropy = parse_entropy_variables(metadata[3].data, 1).unwrap();
+        assert_eq!(entropy.channels, 1);
+        assert_eq!(entropy.medians, [[79, 62, 229], [0; 3]]);
     }
 
     fn sequence_header(index: u32, samples: u32, total: u32, flags: u32) -> BlockHeader {
@@ -626,6 +684,40 @@ mod tests {
 
         assert!(parse_metadata(&[0x80, 0xff, 0xff, 0xff]).is_err());
         assert!(parse_metadata(&[0x40, 0]).is_err());
+    }
+
+    #[test]
+    fn entropy_variables_require_exact_mono_or_stereo_layouts() {
+        assert!(matches!(
+            parse_entropy_variables(&[0; 5], 1),
+            Err(MusicError::Invalid(
+                "WavPack entropy-variable metadata has the wrong length"
+            ))
+        ));
+        assert!(matches!(
+            parse_entropy_variables(&[0; 6], 3),
+            Err(MusicError::Unsupported(
+                "WavPack entropy requires mono or stereo"
+            ))
+        ));
+        let stereo = parse_entropy_variables(
+            &[
+                0x4e, 0x07, 0xf4, 0x06, 0xd8, 0x08, 0x4e, 0x07, 0xf4, 0x06, 0xd8, 0x08,
+            ],
+            2,
+        )
+        .unwrap();
+        assert_eq!(stereo.medians, [[79, 62, 229], [79, 62, 229]]);
+    }
+
+    #[test]
+    fn entropy_medians_outside_integer_range_are_rejected() {
+        assert!(matches!(
+            parse_entropy_variables(&[0, 0x20, 0, 0, 0, 0], 1),
+            Err(MusicError::Limit(
+                "WavPack entropy median exceeds 32-bit decoder range"
+            ))
+        ));
     }
 
     #[test]
