@@ -533,4 +533,28 @@ mod tests {
         assert_eq!(slot.status().playback.state, PlaybackState::Stopped);
         assert_eq!(slot.sink().opened, None);
     }
+
+    #[test]
+    fn replacing_catalog_stops_audio_preserves_matching_selection_and_never_autoplays() {
+        let initial = Temp::new();
+        initial.wav("a.wav");
+        initial.wav("b.wav");
+        let reordered = Temp::new();
+        reordered.wav("b.wav");
+
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), initial.scan());
+        slot.handle(Command::Next, &focus).unwrap(); // Select b.wav.
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        let replaced = slot.replace_library(reordered.scan()).unwrap();
+        assert_eq!(replaced.tracks, 1);
+        assert_eq!(replaced.selection, Some(0)); // Same relative path.
+        assert_eq!(replaced.playback.state, PlaybackState::Stopped);
+        assert!(!replaced.has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(slot.sink().opened, None);
+        assert_eq!(slot.sink().frames_written, 0);
+    }
 }

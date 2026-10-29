@@ -417,6 +417,21 @@ remain absent.
 - `git diff --check`: **pass**.
 - Official format reference: [WavPack 4 & 5 Binary File / Block Format](https://www.wavpack.com/WavPack5FileFormat.pdf).
 
+## 2026-10-29 — G5 catalog replacement lifecycle regression
+
+Added a host-slot regression for replacing a catalog while Music holds the
+mock shared-audio lease. It verifies that the old stream stops and closes, the
+lease is released, a still-present relative selection follows its track to a
+new index, and replacement leaves playback stopped. This covers Music's local
+module lifecycle boundary; it does not establish Pip-Boy/Radio/TV arbitration.
+
+- `cargo test --locked --offline -p rust-music-host`: **exit 0**, 9/9 unit
+  tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 local
+  dependency edges, formatting, warnings-denied Clippy, workspace tests,
+  release build, and macOS feature check passed.
+- `git diff --check`: **pass**.
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:
