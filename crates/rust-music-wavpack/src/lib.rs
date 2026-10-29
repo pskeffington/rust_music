@@ -138,6 +138,49 @@ pub struct MetadataBlock<'a> {
     pub data: &'a [u8],
 }
 
+/// Iterate through every metadata sub-block in one complete WavPack block.
+/// The iterator borrows the input and does not allocate or retain payloads.
+pub struct MetadataIter<'a> {
+    payload: &'a [u8],
+    offset: usize,
+    failed: bool,
+}
+
+impl<'a> Iterator for MetadataIter<'a> {
+    type Item = Result<MetadataBlock<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.failed || self.offset == self.payload.len() {
+            return None;
+        }
+        match parse_metadata(&self.payload[self.offset..]) {
+            Ok((metadata, used)) => {
+                self.offset += used;
+                Some(Ok(metadata))
+            }
+            Err(error) => {
+                self.failed = true;
+                Some(Err(error))
+            }
+        }
+    }
+}
+
+/// Create a zero-copy metadata iterator for one complete, bounded WavPack block.
+pub fn iter_metadata(block: &[u8]) -> Result<MetadataIter<'_>> {
+    let header = BlockHeader::parse(block)?;
+    if block.len() != header.block_bytes {
+        return Err(MusicError::Invalid(
+            "WavPack metadata iterator requires exactly one complete block",
+        ));
+    }
+    Ok(MetadataIter {
+        payload: &block[HEADER_BYTES..],
+        offset: 0,
+        failed: false,
+    })
+}
+
 /// Parse one bounded metadata sub-block from a WavPack audio-block payload.
 /// Metadata lengths are stored in 16-bit words and data is padded to even size.
 pub fn parse_metadata(input: &[u8]) -> Result<(MetadataBlock<'_>, usize)> {
@@ -247,16 +290,36 @@ mod tests {
         assert_eq!(header.channels(), 1);
         header.validate_integer_mono_stereo().unwrap();
 
-        let mut cursor = HEADER_BYTES;
-        let mut metadata_blocks = 0;
-        while cursor < block.len() {
-            let (_, used) = parse_metadata(&block[cursor..]).unwrap();
-            assert!(used >= 2);
-            cursor += used;
-            metadata_blocks += 1;
-        }
-        assert_eq!(cursor, block.len());
-        assert!(metadata_blocks >= 2);
+        let metadata = iter_metadata(&block)
+            .unwrap()
+            .map(|entry| entry.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            metadata.iter().map(|entry| entry.id).collect::<Vec<_>>(),
+            [2, 3, 4, 5, 10]
+        );
+        assert!(metadata.iter().all(|entry| !entry.optional));
+    }
+
+    #[test]
+    fn metadata_iterator_rejects_trailing_and_truncated_subblocks() {
+        let mut complete = block(1, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
+        complete[4..8].copy_from_slice(&28u32.to_le_bytes());
+        complete.extend_from_slice(&[0x02, 1, 0x55, 0x00]);
+        assert_eq!(iter_metadata(&complete).unwrap().count(), 1);
+
+        let mut truncated = complete.clone();
+        truncated[4..8].copy_from_slice(&27u32.to_le_bytes());
+        truncated.pop();
+        let mut metadata = iter_metadata(&truncated).unwrap();
+        assert!(matches!(metadata.next(), Some(Err(MusicError::Invalid(_)))));
+        assert!(metadata.next().is_none());
+
+        complete.push(0xff);
+        assert!(matches!(
+            iter_metadata(&complete),
+            Err(MusicError::Invalid(_))
+        ));
     }
 
     #[test]

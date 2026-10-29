@@ -478,6 +478,21 @@ Fixture generation, SHA-256, and scope limits are recorded alongside the file.
   release build, and macOS feature check passed.
 - `git diff --check`: **pass**.
 
+## 2026-10-29 — RM-014 zero-copy block metadata iteration
+
+Added a borrowed iterator that validates one complete WavPack block and walks
+its metadata sub-blocks without allocating or copying their payloads. A
+malformed entry yields one error and terminates iteration; a block-size
+mismatch, including trailing bytes, is rejected up front. The generated
+FFmpeg stream test now asserts the observed core metadata sequence.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 9/9 unit
+  tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 path-only
+  dependency edges, formatting, warnings-denied Clippy, workspace tests,
+  release build, and macOS feature check passed.
+- `git diff --check`: **pass**.
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:
