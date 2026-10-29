@@ -53,6 +53,11 @@ impl<S: PcmSink> Player<S> {
     pub fn sink(&self) -> &S { &self.sink }
 
     pub fn load(&mut self, decoder: Box<dyn Decoder>) -> Result<()> {
+        if !decoder.format().meets_audiophile_floor() {
+            return Err(MusicError::Unsupported(
+                "audiophile-only playback requires lossless PCM at least 16-bit / 44.1 kHz"
+            ));
+        }
         self.stop()?;
         self.decoder = Some(decoder);
         self.snapshot.generation = self.snapshot.generation.wrapping_add(1);
@@ -191,6 +196,15 @@ mod tests {
         assert_eq!(snap.duration_seconds(), None);
         snap.total_frames = Some(0);
         assert_eq!(snap.progress_per_mille(), None);
+    }
+    #[test]
+    fn lower_quality_pcm_cannot_be_loaded_or_open_the_dac() {
+        let format = AudioFormat::new(8_000, 1, 8).unwrap();
+        let mut player = Player::new(NullSink::default());
+        assert!(matches!(player.load(Box::new(OneBlock { format, step: 0 })),
+            Err(MusicError::Unsupported(_))));
+        assert_eq!(player.status().state, PlaybackState::Empty);
+        assert!(player.sink().opened.is_none());
     }
     #[test]
     fn changing_format_fails_before_output() {
