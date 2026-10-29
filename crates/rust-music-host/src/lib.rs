@@ -284,6 +284,26 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FailWriteSink {
+        finish_attempts: usize,
+        opened: Option<rust_music::AudioFormat>,
+    }
+    impl PcmSink for FailWriteSink {
+        fn open(&mut self, format: rust_music::AudioFormat) -> Result<()> {
+            self.opened = Some(format);
+            Ok(())
+        }
+        fn write(&mut self, _block: &rust_music::PcmBlock) -> Result<()> {
+            Err(MusicError::Output("injected device-write failure".into()))
+        }
+        fn finish(&mut self) -> Result<()> {
+            self.finish_attempts += 1;
+            self.opened = None;
+            Ok(())
+        }
+    }
+
     struct Temp(PathBuf);
     impl Temp {
         fn new() -> Self {
@@ -483,6 +503,26 @@ mod tests {
         assert_eq!(slot.status().playback.state, PlaybackState::Failed);
         assert!(!slot.status().has_audio_focus);
         assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn device_write_failure_releases_the_host_focus_lease() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(FailWriteSink::default(), temp.scan());
+
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+        assert!(matches!(
+            slot.handle(Command::Poll, &focus),
+            Err(MusicError::Output(_))
+        ));
+        assert_eq!(slot.status().playback.state, PlaybackState::Failed);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(slot.sink().finish_attempts, 1);
+        assert_eq!(slot.sink().opened, None);
     }
 
     #[test]
