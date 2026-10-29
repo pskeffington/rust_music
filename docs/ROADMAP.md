@@ -8,8 +8,10 @@ Check each gate with an actual assertion, report or hardware test. A repository 
 | **G1** Integer PCM foundation | typed format, bounded block, WAV decoder, explicit player state, no autoplay | Unit tests and inspect WAV | Source implemented; offline Rust compilation pending |
 | **G2** Native FLAC decoder | STREAMINFO, full CRC, Rice/fixed/LPC, stereo, frame continuity, decoded-PCM MD5 | CLI FLAC->WAV full parity against reference plus IETF corpus | Integrity implementation added; Rust compile, corpus and physical device acceptance pending |
 | **G3** Output devices | own CoreAudio/AudioQueue and ALSA thin API adapters, true device matching and underrun recovery | macOS/Linux physical audio, USB DAC, device switch + bit-perfect loopback | Initial adapters; hardware unverified |
-| **G4** Expanded lossless | Own AIFF/ALAC + MP4/M4A or CAF demux, WAVE extensible and RF64, optional seek support | independent PCM golden parity + malformed chunk tests | Planned |
+| **G4** Expanded lossless | Own AIFF/ALAC + MP4/M4A or CAF demux, RF64, optional seek support; extend G7 PCM-WAVE work | independent PCM golden parity + malformed chunk tests | Planned |
 | **G5** Rust_Boy micro integration | app slot, commands, playlist/index, compact CRT panel and host audio-focus arbiter; WASAPI/AAudio ports | drop-in install/unload; cross-module exclusive audio focus; Android/Windows targets | Source slot and G6 bitmap panel implemented; host deployment, real arbitration and other OS ports unverified |
+| **G6** Tiny display | locally authored 1 KiB micro-panel | deterministic bitmap render and hardware host display | Source implemented; integration pending |
+| **G7** Strict WAV PCM interoperability | RIFF bound checks, odd padding, extensible PCM and exact export | offline WAV reference vectors, real Cargo PCM parity, hardware follow-up | Source implemented; six fixtures pass; Cargo and hardware pending |
 
 ## Immediate priorities
 
@@ -40,3 +42,7 @@ All Cargo dependencies must be local path edges. No third-party native sound lib
 - **Later passes:** true metadata/tag parser, duration/progress and seek, native
   output hardware qualification, ALAC/AIFF. Never claim these controls until
   backed by working implementation and tests.
+
+## G7 addendum - strict WAV and extensible PCM
+
+See [G7 conformance ledger](G7_RIFF_CONFORMANCE.md). Legacy PCM and WAVE_FORMAT_EXTENSIBLE PCM now have source implementations with declared RIFF bounds and pad validation. Six stdlib reference fixtures passed; compiled decoder parity, Rustfmt/Clippy and physical DAC validation remain pending. RF64 and exact speaker-mask routing are separate future gates.

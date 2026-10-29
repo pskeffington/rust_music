@@ -10,7 +10,6 @@ if ! command -v cargo >/dev/null 2>&1; then
     exit 3
 fi
 cargo run --locked --offline --quiet -p rust-music-audit -- .
-cargo fmt --all  # normalize locally, without downloading any formatter
 cargo fmt --all -- --check
 cargo clippy --locked --offline --workspace --all-targets -- -D warnings
 cargo test --locked --offline --workspace

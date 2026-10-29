@@ -23,7 +23,7 @@ those checks.
 ## Implemented foundation
 
 - **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, stereo decorrelation, frame-number continuity, full-file decoded PCM MD5 when provided. Corpus parity is **not yet certified**.
-- **WAVE PCM decoder**: 8/16/24/32-bit RIFF PCM with bounded streaming.
+- **WAVE PCM decoder**: strict RIFF boundaries, odd-chunk padding, 8/16/24/32-bit integer PCM, and PCM WAVE_FORMAT_EXTENSIBLE (including 24-bit samples stored left-aligned in 32-bit containers).
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and *direct Linux ALSA kernel ioctl* (`alsa-output`) adapters. No libasound, mixer plugin, or audio server. Neither is yet hardware validated as bit-perfect.
 - **Local music library**: bounded, explicit directory scan; FLAC/WAV signature detection, stable filename ordering, symlink rejection and no background scanner.
@@ -41,6 +41,8 @@ cargo test --locked --offline --workspace
 python3 scripts/check_literature.py  # optional research maintenance
 python3 scripts/test_flac_reference.py --fixtures-only  # OPTIONAL external reference validation
 python3 scripts/test_flac_reference.py                  # OPTIONAL differential oracle, needs flac + cargo
+python3 scripts/test_wave_reference.py --fixtures-only  # OPTIONAL, stdlib-only WAVE fixtures
+python3 scripts/test_wave_reference.py                  # OPTIONAL, full WAVE PCM round-trip; needs cargo
 cargo run --locked --offline -p rust-music-cli -- scan ~/Music
 cargo run --locked --offline -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run --locked --offline -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
@@ -61,11 +63,12 @@ All **11 workspace crates** are locally authored and have zero third-party Cargo
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
 - [G6 independent micro panel, controls, and validation](docs/G6_MICRO_PANEL.md)
+- [G7 strict RIFF/WAVE PCM implementation and validation ledger](docs/G7_RIFF_CONFORMANCE.md)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
 
-**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. `FLAC -> WAV` parity and physical sample-path testing are separate gates. ALAC/M4A, AIFF, Ogg FLAC, Windows WASAPI, and Android AAudio are not yet supported.
+**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. `FLAC -> WAV` parity and physical sample-path testing are separate gates. ALAC/M4A, AIFF, RF64, Ogg FLAC, Windows WASAPI, and Android AAudio are not yet supported.
 
 **Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 initially reported `startup_failure` with no jobs scheduled; Rust compilation and the full differential suite remain unverified until a runner successfully executes them.
 

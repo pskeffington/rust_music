@@ -2,23 +2,43 @@
 use rust_music::{open_file, AudioFormat, Decoder, MusicError, NullSink, Result};
 use std::{env, fs::File, io::{Seek, SeekFrom, Write}};
 
+const PCM_GUID: [u8; 16] = [1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71];
+
+fn riff_overhead(format: AudioFormat) -> u32 {
+    if format.channels > 2 { 60 } else { 36 }
+}
+
 fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -> Result<()> {
-    // Native FLAC may carry unusual bit depths; WAV uses whole bytes on disk.
     if !matches!(format.bits_per_sample, 8 | 16 | 24 | 32) {
         return Err(MusicError::Unsupported("WAV export supports 8/16/24/32-bit source"));
     }
     let bytes_per_frame = u32::from(format.channels) * u32::from(format.bits_per_sample / 8);
+    // RIFF size includes the one-byte pad after odd-length PCM data. The data
+    // chunk's length field itself remains the original unpadded byte count.
+    let riff_size = data_size.checked_add(riff_overhead(format))
+        .and_then(|size| size.checked_add(data_size & 1))
+        .ok_or(MusicError::Limit("WAV RIFF size exceeds 32-bit limit"))?;
     output.write_all(b"RIFF")?;
-    output.write_all(&(data_size + 36).to_le_bytes())?;
+    output.write_all(&riff_size.to_le_bytes())?;
     output.write_all(b"WAVEfmt ")?;
-    output.write_all(&16u32.to_le_bytes())?;
-    output.write_all(&1u16.to_le_bytes())?;
+    // More than two channels must use WAVE_FORMAT_EXTENSIBLE to avoid an
+    // ambiguous legacy PCM header. The channel mask is intentionally zero:
+    // our Decoder API carries no speaker-location metadata to invent.
+    let extensible = format.channels > 2;
+    output.write_all(&(if extensible { 40u32 } else { 16u32 }).to_le_bytes())?;
+    output.write_all(&(if extensible { 0xfffeu16 } else { 1u16 }).to_le_bytes())?;
     output.write_all(&u16::from(format.channels).to_le_bytes())?;
     output.write_all(&format.sample_rate.to_le_bytes())?;
     output.write_all(&format.sample_rate.checked_mul(bytes_per_frame)
         .ok_or(MusicError::Limit("WAV byte-rate overflow"))?.to_le_bytes())?;
     output.write_all(&(bytes_per_frame as u16).to_le_bytes())?;
     output.write_all(&u16::from(format.bits_per_sample).to_le_bytes())?;
+    if extensible {
+        output.write_all(&22u16.to_le_bytes())?;
+        output.write_all(&u16::from(format.bits_per_sample).to_le_bytes())?;
+        output.write_all(&0u32.to_le_bytes())?;
+        output.write_all(&PCM_GUID)?;
+    }
     output.write_all(b"data")?;
     output.write_all(&data_size.to_le_bytes())?;
     Ok(())
@@ -41,12 +61,17 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
                 _ => return Err(MusicError::Unsupported("unsupported integer PCM width")),
             }
         }
-        file.write_all(&bytes)?;
-        bytes_written = bytes_written.checked_add(bytes.len() as u64)
+        let total = bytes_written.checked_add(bytes.len() as u64)
             .ok_or(MusicError::Limit("WAV size counter overflow"))?;
-        if bytes_written > u64::from(u32::MAX - 36) {
+        // The worst case needs an odd-data padding byte as well as the header.
+        if total > u64::from(u32::MAX - riff_overhead(format) - 1) {
             return Err(MusicError::Limit("WAV RIFF size limit reached; use RF64 in future"));
         }
+        file.write_all(&bytes)?;
+        bytes_written = total;
+    }
+    if bytes_written & 1 != 0 {
+        file.write_all(&[0])?;
     }
     file.seek(SeekFrom::Start(0))?;
     write_header(&mut file, format, bytes_written as u32)?;
@@ -143,5 +168,39 @@ fn main() {
     if let Err(error) = run() {
         eprintln!("rust_music: {error}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header(format: AudioFormat, data_bytes: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_header(&mut out, format, data_bytes).unwrap();
+        out
+    }
+
+    #[test]
+    fn mono_eight_bit_odd_data_requires_riff_padding() {
+        let h = header(AudioFormat::new(44_100, 1, 8).unwrap(), 5);
+        assert_eq!(h.len(), 44);
+        assert_eq!(u32::from_le_bytes(h[4..8].try_into().unwrap()), 42);
+        assert_eq!(&h[36..40], b"data");
+        assert_eq!(u32::from_le_bytes(h[40..44].try_into().unwrap()), 5);
+    }
+
+    #[test]
+    fn six_channel_export_uses_extensible_integer_pcm() {
+        let h = header(AudioFormat::new(96_000, 6, 24).unwrap(), 18);
+        assert_eq!(h.len(), 68);
+        assert_eq!(u32::from_le_bytes(h[4..8].try_into().unwrap()), 78);
+        assert_eq!(&h[12..16], b"fmt ");
+        assert_eq!(u32::from_le_bytes(h[16..20].try_into().unwrap()), 40);
+        assert_eq!(u16::from_le_bytes(h[20..22].try_into().unwrap()), 0xfffe);
+        assert_eq!(u16::from_le_bytes(h[38..40].try_into().unwrap()), 24);
+        assert_eq!(u32::from_le_bytes(h[40..44].try_into().unwrap()), 0);
+        assert_eq!(&h[44..60], PCM_GUID.as_slice());
+        assert_eq!(&h[60..64], b"data");
     }
 }
