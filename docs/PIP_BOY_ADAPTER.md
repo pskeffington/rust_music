@@ -54,7 +54,8 @@ hosts that expose that exact display surface; it is not a `PackageView`.
 | `Activate`, `Resume`, `Resize` | Return a view from the current snapshot. Do not scan a directory, load a track, acquire focus, or start output. |
 | Authorized `play` intent with `media.audio` | Call `slot.handle(Command::Play, &audio_focus_bridge)`. `MusicSlot` loads first, then obtains its sole RAII lease through `AudioFocus::try_acquire_music()`, then starts output. If loading fails before lease acquisition, the host must release its pre-authorized media reservation when the intent returns an error. |
 | Authorized `stop` intent with `media.audio` | Issue `Command::Stop`; release focus even if native drain/close returns an error. |
-| `Suspend`, `Shutdown`, adapter drop | Stop playback and release the lease. Never leave a stream running in the background. |
+| `Suspend` / pop-out | Call `slot.suspend()`: stop output and release the lease while preserving the mounted Music instance, catalog, and selection. Popping back in does not autoplay; require a fresh Play intent. |
+| `Shutdown`, explicit unmount, adapter drop | Drop only the Music adapter/slot instance, stopping playback and releasing any lease. Do not remove or overwrite Radio or another module. |
 | Decoder `Poll` | Schedule on a worker, one bounded block at a time. Never run it on the UI/render thread or native audio callback. |
 | `Next`, `Previous`, `Select` | Deliver only through a host-reviewed user input path. They stop the current track and never autoplay. |
 | Settings | Ask the shell to open its existing Settings screen; Rust Music does not render a Settings substitute. |

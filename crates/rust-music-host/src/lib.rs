@@ -8,6 +8,10 @@
 use rust_music::{open_file, MusicError, PcmSink, PlaybackSnapshot, PlaybackState, Player, Result};
 use rust_music_library::Library;
 
+/// Stable Pip-Boy package identity. It is deliberately distinct from Radio's
+/// `org.rustboy.radio`; the host registers each module as its own package.
+pub const MUSIC_PACKAGE_ID: &str = "org.rustboy.music";
+
 /// Host-owned RAII lease. Its Drop implementation MUST release audio focus.
 /// Music never manufactures a lease or assumes that RADIO/TV is stopped.
 pub trait AudioLease: Send {}
@@ -83,6 +87,14 @@ impl<S: PcmSink> MusicSlot<S> {
             .and_then(|p| catalog.tracks().iter().position(|t| t.relative_path == p))
             .or_else(|| (!catalog.is_empty()).then_some(0));
         self.library = catalog;
+        Ok(self.status())
+    }
+
+    /// Relinquish foreground playback while keeping this module mounted.
+    /// Selection and catalog remain available; returning to Music does not
+    /// autoplay. The operator must issue a fresh `Play` after pop-in.
+    pub fn suspend(&mut self) -> Result<SlotSnapshot> {
+        self.stop()?;
         Ok(self.status())
     }
 
@@ -387,5 +399,34 @@ mod tests {
         slot.handle(Command::Play, &focus).unwrap();
         drop(slot);
         assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn package_identity_is_distinct_and_suspend_preserves_mounted_module() {
+        assert_eq!(MUSIC_PACKAGE_ID, "org.rustboy.music");
+        assert_ne!(MUSIC_PACKAGE_ID, "org.rustboy.radio");
+
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        temp.wav("b.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        slot.handle(Command::Next, &focus).unwrap();
+        assert_eq!(slot.status().selection, Some(1));
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        let suspended = slot.suspend().unwrap();
+        assert_eq!(suspended.tracks, 2);
+        assert_eq!(suspended.selection, Some(1));
+        assert_eq!(suspended.playback.state, PlaybackState::Stopped);
+        assert!(!suspended.has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+
+        // Pop-in resumes the same mounted/catalogued package but never autoplay.
+        assert_eq!(slot.status().tracks, 2);
+        assert_eq!(slot.status().selection, Some(1));
+        assert_eq!(slot.status().playback.state, PlaybackState::Stopped);
+        assert_eq!(slot.sink().opened, None);
     }
 }

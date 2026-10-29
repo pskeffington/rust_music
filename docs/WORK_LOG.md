@@ -224,3 +224,25 @@ chunk sizes, all truncated prefixes, and terminal unknown-sized `data`. CAF
 generated parity is not real-world corpus, host-focus or hardware acceptance;
 those remain open alongside broad M4A/ALAC corpus evidence and Rust_Boy/Pip-Boy
 audio-focus/input integration. The sibling repo was not modified.
+
+## 2026-10-29 — distinct Music package identity and suspend lifecycle
+
+Added the stable `org.rustboy.music` identity to the standalone host crate,
+explicitly distinct from `org.rustboy.radio`. `MusicSlot::suspend()` now stops
+output and releases the host lease while retaining the mounted slot, catalog,
+and selected track. Returning to the foreground does not autoplay; playback
+requires a fresh operator command. The API provides a safe Rust-side lifecycle
+boundary but does not register a package in Pip-Boy or implement Pip-Boy's
+shared Radio/TV/Music focus arbiter.
+
+- `cargo test --locked --offline -p rust-music-host`: **exit 0**, 6/6 tests,
+  including distinct IDs, pop-out lease release, retained selection/catalog,
+  and no autoplay on pop-in.
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 local crates, 28 path-only
+  edges, zero registry/Git crates, fmt, warnings-denied Clippy, workspace
+  tests, release build, and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`, `cargo fmt --all`, and
+  `git diff --check`: **pass**.
+
+Pip-Boy adapter registration, user-authorized playback intents, shared focus,
+worker scheduling, actual display wiring, and hardware audio remain unverified.

@@ -25,8 +25,8 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 
 ## Latest verified checkpoint (2026-10-29)
 
-Branch `build/native-codecs-g0`, latest recorded local commit `ac36449` plus
-the current RM-010 worktree changes. Rust/Cargo 1.99.1/macOS:
+Branch `build/native-codecs-g0`, latest recorded local commit `9cfdf26` plus
+the Music host lifecycle API. Rust/Cargo 1.99.1/macOS:
 `sh scripts/offline-gate.sh` exited 0 on 15 local crates and 28 path-only
 edges, with zero registry/Git crates and zero third-party system links. Fmt,
 warnings-denied Clippy, workspace tests, release build and macOS feature check

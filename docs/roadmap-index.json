@@ -179,8 +179,8 @@
       "id": "G5",
       "title": "Rust_Boy socket and shared audio-focus",
       "owner_agent": "host_integrator",
-      "status": "source_implemented",
-      "next_evidence": "Unit slot and a Pip-Boy bridge contract exist; host-side adapter, worker scheduling, shared Radio/TV/Music arbitration and field acceptance are still unverified",
+      "status": "partial_evidence",
+      "next_evidence": "Rust Music exports distinct org.rustboy.music identity and suspend/pop-out behavior preserving the mounted slot and selection; Pip-Boy adapter registration, user intents, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain unverified",
       "evidence_doc": "docs/HOST_CONTRACT.md"
     },
     {
@@ -368,7 +368,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
-      "blocker": "Pip-Boy has no Music package or verified MusicSlot/AudioFocus bridge; this goal permits read-only host inspection but not sibling-repository edits"
+      "blocker": "Rust Music now exposes stable org.rustboy.music identity and explicit suspend/pop-out behavior with retained module state. Pip-Boy registration, protocol adapter, user-authorized playback intent, shared Radio/TV/Music audio arbiter, and host acceptance are still absent; active goal permits read-only sibling-repository inspection only"
     },
     {
       "id": "RM-007",

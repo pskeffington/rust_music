@@ -19,7 +19,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | **G2** | Native FLAC with CRC, Rice/LPC, PCM MD5 | `codec_engineer` | partial evidence | Seven generated vectors and six private real-world tracks pass native PCM parity; wider codec/hardware claims remain separate |
 | **G3** | Mac AudioQueue / Linux kernel PCM output | `audio_backend` | source implemented | Source present; DAC format, drain and underrun measurement pending |
 | **G4** | Expanded lossless umbrella | `codec_engineer` | partial evidence | AIFF, generated M4A/ALAC, and bounded CAF profiles are implemented; broader ALAC admission remains |
-| **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | source implemented | Unit slot and Pip-Boy bridge contract exist; host-side adapter, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain open |
+| **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | partial evidence | Rust Music has stable `org.rustboy.music` identity and an explicit suspend/pop-out API preserving the mounted slot and selection; Pip-Boy registration/protocol bridge, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain open |
 | **G6** | 128x64 monochrome 1KiB panel | `host_integrator` | source implemented | Renderer exists; hardware screen/controls pending |
 | **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified |
 | **G8** | Six-file private FLAC differential corpus | `gate_verifier` | partial evidence | Reference FLAC/FFmpeg and native Rust PCM hashes match on all six private files; artwork and hardware stress remain separate |
@@ -70,7 +70,7 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 - **FLAC:** Six user-provided private FLAC files passed reference FLAC/FFmpeg parity and native Rust full-PCM hash/byte-count parity. Do not commit audio. [G8 ledger](G8_REALWORLD_FLAC_CORPUS.md).
 - **WAVE:** Local native CLI PCM parity passed 6/6, with malformed RIFF boundary, missing pad and nonzero precision-padding rejection. Physical device output remains untested. [G7 ledger](G7_RIFF_CONFORMANCE.md).
 - **CAF:** Local FFmpeg-generated CAF parity passed 5/5 exact PCM vectors: signed LPCM 16/24/32-bit and ALAC 16/24-bit. FFmpeg is test-vector tooling only; custom channel layouts and unsupported codecs fail closed. Real-world CAF corpus and hardware remain open. [G10 evidence](G10_AUDIOPHILE_FORMATS.md).
-- **Host and hardware:** NullSink and pure render paths are not actual shared focus, screen wiring or DAC tests. The current goal keeps Pip-Boy read-only; the [Pip-Boy adapter contract](PIP_BOY_ADAPTER.md) records the remaining integration work. [Host contract](HOST_CONTRACT.md).
+- **Host and hardware:** NullSink and pure render paths are not actual shared focus, screen wiring or DAC tests. Rust Music now exposes a distinct stable package identity and explicit suspend lifecycle; Pip-Boy registration, shared focus, and host input/display integration remain unverified. The current goal keeps Pip-Boy read-only; the [Pip-Boy adapter contract](PIP_BOY_ADAPTER.md) records the remaining integration work. [Host contract](HOST_CONTRACT.md).
 
 ## Next expansion
 

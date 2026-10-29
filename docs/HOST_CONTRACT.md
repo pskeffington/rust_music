@@ -2,6 +2,8 @@
 
 The `rust-music-host` crate is a **standalone, framework-free interface** for loading Rust Music as one removable Rust_Boy package. It is locally authored, uses only workspace crates, and has no filesystem scanning, decoder thread, UI, soundserver, or network activity during construction. The host owns the window, focus, task scheduling, storage, and platform audio device selection.
 
+The stable package ID is `org.rustboy.music`, distinct from `org.rustboy.radio`. A host registers Music as its own manifest/adapter instance. `MusicSlot::suspend()` releases audio focus and stops output while preserving the mounted slot, library, and selection; popping back in does not autoplay. Explicit unmount drops that Music instance. The ID and lifecycle API do not themselves register Music with Pip-Boy or implement the host's shared focus arbiter.
+
 ## Core interface
 
 - `rust_music_library::scan(root, limits)` runs **only on explicit request**, on a worker thread. It bounds examined filesystem entries, track count and descent depth; checks FLAC/WAV signatures, ignores symlinks, and sorts the resulting relative paths. No tags are downloaded and no audio is played.
