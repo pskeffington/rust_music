@@ -1,6 +1,6 @@
 # Rust Music literature navigation
 
-Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literature-index.json).
+Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature-index.json) and [roadmap routing](roadmap-index.json).
 
 ## Codec, container, and native API standards
 

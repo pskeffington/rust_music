@@ -225,6 +225,18 @@ def validate_registry(data: dict, root: Path = ROOT, check_files: bool = True) -
                 "format registry disagrees with roadmap lossless floor")
         require(formats.get("source_integrity", {}).get("bit_perfect_hardware_verified") is False,
                 "unmeasured hardware fidelity cannot be marked bit-perfect")
+        format_records = formats.get("formats", [])
+        require(isinstance(format_records, list) and format_records,
+                "lossless format registry has no codec entries")
+        format_ids = [record.get("id") for record in format_records]
+        require(len(format_ids) == len(set(format_ids)), "duplicate format IDs")
+        for record in format_records:
+            require(record.get("gate") in gate_ids or record.get("gate") == "future",
+                    f"format {record.get('id')}: gate not indexed in roadmap")
+            require(record.get("stage") in {
+                "native-source-implemented", "planned", "later", "optional"
+            }, f"format {record.get('id')}: invalid stage")
+            require(record.get("accepted_codecs"), f"format {record.get('id')}: empty codec whitelist")
 
 
 def check() -> None:

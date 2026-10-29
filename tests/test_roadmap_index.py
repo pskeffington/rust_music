@@ -53,6 +53,12 @@ class RoadmapIndexTests(unittest.TestCase):
         with self.assertRaises(InvalidIndex):
             validate_registry(value, ROOT, check_files=False)
 
+    def test_blocked_task_must_have_dependency(self):
+        value = self.mutated()
+        value["tasks"][1]["depends_on"] = []
+        with self.assertRaises(InvalidIndex):
+            validate_registry(value, ROOT, check_files=False)
+
     def test_broken_future_task_reference_is_rejected(self):
         value = self.mutated()
         value["tasks"][8]["depends_on"] = ["RM-900"]

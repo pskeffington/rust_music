@@ -14,12 +14,15 @@ def check():
     payload = json.loads((DOCS / "literature-index.json").read_text(encoding="utf-8"))
     assert payload == records(), "registry does not match reviewed source-of-truth"
     assert payload["schema_version"] == 1
+    roadmap = json.loads((DOCS / "roadmap-index.json").read_text(encoding="utf-8"))
+    valid_gates = {gate["id"] for gate in roadmap["gates"]}
+    assert valid_gates == {f"G{i}" for i in range(15)}, "roadmap and literature gate catalogs differ"
     ids = [s["id"] for s in payload["sources"]]
     assert ids == [f"LIT-{i:03d}" for i in range(1, len(ids)+1)]
     for s in payload["sources"]:
         assert s["category"] in payload["categories"]
         assert s["dependency_policy"] == "reference-only"
-        assert s["gate"] in {f"G{i}" for i in range(6)}
+        assert s["gate"] in valid_gates
         assert s["priority"] in {"high", "medium", "low"}
         assert all(s[field].strip() for field in ("title", "decision", "license_note", "validation"))
         url = urlsplit(s["url"])
@@ -28,7 +31,7 @@ def check():
         assert rule["id"] == f"RUST-{i:03d}"
         assert set(rule["evidence_ids"]).issubset(ids) and rule["evidence_ids"]
         assert rule["status"] in {"implemented", "planned", "verified"}
-        assert rule["gate"] in {f"G{i}" for i in range(6)}
+        assert rule["gate"] in valid_gates
     expected_matrix, expected_index = render(payload)
     assert (DOCS / "LITERATURE_MATRIX.md").read_text(encoding="utf-8") == expected_matrix
     assert (DOCS / "LITERATURE_INDEX.md").read_text(encoding="utf-8") == expected_index

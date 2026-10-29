@@ -75,7 +75,7 @@ def render(matrix):
     intro = "# Rust Music independent-codec literature matrix\n\nUpdated: " + UPDATED + "\n\n"
     intro += "All sources are research references **only**. No third-party decoder/player implementation is copied or linked.\n"
     intro += "Project claims are not a hardware benchmark; status is recorded in the registry.\n\n"
-    intro += "[Machine-readable registry](literature-index.json) | [Navigation](LITERATURE_INDEX.md) | [Architecture](ARCHITECTURE.md)\n\n"
+    intro += "[Machine-readable registry](literature-index.json) | [Navigation](LITERATURE_INDEX.md) | [Architecture](ARCHITECTURE.md) | [Roadmap index](roadmap-index.json)\n\n"
     rows = [intro, "## Engineering transfer matrix\n\n", "| ID | Source | Decision | Validation | Gate | License boundary |\n",
             "| --- | --- | --- | --- | --- | --- |\n"]
     for s in matrix["sources"]:
@@ -86,7 +86,7 @@ def render(matrix):
     for s in matrix["standards"]:
         cells = [f'**{s["id"]}**', s["rule"], s["gate"], s["status"], ", ".join(s["evidence_ids"]), s["acceptance"]]
         rows.append("| " + " | ".join(cells) + " |\n")
-    index = ["# Rust Music literature navigation\n\n", f"Updated: {UPDATED}. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literature-index.json).\n\n"]
+    index = ["# Rust Music literature navigation\n\n", f"Updated: {UPDATED}. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature-index.json) and [roadmap routing](roadmap-index.json).\n\n"]
     for key, name in matrix["categories"].items():
         index.append(f"## {name}\n\n")
         for s in matrix["sources"]:

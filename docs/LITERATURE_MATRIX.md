@@ -5,7 +5,7 @@ Updated: 2026-10-29
 All sources are research references **only**. No third-party decoder/player implementation is copied or linked.
 Project claims are not a hardware benchmark; status is recorded in the registry.
 
-[Machine-readable registry](literature-index.json) | [Navigation](LITERATURE_INDEX.md) | [Architecture](ARCHITECTURE.md)
+[Machine-readable registry](literature-index.json) | [Navigation](LITERATURE_INDEX.md) | [Architecture](ARCHITECTURE.md) | [Roadmap index](roadmap-index.json)
 
 ## Engineering transfer matrix
 

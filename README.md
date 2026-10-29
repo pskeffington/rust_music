@@ -41,6 +41,8 @@ those checks.
 sh scripts/offline-gate.sh      # no downloads, no third-party crates
 cargo test --locked --offline --workspace
 python3 scripts/check_literature.py  # optional research maintenance
+python3 scripts/check_roadmap_index.py  # optional Codex task/agent/roadmap validator
+python3 -m unittest discover -s tests -p 'test_roadmap_index.py'  # optional stdlib index tests
 python3 scripts/test_flac_reference.py --fixtures-only  # OPTIONAL external reference validation
 python3 scripts/test_flac_reference.py                  # OPTIONAL differential oracle, needs flac + cargo
 python3 scripts/test_flac_user_corpus.py --mode oracle --require-complete /private/music  # OPTIONAL private real-audio oracle
