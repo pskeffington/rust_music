@@ -1,21 +1,34 @@
 //! Offline decoder acceptance harness. Native device output is a separate gate.
 use rust_music::{open_file, AudioFormat, Decoder, MusicError, NullSink, Result};
-use std::{env, fs::OpenOptions, io::{Seek, SeekFrom, Write}};
+use std::{
+    env,
+    fs::OpenOptions,
+    io::{Seek, SeekFrom, Write},
+};
 
-const PCM_GUID: [u8; 16] = [1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71];
+const PCM_GUID: [u8; 16] = [
+    1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71,
+];
 
 fn riff_overhead(format: AudioFormat) -> u32 {
-    if format.channels > 2 { 60 } else { 36 }
+    if format.channels > 2 {
+        60
+    } else {
+        36
+    }
 }
 
 fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -> Result<()> {
     if !matches!(format.bits_per_sample, 8 | 16 | 24 | 32) {
-        return Err(MusicError::Unsupported("WAV export supports 8/16/24/32-bit source"));
+        return Err(MusicError::Unsupported(
+            "WAV export supports 8/16/24/32-bit source",
+        ));
     }
     let bytes_per_frame = u32::from(format.channels) * u32::from(format.bits_per_sample / 8);
     // RIFF size includes the one-byte pad after odd-length PCM data. The data
     // chunk's length field itself remains the original unpadded byte count.
-    let riff_size = data_size.checked_add(riff_overhead(format))
+    let riff_size = data_size
+        .checked_add(riff_overhead(format))
         .and_then(|size| size.checked_add(data_size & 1))
         .ok_or(MusicError::Limit("WAV RIFF size exceeds 32-bit limit"))?;
     output.write_all(b"RIFF")?;
@@ -29,8 +42,13 @@ fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -
     output.write_all(&(if extensible { 0xfffeu16 } else { 1u16 }).to_le_bytes())?;
     output.write_all(&u16::from(format.channels).to_le_bytes())?;
     output.write_all(&format.sample_rate.to_le_bytes())?;
-    output.write_all(&format.sample_rate.checked_mul(bytes_per_frame)
-        .ok_or(MusicError::Limit("WAV byte-rate overflow"))?.to_le_bytes())?;
+    output.write_all(
+        &format
+            .sample_rate
+            .checked_mul(bytes_per_frame)
+            .ok_or(MusicError::Limit("WAV byte-rate overflow"))?
+            .to_le_bytes(),
+    )?;
     output.write_all(&(bytes_per_frame as u16).to_le_bytes())?;
     output.write_all(&u16::from(format.bits_per_sample).to_le_bytes())?;
     if extensible {
@@ -50,7 +68,9 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
     let sample_bytes = usize::from(format.bits_per_sample / 8);
     let mut bytes_written = 0u64;
     while let Some(block) = decoder.next_block()? {
-        if block.format != format { return Err(MusicError::Invalid("format changed during decode")); }
+        if block.format != format {
+            return Err(MusicError::Invalid("format changed during decode"));
+        }
         let mut bytes = Vec::with_capacity(block.samples.len() * sample_bytes);
         for value in block.samples {
             match sample_bytes {
@@ -61,11 +81,14 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
                 _ => return Err(MusicError::Unsupported("unsupported integer PCM width")),
             }
         }
-        let total = bytes_written.checked_add(bytes.len() as u64)
+        let total = bytes_written
+            .checked_add(bytes.len() as u64)
             .ok_or(MusicError::Limit("WAV size counter overflow"))?;
         // The worst case needs an odd-data padding byte as well as the header.
         if total > u64::from(u32::MAX - riff_overhead(format) - 1) {
-            return Err(MusicError::Limit("WAV RIFF size limit reached; use RF64 in future"));
+            return Err(MusicError::Limit(
+                "WAV RIFF size limit reached; use RF64 in future",
+            ));
         }
         file.write_all(&bytes)?;
         bytes_written = total;
@@ -86,8 +109,10 @@ fn inspect(mut decoder: Box<dyn Decoder>) -> Result<()> {
         blocks += 1;
         frames += block.frames() as u64;
     }
-    println!("{} Hz | {} ch | {} bits | {frames} frames | {blocks} blocks | CRC verified when FLAC",
-        format.sample_rate, format.channels, format.bits_per_sample);
+    println!(
+        "{} Hz | {} ch | {} bits | {frames} frames | {blocks} blocks | CRC verified when FLAC",
+        format.sample_rate, format.channels, format.bits_per_sample
+    );
     Ok(())
 }
 #[cfg(all(target_os = "macos", feature = "macos-output"))]
@@ -102,24 +127,32 @@ fn play(input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
 #[cfg(all(target_os = "linux", feature = "alsa-output"))]
 fn play(input: Box<dyn Decoder>, device: Option<&str>) -> Result<()> {
     use rust_music::{AlsaSink, PlaybackState, Player};
-    let device = device.ok_or(MusicError::Invalid("Linux playback requires explicit hw:CARD,DEVICE"))?;
+    let device = device.ok_or(MusicError::Invalid(
+        "Linux playback requires explicit hw:CARD,DEVICE",
+    ))?;
     let mut player = Player::new(AlsaSink::new(device, device.starts_with("hw:"))?);
     player.load(input)?;
     player.play()?;
     while player.step()?.state == PlaybackState::Playing {}
     Ok(())
 }
-#[cfg(not(any(all(target_os = "macos", feature = "macos-output"),
-              all(target_os = "linux", feature = "alsa-output"))))]
+#[cfg(not(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+)))]
 fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
-    Err(MusicError::Unsupported("native playback needs --features macos-output (macOS) or alsa-output (Linux)"))
+    Err(MusicError::Unsupported(
+        "native playback needs --features macos-output (macOS) or alsa-output (Linux)",
+    ))
 }
 
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
     let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
-    let path = args.next().ok_or(MusicError::Invalid("missing input filename"))?;
+    let path = args
+        .next()
+        .ok_or(MusicError::Invalid("missing input filename"))?;
     match action.as_str() {
         "scan" => {
             use rust_music_library::{scan, ScanLimits};
@@ -192,15 +225,28 @@ mod tests {
 
     struct EmptyDecoder(AudioFormat);
     impl Decoder for EmptyDecoder {
-        fn format(&self) -> AudioFormat { self.0 }
-        fn next_block(&mut self) -> Result<Option<rust_music::PcmBlock>> { Ok(None) }
+        fn format(&self) -> AudioFormat {
+            self.0
+        }
+        fn next_block(&mut self) -> Result<Option<rust_music::PcmBlock>> {
+            Ok(None)
+        }
     }
 
     #[test]
     fn export_refuses_to_overwrite_existing_audio() {
-        use std::{fs, time::{SystemTime, UNIX_EPOCH}};
-        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("rust-music-no-clobber-{}-{stamp}.wav", std::process::id()));
+        use std::{
+            fs,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "rust-music-no-clobber-{}-{stamp}.wav",
+            std::process::id()
+        ));
         fs::write(&path, b"KEEP_EXISTING_MUSIC").unwrap();
         let format = AudioFormat::new(44_100, 2, 16).unwrap();
         assert!(export_wav(Box::new(EmptyDecoder(format)), path.to_str().unwrap()).is_err());
