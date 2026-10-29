@@ -73,6 +73,7 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 - [G8 real-world FLAC corpus (checksums only; private audio not committed)](docs/G8_REALWORLD_FLAC_CORPUS.md)
 - [G9 exact playback timing](docs/G9_TIMING_PROGRESS.md)
 - [G10 audiophile-only format policy and native AIFF implementation](docs/G10_AUDIOPHILE_FORMATS.md)
+- [Machine-readable lossless format admission matrix](docs/lossless-formats.json)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
