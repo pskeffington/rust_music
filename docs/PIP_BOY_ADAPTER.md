@@ -61,10 +61,14 @@ hosts that expose that exact display surface; it is not a `PackageView`.
 | Settings | Ask the shell to open its existing Settings screen; Rust Music does not render a Settings substitute. |
 
 The wrapper must map a snapshot to bounded plain text, such as filename,
-container, PCM format, playback state, and sample-derived elapsed time. Do not
-invent artist tags, cover art, seeking, pause/resume, or duration. The current
-Rust Music `MusicSlot` supports Play/Stop and Previous/Next/Select; it does not
-implement pause/resume.
+container, PCM format, playback state, and sample-derived elapsed time. The
+catalog exposes only bounded, validated FLAC/AIFF text tags and sanitized title
+fallbacks; it does not expose artwork. `MusicSlot` supports FLAC frame seek via
+`Command::SeekFrame` when a declared frame count and valid seek data are
+available. A successful seek drains output, releases focus, and leaves the slot
+ready for an explicit Play. The panel currently has no seek control, so the
+host must not expose seek until it maps reviewed user input to that command.
+Pause/resume remains unsupported.
 
 ## Audio ownership boundary
 

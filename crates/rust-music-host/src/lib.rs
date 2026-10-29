@@ -29,6 +29,9 @@ pub enum Command {
     Previous,
     Play,
     Stop,
+    /// Reposition a seek-capable decoder; successful seeks stop output and do
+    /// not autoplay. Frames are sample frames per channel, not PCM samples.
+    SeekFrame(u64),
     /// Process exactly one decoded block. The caller schedules a worker tick.
     Poll,
 }
@@ -109,6 +112,7 @@ impl<S: PcmSink> MusicSlot<S> {
             Command::Previous => self.move_selection(false)?,
             Command::Play => self.play(audio_focus)?,
             Command::Stop => self.stop()?,
+            Command::SeekFrame(frame) => self.seek_frame(frame)?,
             Command::Poll => self.poll()?,
         }
         Ok(self.status())
@@ -180,6 +184,13 @@ impl<S: PcmSink> MusicSlot<S> {
         self.focus_lease = None; // Release even when native close fails.
         result
     }
+    fn seek_frame(&mut self, frame: u64) -> Result<()> {
+        let result = self.player.seek_frame(frame);
+        if self.player.status().state != PlaybackState::Playing {
+            self.focus_lease = None;
+        }
+        result
+    }
 }
 
 impl<S: PcmSink> Drop for MusicSlot<S> {
@@ -205,6 +216,34 @@ mod tests {
     };
 
     static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn crc8(bytes: &[u8]) -> u8 {
+        bytes.iter().fold(0u8, |mut crc, byte| {
+            crc ^= byte;
+            for _ in 0..8 {
+                crc = if crc & 0x80 != 0 {
+                    (crc << 1) ^ 0x07
+                } else {
+                    crc << 1
+                };
+            }
+            crc
+        })
+    }
+
+    fn crc16(bytes: &[u8]) -> u16 {
+        bytes.iter().fold(0u16, |mut crc, byte| {
+            crc ^= u16::from(*byte) << 8;
+            for _ in 0..8 {
+                crc = if crc & 0x8000 != 0 {
+                    (crc << 1) ^ 0x8005
+                } else {
+                    crc << 1
+                };
+            }
+            crc
+        })
+    }
 
     #[derive(Clone, Default)]
     struct TestFocus {
@@ -279,6 +318,27 @@ mod tests {
             bytes.extend_from_slice(b"data");
             bytes.extend_from_slice(&2u32.to_le_bytes());
             bytes.extend_from_slice(&123i16.to_le_bytes());
+            fs::write(self.0.join(name), bytes).unwrap();
+        }
+        fn flac(&self, name: &str) {
+            let mut bytes = b"fLaC".to_vec();
+            bytes.extend_from_slice(&[0, 0, 0, 34]);
+            bytes.extend_from_slice(&16u16.to_be_bytes());
+            bytes.extend_from_slice(&16u16.to_be_bytes());
+            bytes.extend_from_slice(&[0; 6]);
+            let packed = (44_100u64 << 44) | (15u64 << 36) | 16;
+            bytes.extend_from_slice(&packed.to_be_bytes());
+            bytes.extend_from_slice(&[0; 16]);
+            bytes.extend_from_slice(&[0x83, 0, 0, 18]);
+            bytes.extend_from_slice(&0u64.to_be_bytes());
+            bytes.extend_from_slice(&0u64.to_be_bytes());
+            bytes.extend_from_slice(&16u16.to_be_bytes());
+
+            let mut frame = vec![0xff, 0xf8, 0x60, 0, 0, 15];
+            frame.push(crc8(&frame));
+            frame.extend_from_slice(&[0, 0x01, 0x00]);
+            frame.extend_from_slice(&crc16(&frame).to_be_bytes());
+            bytes.extend_from_slice(&frame);
             fs::write(self.0.join(name), bytes).unwrap();
         }
         fn low_quality_wav(&self, name: &str) {
@@ -360,6 +420,50 @@ mod tests {
         focus.claimed.store(false, Ordering::Release);
         slot.handle(Command::Play, &focus).unwrap();
         slot.handle(Command::Stop, &focus).unwrap();
+        assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn unsupported_seek_keeps_current_audio_lease_and_playback() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        assert!(matches!(
+            slot.handle(Command::SeekFrame(0), &focus),
+            Err(MusicError::Unsupported(_))
+        ));
+        assert_eq!(slot.status().playback.state, PlaybackState::Playing);
+        assert!(slot.status().has_audio_focus);
+        assert!(focus.claimed.load(Ordering::Acquire));
+        slot.handle(Command::Stop, &focus).unwrap();
+        assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn successful_flac_seek_releases_focus_without_autoplay() {
+        let temp = Temp::new();
+        temp.flac("a.flac");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        let seeked = slot.handle(Command::SeekFrame(8), &focus).unwrap();
+        assert_eq!(seeked.playback.state, PlaybackState::Ready);
+        assert_eq!(seeked.playback.frames_delivered, 8);
+        assert!(!seeked.has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(slot.sink().frames_written, 0);
+
+        slot.handle(Command::Play, &focus).unwrap();
+        slot.handle(Command::Poll, &focus).unwrap();
+        assert_eq!(slot.sink().frames_written, 8);
+        slot.handle(Command::Poll, &focus).unwrap();
+        assert_eq!(slot.status().playback.state, PlaybackState::Finished);
         assert!(!focus.claimed.load(Ordering::Acquire));
     }
 

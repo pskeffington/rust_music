@@ -108,6 +108,51 @@ impl<S: PcmSink> Player<S> {
         self.snapshot.state = PlaybackState::Playing;
         Ok(())
     }
+    /// Reposition a seek-capable decoder on a worker thread. A successful
+    /// seek drains active output and returns to Ready; a fresh Play is required.
+    pub fn seek_frame(&mut self, frame: u64) -> Result<()> {
+        if !matches!(
+            self.snapshot.state,
+            PlaybackState::Ready | PlaybackState::Playing | PlaybackState::Finished
+        ) {
+            return Err(MusicError::Invalid(
+                "seek requires a loaded track in Ready, Playing, or Finished state",
+            ));
+        }
+        let decoder = self
+            .decoder
+            .as_mut()
+            .ok_or(MusicError::Invalid("decoder missing"))?;
+        if !decoder.supports_seek() {
+            return Err(MusicError::Unsupported(
+                "sample-accurate seek is unsupported for this format",
+            ));
+        }
+        if self
+            .snapshot
+            .total_frames
+            .is_some_and(|total| frame > total)
+        {
+            return Err(MusicError::Invalid("seek target is beyond end of track"));
+        }
+        let was_playing = self.snapshot.state == PlaybackState::Playing;
+        if let Err(error) = decoder.seek_frame(frame) {
+            if was_playing {
+                let _ = self.sink.finish();
+            }
+            self.snapshot.state = PlaybackState::Failed;
+            return Err(error);
+        }
+        if was_playing {
+            if let Err(error) = self.sink.finish() {
+                self.snapshot.state = PlaybackState::Failed;
+                return Err(error);
+            }
+        }
+        self.snapshot.frames_delivered = frame;
+        self.snapshot.state = PlaybackState::Ready;
+        Ok(())
+    }
     /// One bounded decoding/output step. Call from a worker, not the UI or audio callback.
     pub fn step(&mut self) -> Result<PlaybackSnapshot> {
         if self.snapshot.state != PlaybackState::Playing {
@@ -233,6 +278,37 @@ mod tests {
         expected: AudioFormat,
         actual: AudioFormat,
     }
+    struct Seekable {
+        format: AudioFormat,
+        cursor: u64,
+        total: u64,
+    }
+    impl Decoder for Seekable {
+        fn format(&self) -> AudioFormat {
+            self.format
+        }
+        fn total_frames(&self) -> Option<u64> {
+            Some(self.total)
+        }
+        fn supports_seek(&self) -> bool {
+            true
+        }
+        fn seek_frame(&mut self, frame: u64) -> Result<()> {
+            if frame > self.total {
+                return Err(MusicError::Invalid("test seek beyond end"));
+            }
+            self.cursor = frame;
+            Ok(())
+        }
+        fn next_block(&mut self) -> Result<Option<PcmBlock>> {
+            if self.cursor == self.total {
+                return Ok(None);
+            }
+            let sample = self.cursor as i32;
+            self.cursor += 1;
+            PcmBlock::new(self.format, vec![sample]).map(Some)
+        }
+    }
     impl Decoder for Mismatch {
         fn format(&self) -> AudioFormat {
             self.expected
@@ -286,6 +362,60 @@ mod tests {
         assert_eq!(player.status().state, PlaybackState::Failed);
         assert_eq!(player.sink().frames_written, 0);
         assert!(player.sink().opened.is_none());
+    }
+    #[test]
+    fn seek_drains_active_output_and_requires_explicit_play_again() {
+        let format = AudioFormat::new(44_100, 1, 16).unwrap();
+        let mut player = Player::new(NullSink::default());
+        player
+            .load(Box::new(Seekable {
+                format,
+                cursor: 0,
+                total: 5,
+            }))
+            .unwrap();
+        player.play().unwrap();
+        player.step().unwrap();
+        assert_eq!(player.status().frames_delivered, 1);
+        player.seek_frame(3).unwrap();
+        assert_eq!(player.status().state, PlaybackState::Ready);
+        assert_eq!(player.status().frames_delivered, 3);
+        assert!(player.sink().opened.is_none());
+        player.play().unwrap();
+        player.step().unwrap();
+        assert_eq!(player.sink().frames_written, 2);
+        assert_eq!(player.status().frames_delivered, 4);
+    }
+
+    #[test]
+    fn unsupported_or_out_of_range_seek_keeps_current_playback() {
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let mut player = Player::new(NullSink::default());
+        player.load(Box::new(OneBlock { format, step: 0 })).unwrap();
+        player.play().unwrap();
+        assert!(matches!(
+            player.seek_frame(0),
+            Err(MusicError::Unsupported(_))
+        ));
+        assert_eq!(player.status().state, PlaybackState::Playing);
+        assert!(player.sink().opened.is_some());
+
+        player.stop().unwrap();
+        let mut seekable = Player::new(NullSink::default());
+        seekable
+            .load(Box::new(Seekable {
+                format: AudioFormat::new(44_100, 1, 16).unwrap(),
+                cursor: 0,
+                total: 5,
+            }))
+            .unwrap();
+        seekable.play().unwrap();
+        assert!(matches!(
+            seekable.seek_frame(6),
+            Err(MusicError::Invalid(_))
+        ));
+        assert_eq!(seekable.status().state, PlaybackState::Playing);
+        assert!(seekable.sink().opened.is_some());
     }
     struct FailClose {
         opened: bool,

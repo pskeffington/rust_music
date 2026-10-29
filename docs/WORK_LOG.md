@@ -314,3 +314,24 @@ independent-source search: two separately CC0-marked candidates labeled
 "Apple Lossless Audio" were actually AAC/mp4a by `ffprobe`; Rust Music refused
 the AAC at its ALAC sample-entry check. Neither is included as ALAC evidence
 or retained as a corpus fixture.
+
+## 2026-10-29 — RM-012 validated FLAC seek
+
+Added bounded FLAC SEEKTABLE parsing and sample-frame seeking for seekable
+inputs with declared STREAMINFO totals. Seek initializes at the closest
+preceding valid point, decodes through the target, and trims the target block
+sample-accurately. The host exposes `Command::SeekFrame`; success drains output,
+releases the shared focus lease, and requires explicit Play. Unsupported and
+out-of-range requests do not interrupt current playback. Whole-stream PCM MD5
+is intentionally unavailable after a partial seek.
+
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 local crates, 28 path-only
+  edges, fmt, warnings-denied Clippy, workspace tests, release build, and macOS
+  feature check passed.
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, 4/4 exact PCM ALAC cases;
+  ingestion and AAC refusal passed.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
+- Synthetic fixed- and variable-block FLAC tests cover exact frame boundaries,
+  mid-frame trimming, EOF, invalid targets, and invalid seektable offsets.
+  Real-world encoder seektable compatibility and host input routing remain open.

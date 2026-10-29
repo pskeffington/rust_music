@@ -103,6 +103,16 @@ pub trait Decoder: Send {
     fn total_frames(&self) -> Option<u64> {
         None
     }
+    /// Whether this decoder can reposition to an exact PCM sample frame.
+    fn supports_seek(&self) -> bool {
+        false
+    }
+    /// Position the next decoded block at `frame`. Unsupported by default.
+    fn seek_frame(&mut self, _frame: u64) -> Result<()> {
+        Err(MusicError::Unsupported(
+            "sample-accurate seek is unsupported",
+        ))
+    }
     fn next_block(&mut self) -> Result<Option<PcmBlock>>;
 }
 

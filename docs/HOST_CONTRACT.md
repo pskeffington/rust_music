@@ -8,7 +8,7 @@ The stable package ID is `org.rustboy.music`, distinct from `org.rustboy.radio`.
 
 - `rust_music_library::scan(root, limits)` runs **only on explicit request**, on a worker thread. It bounds examined filesystem entries, track count and descent depth; checks FLAC/WAV signatures, ignores symlinks, and sorts the resulting relative paths. No tags are downloaded and no audio is played.
 - `MusicSlot::new(sink, library)` creates one player and an initial selection if nonempty. It does not open audio output or load media.
-- `MusicSlot::handle(Command::{Select,Next,Previous,Play,Stop,Poll}, focus)` is the single command entrypoint. Selection and navigation always stop the previous track and **do not autoplay** the next track. `Poll` processes at most one decoded PCM block and must execute off the UI/render thread.
+- `MusicSlot::handle(Command::{Select,Next,Previous,Play,Stop,Poll,SeekFrame}, focus)` is the single command entrypoint. Selection and navigation always stop the previous track and **do not autoplay** the next track. `SeekFrame` is supported only by decoders that declare a known frame count and implement seeking. A successful seek drains active output, releases focus, and leaves the slot `Ready`; the host must require a fresh Play. Unsupported or out-of-range seeks leave active playback untouched. `Poll` processes at most one decoded PCM block and must execute off the UI/render thread.
 - `MusicSlot::status()` is a small read-only snapshot: selection, number of tracks, playback generation/state/frames, and whether this slot currently holds exclusive audio focus.
 - `MusicSlot::replace_library(catalog)` stops playback and retains the old relative-path selection when possible; scanning remains external to the slot.
 
@@ -51,7 +51,7 @@ without starting audio or opening a device. This is **not** a hardware UI test.
 
 ## Explicit limitations and acceptance
 
-- No pause/resume, sample-accurate seek, playlist persistence, embedded album art, artist/tag parser or asynchronous library watcher yet. Do not expose fake controls.
+- No pause/resume, playlist persistence, embedded album art, or asynchronous library watcher yet. FLAC sample-accurate frame seeking is implemented, but the panel has no seek control and host user-intent routing remains unverified. Do not expose fake controls.
 - A path recheck rejects symlink replacement before file open, but cannot rule out a malicious local filesystem race without a platform-specific no-follow open; trust/permission boundaries must be set by the host.
 - Host tests use `NullSink` and synthetic WAV files. Passing them proves neither CoreAudio nor ALSA kernel playback, nor exclusive focus interoperability until integrated with Rust_Radio/Rust_TV.
 - `rust-music-library` and `rust-music-host` must build and test with `cargo --locked --offline` using only the local Rust toolchain. The full offline gate passed locally on Rust/Cargo 1.99.1 and macOS; this does not verify shared Rust_Boy audio-focus behavior or physical output.

@@ -244,7 +244,7 @@
       "title": "Bounded metadata and sample-accurate seek",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "FLAC Vorbis and AIFF text tags pass deterministic size/UTF-8 validation and omit artwork; validated sample-accurate FLAC seek remains planned",
+      "next_evidence": "Bounded FLAC/AIFF tags and synthetic fixed/variable-block FLAC seek exact-frame tests pass; real-world seektable compatibility, host input routing and hardware acceptance remain",
       "evidence_doc": "docs/G13_METADATA_AND_SEEK.md"
     },
     {
@@ -477,7 +477,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "gate_verifier",
       "priority": "P2",
-      "status": "planned",
+      "status": "done",
       "depends_on": [
         "RM-002"
       ],
@@ -487,7 +487,7 @@
       ],
       "create_paths": [],
       "acceptance": "Seektable and frame-boundary tests compare exact expected PCM frames; invalid seeks fail closed",
-      "blocker": "None; RM-002 passed. Seeking remains unsupported until exact frame-boundary and invalid-seek tests pass"
+      "blocker": "Synthetic fixed/variable-block exact-frame, invalid target, malformed offset, and host lease lifecycle tests pass. Real-world encoder seektable compatibility and host seek input remain open; successful partial seeks cannot verify whole-stream PCM MD5."
     },
     {
       "id": "RM-013",

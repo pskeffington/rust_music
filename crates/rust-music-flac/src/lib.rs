@@ -6,10 +6,10 @@
 //!
 //! Scope: native FLAC, mono/independent multi-channel and all FLAC stereo modes,
 //! constant/verbatim/fixed/LPC subframes, both Rice methods, wasted bits, and
-//! header/frame CRC. Ogg FLAC and seeking are not yet supported.
+//! header/frame CRC. Ogg FLAC is not yet supported.
 
 use rust_music_core::{AudioFormat, Decoder, MusicError, PcmBlock, Result};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 
 mod md5;
 use md5::Md5;
@@ -19,6 +19,7 @@ const MAX_METADATA_BYTES: u32 = 16 * 1024 * 1024;
 const MAX_TOTAL_METADATA_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_RICE_UNARY: u64 = 1 << 20;
+const MAX_SEEKPOINTS: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StreamInfo {
@@ -29,6 +30,13 @@ pub struct StreamInfo {
     pub format: AudioFormat,
     pub total_samples: u64,
     pub pcm_md5: [u8; 16],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SeekPoint {
+    sample_number: u64,
+    stream_offset: u64,
+    frame_samples: u16,
 }
 
 fn be24(raw: &[u8]) -> u32 {
@@ -78,13 +86,16 @@ fn skip_bounded<R: Read>(reader: &mut R, bytes: u32) -> Result<()> {
     Ok(())
 }
 
-fn read_metadata<R: Read>(reader: &mut R) -> Result<StreamInfo> {
+fn read_metadata<R: Read>(reader: &mut R) -> Result<(StreamInfo, Vec<SeekPoint>)> {
     let mut magic = [0; 4];
     reader.read_exact(&mut magic)?;
     if &magic != b"fLaC" {
         return Err(MusicError::Invalid("missing native FLAC marker"));
     }
     let mut info = None;
+    let mut seekpoints = Vec::new();
+    let mut saw_seektable = false;
+    let mut saw_seek_placeholder = false;
     let mut last = false;
     let mut metadata_bytes = 0u64;
     for index in 0..MAX_METADATA_BLOCKS {
@@ -118,7 +129,53 @@ fn read_metadata<R: Read>(reader: &mut R) -> Result<StreamInfo> {
             if kind == 0 {
                 return Err(MusicError::Invalid("duplicate STREAMINFO"));
             }
-            skip_bounded(reader, length)?;
+            if kind == 3 {
+                if saw_seektable {
+                    return Err(MusicError::Invalid("duplicate FLAC SEEKTABLE"));
+                }
+                saw_seektable = true;
+                if length % 18 != 0 {
+                    return Err(MusicError::Invalid(
+                        "FLAC SEEKTABLE length is not a whole point count",
+                    ));
+                }
+                let points = (length / 18) as usize;
+                if seekpoints.len().saturating_add(points) > MAX_SEEKPOINTS {
+                    return Err(MusicError::Limit("too many FLAC seekpoints"));
+                }
+                for _ in 0..points {
+                    let mut raw = [0u8; 18];
+                    reader.read_exact(&mut raw)?;
+                    let point = SeekPoint {
+                        sample_number: u64::from_be_bytes(raw[..8].try_into().unwrap()),
+                        stream_offset: u64::from_be_bytes(raw[8..16].try_into().unwrap()),
+                        frame_samples: u16::from_be_bytes(raw[16..18].try_into().unwrap()),
+                    };
+                    if point.sample_number == u64::MAX {
+                        if point.stream_offset != u64::MAX || point.frame_samples != 0 {
+                            return Err(MusicError::Invalid(
+                                "malformed FLAC SEEKTABLE placeholder",
+                            ));
+                        }
+                        saw_seek_placeholder = true;
+                    } else {
+                        if saw_seek_placeholder
+                            || point.frame_samples == 0
+                            || seekpoints.last().is_some_and(|previous: &SeekPoint| {
+                                point.sample_number <= previous.sample_number
+                                    || point.stream_offset <= previous.stream_offset
+                            })
+                        {
+                            return Err(MusicError::Invalid(
+                                "FLAC seekpoints are not strictly ordered",
+                            ));
+                        }
+                        seekpoints.push(point);
+                    }
+                }
+            } else {
+                skip_bounded(reader, length)?;
+            }
         }
         if last {
             break;
@@ -127,7 +184,10 @@ fn read_metadata<R: Read>(reader: &mut R) -> Result<StreamInfo> {
     if !last {
         return Err(MusicError::Limit("too many FLAC metadata blocks"));
     }
-    info.ok_or(MusicError::Invalid("FLAC STREAMINFO missing"))
+    Ok((
+        info.ok_or(MusicError::Invalid("FLAC STREAMINFO missing"))?,
+        seekpoints,
+    ))
 }
 
 fn crc8_update(mut crc: u8, byte: u8) -> u8 {
@@ -259,6 +319,19 @@ impl<R: Read> Bits<R> {
                 return Err(MusicError::Invalid("nonzero FLAC frame pad bits"));
             }
         }
+        Ok(())
+    }
+}
+
+impl<R: Read + Seek> Bits<R> {
+    fn seek_to(&mut self, offset: u64) -> Result<()> {
+        self.input.seek(SeekFrom::Start(offset))?;
+        self.current = 0;
+        self.left = 0;
+        self.frame_tracking = false;
+        self.frame_bytes = 0;
+        self.crc8 = 0;
+        self.crc16 = 0;
         Ok(())
     }
 }
@@ -499,27 +572,51 @@ fn subframe<R: Read>(b: &mut Bits<R>, block: usize, bits: u8) -> Result<Vec<i64>
 }
 
 /// Pull-based FLAC reader. Constructing it only parses metadata: never opens audio.
-pub struct FlacDecoder<R: Read + Send> {
+pub struct FlacDecoder<R: Read + Seek + Send> {
     reader: Bits<R>,
     info: StreamInfo,
+    seekpoints: Vec<SeekPoint>,
+    first_frame_offset: u64,
     decoded_frames: u64,
     frame_index: u64,
     blocking_strategy: Option<bool>,
     pcm_md5: Option<Md5>,
     finished: bool,
+    pending: Option<PcmBlock>,
+    active_seekpoint: Option<SeekPoint>,
 }
-impl<R: Read + Send> FlacDecoder<R> {
+impl<R: Read + Seek + Send> FlacDecoder<R> {
     pub fn new(mut input: R) -> Result<Self> {
-        let info = read_metadata(&mut input)?;
+        let (info, seekpoints) = read_metadata(&mut input)?;
+        let first_frame_offset = input.stream_position()?;
+        let file_end = input.seek(SeekFrom::End(0))?;
+        for point in &seekpoints {
+            let absolute = first_frame_offset
+                .checked_add(point.stream_offset)
+                .ok_or(MusicError::Limit("FLAC seekpoint byte offset overflows"))?;
+            if absolute >= file_end
+                || point.frame_samples > info.max_block_size
+                || (info.total_samples != 0 && point.sample_number >= info.total_samples)
+            {
+                return Err(MusicError::Invalid(
+                    "FLAC seekpoint lies outside the stream",
+                ));
+            }
+        }
+        input.seek(SeekFrom::Start(first_frame_offset))?;
         let pcm_md5 = (info.pcm_md5 != [0; 16]).then(Md5::new);
         Ok(Self {
             reader: Bits::new(input),
             info,
+            seekpoints,
+            first_frame_offset,
             decoded_frames: 0,
             frame_index: 0,
             blocking_strategy: None,
             pcm_md5,
             finished: false,
+            pending: None,
+            active_seekpoint: None,
         })
     }
     pub fn stream_info(&self) -> &StreamInfo {
@@ -547,7 +644,85 @@ impl<R: Read + Send> FlacDecoder<R> {
         }
     }
 
+    pub fn seek_frame(&mut self, target: u64) -> Result<()> {
+        if self.info.total_samples == 0 {
+            return Err(MusicError::Unsupported(
+                "FLAC seek requires a declared STREAMINFO sample count",
+            ));
+        }
+        if target > self.info.total_samples {
+            return Err(MusicError::Invalid(
+                "FLAC seek target is beyond end of stream",
+            ));
+        }
+        self.pending = None;
+        self.finished = false;
+        if target == self.info.total_samples {
+            self.pcm_md5 = None;
+            self.decoded_frames = target;
+            self.frame_index = 0;
+            self.active_seekpoint = None;
+            self.finished = true;
+            return Ok(());
+        }
+        let point = self
+            .seekpoints
+            .iter()
+            .copied()
+            .take_while(|point| point.sample_number <= target)
+            .last();
+        let (sample, offset, active_seekpoint) = match point {
+            Some(point) => (
+                point.sample_number,
+                self.first_frame_offset
+                    .checked_add(point.stream_offset)
+                    .ok_or(MusicError::Limit("FLAC seek offset overflows"))?,
+                Some(point),
+            ),
+            None => (0, self.first_frame_offset, None),
+        };
+        self.pcm_md5 = if sample == 0 && offset == self.first_frame_offset {
+            (self.info.pcm_md5 != [0; 16]).then(Md5::new)
+        } else {
+            None
+        };
+        self.reader.seek_to(offset)?;
+        self.decoded_frames = sample;
+        self.frame_index = 0;
+        self.active_seekpoint = active_seekpoint;
+        loop {
+            let block = self
+                .decode_frame()?
+                .ok_or(MusicError::Invalid("FLAC seek reached EOF before target"))?;
+            let end = self.decoded_frames;
+            let start = end
+                .checked_sub(block.frames() as u64)
+                .ok_or(MusicError::Invalid("FLAC seek frame bounds underflow"))?;
+            if target >= end {
+                continue;
+            }
+            if target < start {
+                return Err(MusicError::Invalid("FLAC seek skipped over target frame"));
+            }
+            let skip_frames = usize::try_from(target - start)
+                .map_err(|_| MusicError::Limit("FLAC seek frame count exceeds address space"))?;
+            let skip_samples = skip_frames * usize::from(self.info.format.channels);
+            self.pending = Some(PcmBlock::new(
+                self.info.format,
+                block.samples[skip_samples..].to_vec(),
+            )?);
+            return Ok(());
+        }
+    }
+
     pub fn next_frame(&mut self) -> Result<Option<PcmBlock>> {
+        if self.pending.is_some() {
+            return Ok(self.pending.take());
+        }
+        self.decode_frame()
+    }
+
+    fn decode_frame(&mut self) -> Result<Option<PcmBlock>> {
         if self.finished {
             return Ok(None);
         }
@@ -602,8 +777,20 @@ impl<R: Read + Send> FlacDecoder<R> {
             ));
         }
         let number = utf8_number(b)?;
+        let size = block_size(block_rate >> 4, b)?;
+        let rate = sample_rate(block_rate & 15, b, self.info.format.sample_rate)?;
+        if size == 0 || size > usize::from(self.info.max_block_size) {
+            return Err(MusicError::Invalid("FLAC block exceeds STREAMINFO maximum"));
+        }
         let expected_number = if variable_blocking {
             self.decoded_frames
+        } else if let Some(point) = self.active_seekpoint {
+            if point.frame_samples as usize != size || point.sample_number % size as u64 != 0 {
+                return Err(MusicError::Invalid(
+                    "FLAC fixed-block seekpoint does not align to its frame",
+                ));
+            }
+            point.sample_number / size as u64
         } else {
             self.frame_index
         };
@@ -612,10 +799,11 @@ impl<R: Read + Send> FlacDecoder<R> {
                 "non-sequential FLAC frame/sample number",
             ));
         }
-        let size = block_size(block_rate >> 4, b)?;
-        let rate = sample_rate(block_rate & 15, b, self.info.format.sample_rate)?;
-        if size == 0 || size > usize::from(self.info.max_block_size) {
-            return Err(MusicError::Invalid("FLAC block exceeds STREAMINFO maximum"));
+        if self
+            .active_seekpoint
+            .is_some_and(|point| point.frame_samples as usize != size)
+        {
+            return Err(MusicError::Invalid("FLAC seekpoint frame size mismatch"));
         }
         if rate != self.info.format.sample_rate
             || channels != self.info.format.channels
@@ -683,21 +871,41 @@ impl<R: Read + Send> FlacDecoder<R> {
                 "FLAC decoded samples exceed STREAMINFO total",
             ));
         }
-        self.frame_index = self
-            .frame_index
-            .checked_add(1)
-            .ok_or(MusicError::Limit("FLAC frame index overflow"))?;
+        self.frame_index = if !variable_blocking {
+            if let Some(point) = self.active_seekpoint {
+                point
+                    .sample_number
+                    .checked_div(size as u64)
+                    .and_then(|index| index.checked_add(1))
+                    .ok_or(MusicError::Limit("FLAC frame index overflow"))?
+            } else {
+                self.frame_index
+                    .checked_add(1)
+                    .ok_or(MusicError::Limit("FLAC frame index overflow"))?
+            }
+        } else {
+            self.frame_index
+                .checked_add(1)
+                .ok_or(MusicError::Limit("FLAC frame index overflow"))?
+        };
+        self.active_seekpoint = None;
         self.blocking_strategy = Some(variable_blocking);
         self.update_pcm_md5(&interleaved);
         Ok(Some(PcmBlock::new(self.info.format, interleaved)?))
     }
 }
-impl<R: Read + Send> Decoder for FlacDecoder<R> {
+impl<R: Read + Seek + Send> Decoder for FlacDecoder<R> {
     fn format(&self) -> AudioFormat {
         self.info.format
     }
     fn total_frames(&self) -> Option<u64> {
         (self.info.total_samples != 0).then_some(self.info.total_samples)
+    }
+    fn supports_seek(&self) -> bool {
+        self.info.total_samples != 0
+    }
+    fn seek_frame(&mut self, frame: u64) -> Result<()> {
+        FlacDecoder::seek_frame(self, frame)
     }
     fn next_block(&mut self) -> Result<Option<PcmBlock>> {
         self.next_frame()
@@ -722,7 +930,17 @@ mod tests {
         bytes
     }
     fn add_frame(file: &mut Vec<u8>, channel_code: u8, subframes: &[u8]) {
-        let mut frame = vec![0xff, 0xf8, 0x60, channel_code << 4, 0, 15];
+        add_frame_number(file, channel_code, 0, false, subframes);
+    }
+    fn add_frame_number(
+        file: &mut Vec<u8>,
+        channel_code: u8,
+        number: u8,
+        variable_blocking: bool,
+        subframes: &[u8],
+    ) {
+        let blocking = if variable_blocking { 0xf9 } else { 0xf8 };
+        let mut frame = vec![0xff, blocking, 0x60, channel_code << 4, number, 15];
         let crc = frame
             .iter()
             .fold(0u8, |value, &byte| crc8_update(value, byte));
@@ -733,6 +951,38 @@ mod tests {
             .fold(0u16, |value, &byte| crc16_update(value, byte));
         frame.extend_from_slice(&crc.to_be_bytes());
         file.extend(frame);
+    }
+    fn seekable_constant_flac(variable_blocking: bool) -> Vec<u8> {
+        let frames = [
+            [0x00, 0x00, 100],
+            [0x00, 0x00, 200],
+            [0x00, 0x01, 44],
+            [0x00, 0x01, 144],
+        ];
+        let mut encoded_frames = Vec::new();
+        for (index, subframe) in frames.iter().enumerate() {
+            let number = if variable_blocking { index * 16 } else { index };
+            add_frame_number(
+                &mut encoded_frames,
+                0,
+                number as u8,
+                variable_blocking,
+                subframe,
+            );
+        }
+        let second_point_offset = (encoded_frames.len() / 2) as u64;
+        let mut file = fixture_header(1, 64);
+        file[4] = 0; // STREAMINFO is not the final metadata block.
+        let mut table = Vec::new();
+        for (sample, offset) in [(0u64, 0u64), (32, second_point_offset)] {
+            table.extend_from_slice(&sample.to_be_bytes());
+            table.extend_from_slice(&offset.to_be_bytes());
+            table.extend_from_slice(&16u16.to_be_bytes());
+        }
+        file.extend_from_slice(&[0x83, 0, 0, table.len() as u8]);
+        file.extend_from_slice(&table);
+        file.extend_from_slice(&encoded_frames);
+        file
     }
     #[test]
     fn constant_mono_is_lossless() {
@@ -836,5 +1086,55 @@ mod tests {
         assert!(utf8_number(&mut decoder).is_err());
         let mut canonical = Bits::new(Cursor::new(vec![0xc2, 0x80]));
         assert_eq!(utf8_number(&mut canonical).unwrap(), 128);
+    }
+
+    #[test]
+    fn seektable_repositions_to_exact_sample_and_frame_boundaries() {
+        for variable_blocking in [false, true] {
+            let mut decoder =
+                FlacDecoder::new(Cursor::new(seekable_constant_flac(variable_blocking))).unwrap();
+            assert!(decoder.supports_seek());
+
+            decoder.seek_frame(40).unwrap();
+            assert_eq!(decoder.next_frame().unwrap().unwrap().samples, vec![300; 8]);
+            assert_eq!(
+                decoder.next_frame().unwrap().unwrap().samples,
+                vec![400; 16]
+            );
+            assert_eq!(decoder.next_frame().unwrap(), None);
+
+            decoder.seek_frame(16).unwrap();
+            assert_eq!(
+                decoder.next_frame().unwrap().unwrap().samples,
+                vec![200; 16]
+            );
+            decoder.seek_frame(32).unwrap();
+            assert_eq!(
+                decoder.next_frame().unwrap().unwrap().samples,
+                vec![300; 16]
+            );
+
+            decoder.seek_frame(64).unwrap();
+            assert_eq!(decoder.next_frame().unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn invalid_seek_targets_and_seekpoint_offsets_fail_closed() {
+        let mut decoder = FlacDecoder::new(Cursor::new(seekable_constant_flac(false))).unwrap();
+        assert!(matches!(
+            decoder.seek_frame(65),
+            Err(MusicError::Invalid(_))
+        ));
+        assert_eq!(
+            decoder.next_frame().unwrap().unwrap().samples,
+            vec![100; 16]
+        );
+
+        let mut invalid = seekable_constant_flac(false);
+        // Second seekpoint offset starts after the STREAMINFO and SEEKTABLE.
+        let offset_field = 4 + 4 + 34 + 4 + 18 + 8;
+        invalid[offset_field..offset_field + 8].copy_from_slice(&u64::MAX.to_be_bytes());
+        assert!(FlacDecoder::new(Cursor::new(invalid)).is_err());
     }
 }

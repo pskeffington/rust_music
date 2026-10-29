@@ -33,5 +33,15 @@ Observed local evidence on 2026-10-29:
 
 ## RM-012 — FLAC seek
 
-Sample-accurate seek remains unimplemented. Do not expose seeking until
-validated frame/seektable behavior and exact PCM-frame tests pass.
+Implemented for seekable FLAC readers with a declared STREAMINFO sample count.
+The decoder validates the bounded SEEKTABLE, selects the nearest preceding
+point (or the first frame), decodes/discards frames, and trims PCM at the
+requested sample. Fixed- and variable-block fixtures verify exact PCM at frame
+boundaries and within frames, end-of-stream, invalid targets, and malformed
+offset rejection. The host `Command::SeekFrame` drains active output, releases
+the audio lease and returns to `Ready`; it never resumes automatically.
+
+Current evidence is synthetic. Real-world encoder/seektable compatibility and
+host input routing remain open. A partial seek cannot verify the whole-stream
+PCM MD5, so successful seek does not claim that checksum validation. The panel
+does not expose a seek control until the host provides a reviewed input path.

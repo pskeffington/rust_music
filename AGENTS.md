@@ -26,7 +26,8 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 ## Latest verified checkpoint (2026-10-29)
 
 Branch `build/native-codecs-g0`; the latest verified checkpoint includes
-RM-017 M4A ingestion/corpus work and RM-011 bounded local tags. Rust/Cargo
+RM-017 M4A ingestion/corpus work, RM-011 bounded local tags, and RM-012
+synthetic fixed/variable-block FLAC seek. Rust/Cargo
 1.99.1/macOS:
 `sh scripts/offline-gate.sh` exited 0 on 15 local crates and 28 path-only
 edges, with zero registry/Git crates and zero third-party system links. Fmt,
@@ -43,4 +44,6 @@ reference/native parity remain recorded in their ledgers; private audio stays
 outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual
 Rust_Boy/Pip-Boy shared focus and input routing, physical panel/output and
 device acceptance remain unverified. Keep PR #1 draft and do not modify sibling
-repositories under the current goal.
+repositories under the current goal. RM-012 host seek routing, real-world
+seektable compatibility, Rust_Boy shared focus and physical panel/output remain
+unverified pending external acceptance evidence.
