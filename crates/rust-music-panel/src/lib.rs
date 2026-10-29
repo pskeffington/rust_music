@@ -134,6 +134,7 @@ pub fn render(view: PanelView<'_>) -> MonoFrame {
     match view.container {
         Some(AudioContainer::Flac) => { frame.text(99, 28, "FLAC", 4); }
         Some(AudioContainer::Wave) => { frame.text(99, 28, "WAV", 3); }
+        Some(AudioContainer::Aiff) => { frame.text(99, 28, "AIFF", 4); }
         None => {}
     }
     // Show exact sample-derived elapsed/duration clocks only when declared.
