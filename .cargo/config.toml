@@ -1,0 +1,5 @@
+# All Rust_Music workspace builds are offline by default.
+# Crates outside this workspace and network fetches are never required.
+[net]
+offline = true
+retry = 0

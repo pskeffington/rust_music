@@ -147,6 +147,12 @@ fn scan_rust(path: &Path, report: &mut Audit) -> Result<(), String> {
 
 fn audit(root: &Path) -> Result<Audit, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let config = read(&root.join(".cargo/config.toml"))?;
+    requirement(config.lines().any(|line| line.trim() == "offline = true"),
+                "Cargo offline default missing from .cargo/config.toml")?;
+    requirement(!config.contains("replace-with") && !config.contains("registries.")
+                && !config.contains("git-fetch-with-cli"),
+                "Cargo source/network override is forbidden")?;
     let manifest = read(&root.join("Cargo.toml"))?;
     requirement(manifest.contains("resolver = \"2\""), "resolver 2 required")?;
     for raw in manifest.lines() {
