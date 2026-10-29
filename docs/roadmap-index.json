@@ -590,7 +590,7 @@
       ],
       "create_paths": [],
       "acceptance": "Bounded library scan recognizes .m4a/.mp4/.mp4a by ftyp and panel labels M4A; six licensed Archive.org ALAC fixtures at 16/44.1 and 24/48 pass exact PCM parity against FFmpeg; AAC remains rejected; fixture hashes and license provenance are recorded",
-      "blocker": "Acceptance passed locally: six Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (five 16-bit/44.1 kHz and one 24-bit/48 kHz); scan ingests MP4-family containers and AAC decoder refusal passed. Wider independent source/encoder coverage remains an ALAC admission qualification"
+      "blocker": "Acceptance passed locally: six Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (five 16-bit/44.1 kHz and one 24-bit/48 kHz); scan ingests MP4-family containers and four AAC fixtures (three Archive.org music items and one generated file) are rejected. The added album tracks are AAC only and do not widen ALAC parity; independent ALAC source/encoder and supported 20/32-bit and mono profiles remain open"
     }
   ]
 }

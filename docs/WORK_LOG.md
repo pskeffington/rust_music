@@ -670,6 +670,33 @@ from an unverified label. Expanding beyond this collection requires finding
 and verifying an independent M4A/ALAC source, rather than counting AAC files as
 ALAC decoder coverage.
 
+## 2026-10-29 — Archive.org album M4A ingestion samples
+
+The user requested a small set of M4A album files and a list of the corpus
+types still needed. The ALAC-positive gap remains an independent encoder/source
+plus real M4A samples at supported 20/32-bit and mono profiles. Archive.org's
+Netlabels format search yielded two separately licensed music albums suitable
+for real M4A/AAC ingestion denial coverage. One short track from each was
+downloaded and verified; neither is counted as lossless decoder evidence.
+
+- `LTTS001A` / *Winter's Child* / Lost to the Sea, CC BY 4.0 uploader metadata:
+  `03. Amazing Grace.m4a`, 1,469,859 bytes, AAC 44.1 kHz stereo,
+  SHA-256 `ca33660a87bf7d02676562851a5806f2bbdd6c5022fa8b17dadd4715e9835243`.
+- `christian-thbe-hegdgehgog-boys-vapor-wave-tape-rip`, sonichuwave クィック,
+  CC BY-SA 4.0 uploader metadata: track 02, 3,287,206 bytes, AAC 44.1 kHz
+  stereo, SHA-256
+  `2406cdcb798c50b7cdf4b23a2f94986c82f373785957d04974972a30570987ca`.
+- The source item/license/track attribution, hashes, and remaining corpus needs
+  are recorded in `crates/rust-music-mp4/tests/fixtures/upstream/README.md`.
+  The script now verifies both hashes, codec/profile, catalog ingestion, and
+  fail-closed AAC refusal.
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**; six ALAC files remained
+  byte-exact against FFmpeg, `.mp4a` alias ingestion passed, and all four AAC
+  fixtures (three Archive.org plus one generated) were rejected.
+- Archive.org's format label is not treated as codec evidence. A separately
+  inspected voice-message candidate labeled Apple Lossless was AAC and was
+  removed rather than retained as music or ALAC evidence.
+
 ## 2026-10-29 — RM-012 real-world FLAC seek parity
 
 Added a bounded `decode-range` CLI action for seek-capable inputs. It requires a

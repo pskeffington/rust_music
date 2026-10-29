@@ -17,7 +17,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Six generated native CLI vectors pass PCM parity; physical output pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
 | .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
 | .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
-| .m4a / .mp4 | MP4 containing ALAC | Bounded profile passes generated parity and six Internet Archive CC0 M4A files (five 16-bit/44.1 kHz and one 24-bit/48 kHz) with exact PCM parity against FFmpeg; scanner indexes `.m4a`/`.mp4` by `ftyp`, while codec admission stays in the decoder. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broader ALAC/CAF corpus remains open | AAC in identical container prohibited |
+| .m4a / .mp4 / .mp4a | MP4 containing ALAC | Bounded profile passes generated parity and six Internet Archive CC0 ALAC M4A files (five 16-bit/44.1 kHz and one 24-bit/48 kHz) with exact PCM parity against FFmpeg. Three additional Archive.org music M4As and one generated M4A are verified AAC and rejected; `.mp4a` signature ingestion is exercised. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Independent ALAC source/encoder, other supported ALAC depths/layouts, and real-world CAF corpus remain open | AAC in identical container prohibited |
 | .caf | ALAC or signed integer LPCM | Bounded profile passes generated FFmpeg-encoded CAF parity: ALAC 16/24-bit and LPCM 16/24/32-bit; strict cookie, packet-table, chunk-bound and codec checks; no OS decoder fallback. Broad real-world CAF corpus and host/output validation remain open | Mono/stereo only; reject AAC, ADPCM, float PCM and unsupported channel layouts |
 | .wv | WavPack pure lossless or hybrid with verified correction | Decoder planned; bounded framing/parser foundation exists but is not admitted | Reject hybrid unless its correction stream is completely validated and paired |
 | RF64/BWF .wav | Extended large-file PCM | Native source implemented | Bounded ds64 parser and synthetic >4 GiB streaming/sample parity; real large-file corpus and hardware remain unverified |
@@ -66,7 +66,7 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 
 ## Next priorities
 
-1. Expand ALAC parity over independently generated depths and a real-world M4A/CAF corpus; retain strict AAC/DRM denial.
+1. Expand ALAC parity with an independent source/encoder and supported 20/32-bit and mono M4A samples; add real-world CAF coverage and retain strict AAC/DRM denial.
 3. Bounded metadata, safe cover art exclusion from the tiny framebuffer, exact seek.
 4. Hardware output negotiation, anti-resampling checks, bit-perfect DAC loopback and shared Radio/TV focus.
 5. Add WavPack lossless, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests. RF64/ds64 source support exists, with broad real-file and hardware acceptance still open.

@@ -39,3 +39,32 @@ The AAC sample exercises real MP4-family container ingestion and fail-closed
 codec admission. It does not expand ALAC decoder parity coverage. The item's
 rights label is uploader-supplied Archive.org metadata, not an independent
 rights audit.
+
+## Additional album AAC rejection samples
+
+Two tracks were selected from separate Archive.org Netlabels albums and
+downloaded on 2026-10-29 as small real-world M4A ingestion cases. Archive.org
+lists both as `MPEG-4 Audio`; local `ffprobe` confirms AAC, 44,100 Hz, stereo.
+They are rejection fixtures only and do not add ALAC decoder parity.
+
+| Fixture | Archive.org item / album / creator | Track | Item license | SHA-256 |
+| --- | --- | --- | --- | --- |
+| `ia-ltts001a-amazing-grace-aac.m4a` | [`LTTS001A`](https://archive.org/details/LTTS001A), *Winter's Child*, Lost to the Sea | `03. Amazing Grace.m4a` | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `ca33660a87bf7d02676562851a5806f2bbdd6c5022fa8b17dadd4715e9835243` |
+| `ia-sonichuwave-tape-rip-aac.m4a` | [`christian-thbe-hegdgehgog-boys-vapor-wave-tape-rip`](https://archive.org/details/christian-thbe-hegdgehgog-boys-vapor-wave-tape-rip), sonichuwave クィック | `02 Ｓｏｎｉｃｈｕ＇ｓ Ｚｉｐ.m4a` | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | `2406cdcb798c50b7cdf4b23a2f94986c82f373785957d04974972a30570987ca` |
+
+Attribution is preserved here with each source item and track. The Archive.org
+license values are uploader-supplied and are not an independent rights audit.
+The optional corpus script verifies each fixture hash and observed codec,
+indexes each file, and confirms the decoder refuses AAC.
+
+## Corpus coverage and remaining files needed
+
+| Test need | Checked-in evidence | Still needed |
+| --- | --- | --- |
+| ALAC positive parity | Six Musopen files: five stereo 16-bit/44.1 kHz and one stereo 24-bit/48 kHz; exact Rust/FFmpeg PCM equality | An independent ALAC source/encoder, plus real M4A samples covering supported 20-bit/32-bit and mono profiles |
+| AAC denial in M4A | One CC0-labeled Archive.org sample, two separately licensed netlabel album tracks, and one generated AAC sample; all four are codec-probed and rejected | Broader container-layout examples only where they exercise an input profile the parser intends to support |
+| MP4-family filename ingestion | Real `.m4a` inputs and a byte-identical `.mp4a` alias are scanned by content signature | A real `.mp4`-named audio input can strengthen the alias case; extension alone must never grant codec support |
+| CAF ALAC/LPCM | Generated ALAC 16/24-bit and signed LPCM 16/24/32-bit vectors pass exact PCM parity | Independently sourced real-world CAF files |
+
+Corpus rows marked “still needed” are evidence gaps, not implied support. AAC
+fixtures validate fail-closed admission only; they are never playback inputs.

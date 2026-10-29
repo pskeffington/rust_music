@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Verify the checked-in CC0 ALAC/M4A corpus, Rust PCM parity and ingestion.
+"""Verify checked-in Archive.org ALAC/AAC M4A fixtures, PCM parity and ingestion.
 
 FFmpeg and ffprobe are optional local oracle tools; neither is a runtime
-dependency. The AAC negative fixture is a deterministic synthetic file.
+dependency. One AAC negative fixture is deterministic and synthetic.
 """
 import hashlib
 import pathlib
@@ -22,9 +22,25 @@ CASES = {
     "ia-mazurka-op17-no3.m4a": ("3b59179aec77376f5609a7130ad7cd9a19d9ae484b98f3a6f4c80152922d0d10", 44100, 16),
     "ia-mazurka-op17-no4.m4a": ("e231321ea7671950c16edd0d5bd93863479efbd1cb8acae183d2d9c5c16eb3bb", 44100, 16),
 }
-AAC_ARCHIVE = (
-    "ia-stificash-starstedede-aac.m4a",
-    "b3735fba8acf607bf51438fa43ad4c314da46c07d75482eae99629bc3d422857",
+AAC_ARCHIVES = (
+    (
+        "ia-stificash-starstedede-aac.m4a",
+        "b3735fba8acf607bf51438fa43ad4c314da46c07d75482eae99629bc3d422857",
+        44100,
+        2,
+    ),
+    (
+        "ia-ltts001a-amazing-grace-aac.m4a",
+        "ca33660a87bf7d02676562851a5806f2bbdd6c5022fa8b17dadd4715e9835243",
+        44100,
+        2,
+    ),
+    (
+        "ia-sonichuwave-tape-rip-aac.m4a",
+        "2406cdcb798c50b7cdf4b23a2f94986c82f373785957d04974972a30570987ca",
+        44100,
+        2,
+    ),
 )
 
 
@@ -85,35 +101,44 @@ def run():
         shutil.copyfile(UPSTREAM / next(iter(CASES)), mp4a_alias)
         for path in [
             *(UPSTREAM / name for name in CASES),
-            UPSTREAM / AAC_ARCHIVE[0],
+            *(UPSTREAM / name for name, _, _, _ in AAC_ARCHIVES),
             FIXTURES / "generated_aac.m4a",
         ]:
             shutil.copyfile(path, scan_root / path.name)
         scan = rust_cli("scan", scan_root).stdout
         if (
-            f"{len(CASES) + 3} tracks" not in scan
+            f"{len(CASES) + len(AAC_ARCHIVES) + 2} tracks" not in scan
             or "Mp4" not in scan
             or any(name not in scan for name in CASES)
-            or AAC_ARCHIVE[0] not in scan
+            or any(name not in scan for name, _, _, _ in AAC_ARCHIVES)
             or "archive-alias.mp4a" not in scan
         ):
             raise AssertionError(f"M4A signature ingestion failed: {scan}")
-        archive_aac = UPSTREAM / AAC_ARCHIVE[0]
-        if hashlib.sha256(archive_aac.read_bytes()).hexdigest() != AAC_ARCHIVE[1]:
-            raise AssertionError("Archive.org AAC fixture hash mismatch")
-        for aac in (FIXTURES / "generated_aac.m4a", archive_aac):
+        for name, expected_hash, expected_rate, expected_channels in AAC_ARCHIVES:
+            aac = UPSTREAM / name
+            if hashlib.sha256(aac.read_bytes()).hexdigest() != expected_hash:
+                raise AssertionError(f"Archive.org AAC fixture hash mismatch: {name}")
             aac_details = dict(line.split("=", 1) for line in codec(aac).splitlines())
             if aac_details.get("codec_name") != "aac":
                 raise AssertionError(f"negative fixture is not AAC: {aac}: {aac_details}")
-            if aac == archive_aac and any(
+            if any(
                 aac_details.get(key) != value
-                for key, value in {"sample_rate": "44100", "channels": "2"}.items()
+                for key, value in {
+                    "sample_rate": str(expected_rate),
+                    "channels": str(expected_channels),
+                }.items()
             ):
                 raise AssertionError(f"unexpected Archive.org AAC stream details: {aac_details}")
             denied = rust_cli("inspect", aac, ok=False)
             if denied.returncode == 0:
                 raise AssertionError(f"AAC negative fixture was not rejected: {aac}")
-        print("PASS ingestion: Archive.org ALAC/AAC M4As and .mp4a alias catalogued; both AAC fixtures rejected")
+        generated_aac = FIXTURES / "generated_aac.m4a"
+        if dict(line.split("=", 1) for line in codec(generated_aac).splitlines()).get("codec_name") != "aac":
+            raise AssertionError("generated negative fixture is not AAC")
+        denied = rust_cli("inspect", generated_aac, ok=False)
+        if denied.returncode == 0:
+            raise AssertionError("generated AAC fixture was not rejected")
+        print("PASS ingestion: Archive.org ALAC/AAC M4As and .mp4a alias catalogued; all four AAC fixtures rejected")
     print(f"PASS: {len(CASES)}/{len(CASES)} checked-in Internet Archive ALAC/M4A parity cases; temporary PCM outputs removed")
 
 
