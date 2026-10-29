@@ -53,9 +53,9 @@ which requires a seek-capable decoder, declared total, in-range sample bounds,
 and a WAV-size-safe requested range. With the six supplied FLACs, the harness
 compares up to 257-frame Rust output at every real SEEKTABLE sample and the
 following sample against FFmpeg PCM. All 132 ranges across six streams passed
-at every populated seekpoint. The source FLACs and all temporary reference/range PCM remained
-outside Git and were removed from temporary storage. This validates these six
-encodes only; whole-file decoding/FLAC integrity is still checked separately,
+at every populated seekpoint. The source FLACs and all temporary reference/range
+PCM remained outside Git and were removed from temporary storage. This validates
+these six encodes only; whole-file decoding/FLAC integrity is checked separately,
 and a partial seek does not validate the complete stream MD5.
 
 Observed command:

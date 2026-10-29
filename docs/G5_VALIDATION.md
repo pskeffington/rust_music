@@ -4,8 +4,8 @@ Recorded 2026-10-29. Local workspace build, Clippy, tests and release build pass
 
 | Check | Result | Evidence / reproducible command |
 | --- | --- | --- |
-| Workspace closure | PASS (static and offline audit) | 12 Cargo workspace crates; 21 internal path edges; no registry/Git crates |
-| Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (19 sources, 16 rules, exact generated markdown parity) |
+| Workspace closure | PASS (static and offline audit) | 16 Cargo workspace crates; 29 internal path edges; no registry/Git crates |
+| Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (20 sources, 16 rules, exact generated markdown parity) |
 | Reference FLAC fixture validity | PASS (reference-only) | `python3 scripts/test_flac_reference.py --fixtures-only` (seven FLAC files, 8/16/24/32-bit mono/stereo/six-channel, reference MD5) |
 | Bounded library tests | PASS | Local `sh scripts/offline-gate.sh`; symlink avoidance, scan limits, stable ordering |
 | Host slot and exclusive focus tests | PASS (mock focus) | Local `sh scripts/offline-gate.sh`; no autoplay, EOF/Stop/Drop release, denial before output, and device-open failure releases the host lease |
@@ -24,4 +24,8 @@ Recorded 2026-10-29. Local workspace build, Clippy, tests and release build pass
 
 ## Next gate
 
-Run the private six-track native FLAC parity command on the operator-owned files, then implement and test the host-side shared focus bridge and qualify physical DAC behavior. Do not merge or claim bit-perfect until acceptance evidence is recorded.
+The six supplied private FLACs pass whole-track native/reference PCM parity and
+exact range parity at all 132 populated SEEKTABLE positions and their following
+samples. The next G5 acceptance is host-side shared focus arbitration across
+Radio/TV/Music; physical DAC qualification remains separate. Do not merge or
+claim bit-perfect until the corresponding evidence is recorded.
