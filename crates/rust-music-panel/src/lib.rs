@@ -232,7 +232,7 @@ mod tests {
     use rust_music::{AudioFormat, NullSink, PlaybackSnapshot};
     use rust_music_host::MusicSlot;
     use rust_music_library::{scan, ScanLimits};
-    use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     #[test]
     fn framebuffer_one_kib_and_bounds() {
@@ -314,6 +314,6 @@ mod tests {
         assert_eq!(frame.pixels().len(), BYTES);
         assert_eq!(slot.status(), before);
         assert!(frame.pixels().iter().any(|byte| *byte != 0));
-        fs::remove_dir_all(PathBuf::from(path)).unwrap();
+        fs::remove_dir_all(&path).unwrap();
     }
 }
