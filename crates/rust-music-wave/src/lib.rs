@@ -96,6 +96,7 @@ pub struct WaveDecoder<R: Read + Send> {
     input: R,
     format: WaveFormat,
     remaining: u64,
+    total_frames: u64,
     pad_after_data: bool,
 }
 
@@ -138,6 +139,7 @@ impl<R: Read + Send> WaveDecoder<R> {
                         input,
                         format,
                         remaining: length,
+                        total_frames: length / frame_bytes as u64,
                         pad_after_data: length & 1 != 0,
                     });
             } else {
@@ -195,6 +197,7 @@ impl<R: Read + Send> WaveDecoder<R> {
 
 impl<R: Read + Send> Decoder for WaveDecoder<R> {
     fn format(&self) -> AudioFormat { self.format.pcm }
+    fn total_frames(&self) -> Option<u64> { Some(self.total_frames) }
     fn next_block(&mut self) -> Result<Option<PcmBlock>> { self.next_pcm_block() }
 }
 
@@ -235,10 +238,12 @@ mod tests {
     fn signed_24_and_unsigned_8() {
         let source = wave(24, 2, &[0xff, 0xff, 0x7f, 0, 0, 0x80], false, 24);
         let mut decoder = WaveDecoder::new(Cursor::new(source)).unwrap();
+        assert_eq!(decoder.total_frames(), Some(1));
         assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![8_388_607, -8_388_608]);
         assert_eq!(decoder.next_pcm_block().unwrap(), None);
         let source = wave(8, 1, &[0, 128, 255], false, 8);
         let mut decoder = WaveDecoder::new(Cursor::new(source)).unwrap();
+        assert_eq!(decoder.total_frames(), Some(3));
         assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![-128, 0, 127]);
         assert_eq!(decoder.next_pcm_block().unwrap(), None);
     }
