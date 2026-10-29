@@ -5,6 +5,30 @@ independent Rust Music build can be hosted by Pip-Boy without taking ownership
 of the shell, Settings, or the shared audio device. It does not claim that a
 Pip-Boy adapter is already implemented or hardware-tested.
 
+## Universal dock and Radio replacement model
+
+Treat Pip-Boy's universal package host as the **dock**: Rust Music is a
+replaceable package that enters the shared foreground slot, while the shell
+continues to own device access, Settings, navigation, and package lifecycle.
+Rust Music must have its own stable package identity (for example,
+`org.rustboy.music`) and must not impersonate or overwrite Radio's identity.
+
+For the common “replace Radio with Music” operation, install/register both
+trusted packages, then select Music in the one-foreground host. The host
+suspends Radio before activating/resuming Music; selecting Radio later reverses
+the handoff. This is foreground replacement, not destructive uninstall or
+registry replacement. The inspected v1 host can select among already-mounted
+trusted built-ins, but has no dynamic external module loader or general
+`replace()` API. A truly swappable third-party module requires a separately
+reviewed package loader/IPC boundary and is outside this adapter-ready contract.
+
+The current built-in Radio is a passive catalogue and does not expose playback
+intents. A useful Music-for-Radio dock therefore requires host-side work to
+register the Music package, add user-facing Play/Stop/navigation actions, and
+bridge Pip-Boy's shared Radio/TV audio arbitration to `AudioFocus`. Keep the
+package identity and adapter separate so Music can coexist with Radio and the
+operator can switch between them safely.
+
 ## Keep the product crate independent
 
 `rust-music-host` exposes the framework-free `MusicSlot`, typed commands,
@@ -69,6 +93,9 @@ Play cannot strand the package as media owner.
   does not by itself provide one.
 - No actual Music package is in Pip-Boy's current package roster, and no
   Radio/TV/Music interoperability or physical display/audio test is recorded.
+- The host's current trusted built-in bootstrap is not a universal third-party
+  package loader; module foreground switching is supported conceptually, but
+  dynamic install, unload-and-replace, and external isolation are not.
 
 These gaps require host-side implementation and acceptance. Until that work is
 authorized and complete, Rust Music is **adapter-ready at its public host API**

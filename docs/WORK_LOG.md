@@ -25,6 +25,24 @@ The six source recordings remained at their supplied locations. The script
 used temporary decoded WAV files and removed them on exit; no audio, artwork,
 or absolute source paths were added to Git.
 
+**Pip-Boy universal dock clarification:** documented the intended Radio-to-Music
+foreground handoff in `PIP_BOY_ADAPTER.md`. Music keeps a distinct package ID;
+selecting it suspends Radio and transfers the shared foreground slot. This is
+not destructive module replacement or dynamic third-party installation: the
+current host only bootstraps trusted built-ins and still lacks Music controls
+and the shared audio-focus bridge. After a later, explicit user authorization,
+the separate Pip-Boy PR worktree received one scoped lifecycle regression and
+documentation commit (`dcc7f5c`); it was not pushed, merged, or treated as Music
+integration evidence. No additional sibling-repository changes are in scope.
+
+**Rust Music revalidation:** on working tree `314913d` plus the documentation
+delta above, `sh scripts/offline-gate.sh` passed again, including locked offline
+workspace build/tests, release build, Clippy, formatting and macOS feature
+check. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, and `git diff --check` also passed.
+This revalidates the local Rust Music release floor; it does not clear the
+host-integration or physical-hardware gates.
+
 **Remaining acceptance:** `RM-005` needs physical DAC evidence. `RM-006` and
 `RM-007` need host-side shared Music/Radio/TV focus, package controls and panel
 acceptance; the Pip-Boy worktree remains read-only under the current scope.
