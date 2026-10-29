@@ -24,7 +24,7 @@ those checks.
 
 - **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, stereo decorrelation, frame-number continuity, full-file decoded PCM MD5 when provided. Corpus parity is **not yet certified**.
 - **WAVE PCM decoder**: strict RIFF boundaries, odd-chunk padding, 8/16/24/32-bit integer PCM, and PCM WAVE_FORMAT_EXTENSIBLE (including 24-bit samples stored left-aligned in 32-bit containers).
-- **AIFF / AIFF-C integer PCM decoder (G10)**: newly written local crate with strict FORM/COMM/SSND bounds, 80-bit sample rate and exact 8/16/24/32-bit PCM, plus AIFF-C signed NONE/twos/sowt; Rust compilation and corpus parity still pending.
+- **AIFF / AIFF-C integer PCM decoder (G10)**: newly written local crate with strict FORM/COMM/SSND bounds, 80-bit sample rate and exact 8/16/24/32-bit PCM, plus AIFF-C signed NONE/twos/sowt; Operator-run native CLI PCM parity 7/7 on generated cases; full offline gate and hardware validation still pending.
 - **Audiophile-only playback**: lossless native decoders; minimum playable 16-bit / 44.1 kHz. Lower-resolution inputs remain usable only in decoder conformance tests and are rejected before native DAC activation. MP3, AAC, Opus, Vorbis and other lossy codecs are excluded; M4A/ALAC is a planned, not implemented, addition.
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and *direct Linux ALSA kernel ioctl* (`alsa-output`) adapters. No libasound, mixer plugin, or audio server. Neither is yet hardware validated as bit-perfect.
@@ -78,7 +78,7 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)
 
-**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. `FLAC -> WAV` parity and physical sample-path testing are separate gates. ALAC/M4A, CAF, RF64, Ogg FLAC, WavPack, native DSD, Windows WASAPI, and Android AAudio are not yet supported. AIFF/AIFF-C integer PCM is implemented in source but requires compiled parity acceptance. A filename extension is never proof of losslessness; the scanner only makes a provisional signature-based catalog and the player enforces codec/quality checks before playback.
+**Important:** Losslessly decoded integer PCM is not the same as verified bit-perfect DAC output. `FLAC -> WAV` parity and physical sample-path testing are separate gates. ALAC/M4A, CAF, RF64, Ogg FLAC, WavPack, native DSD, Windows WASAPI, and Android AAudio are not yet supported. AIFF/AIFF-C integer PCM passed seven operator-run native CLI parity vectors; complete offline gate and physical DAC acceptance remain pending. A filename extension is never proof of losslessness; the scanner only makes a provisional signature-based catalog and the player enforces codec/quality checks before playback.
 
 **Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 initially reported `startup_failure` with no jobs scheduled; Rust compilation and the full differential suite remain unverified until a runner successfully executes them.
 
