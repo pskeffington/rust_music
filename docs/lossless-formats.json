@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "profile": "audiophile-lossless-only",
+  "playback_floor": {
+    "integer_pcm_bits": 16,
+    "sample_rate_hz": 44100
+  },
+  "source_integrity": {
+    "no_upsampling": true,
+    "no_automatic_resampling": true,
+    "no_float_dsp": true,
+    "bit_perfect_hardware_verified": false,
+    "codec_header_proves_mastering_quality": false
+  },
+  "catalog": {
+    "method": "local-extension-and-magic-probe",
+    "status": "provisional-not-full-decoder-validation",
+    "unsafe_audio_cannot_pass_player_load": true
+  },
+  "formats": [
+    {
+      "id": "flac",
+      "extensions": [
+        ".flac"
+      ],
+      "container": "native FLAC",
+      "accepted_codecs": [
+        "FLAC"
+      ],
+      "stage": "native-source-implemented",
+      "verification": "cargo-and-full-PCM-parity-pending",
+      "gate": "G2"
+    },
+    {
+      "id": "riff-wave",
+      "extensions": [
+        ".wav"
+      ],
+      "container": "RIFF/WAVE",
+      "accepted_codecs": [
+        "integer PCM",
+        "WAVE_FORMAT_EXTENSIBLE integer PCM"
+      ],
+      "stage": "native-source-implemented",
+      "verification": "cargo-and-full-PCM-parity-pending",
+      "gate": "G7"
+    },
+    {
+      "id": "aiff",
+      "extensions": [
+        ".aif",
+        ".aiff"
+      ],
+      "container": "AIFF",
+      "accepted_codecs": [
+        "signed integer PCM"
+      ],
+      "stage": "native-source-implemented",
+      "verification": "cargo-and-full-PCM-parity-pending",
+      "gate": "G10"
+    },
+    {
+      "id": "aiff-c",
+      "extensions": [
+        ".aifc"
+      ],
+      "container": "AIFF-C",
+      "accepted_codecs": [
+        "NONE",
+        "twos",
+        "sowt"
+      ],
+      "stage": "native-source-implemented",
+      "verification": "cargo-and-full-PCM-parity-pending",
+      "gate": "G10",
+      "refuse_codecs": [
+        "alaw",
+        "ulaw",
+        "ADPCM",
+        "float"
+      ]
+    },
+    {
+      "id": "alac-m4a",
+      "extensions": [
+        ".m4a"
+      ],
+      "container": "MP4/M4A",
+      "accepted_codecs": [
+        "ALAC"
+      ],
+      "stage": "planned",
+      "verification": "not-implemented",
+      "gate": "G11",
+      "refuse_codecs": [
+        "AAC",
+        "DRM"
+      ]
+    },
+    {
+      "id": "alac-caf",
+      "extensions": [
+        ".caf"
+      ],
+      "container": "CAF",
+      "accepted_codecs": [
+        "ALAC",
+        "integer linear PCM"
+      ],
+      "stage": "planned",
+      "verification": "not-implemented",
+      "gate": "G11",
+      "refuse_codecs": [
+        "AAC",
+        "ADPCM"
+      ]
+    },
+    {
+      "id": "wavpack",
+      "extensions": [
+        ".wv"
+      ],
+      "container": "WavPack",
+      "accepted_codecs": [
+        "pure lossless",
+        "hybrid with validated .wvc correction"
+      ],
+      "stage": "planned",
+      "verification": "not-implemented",
+      "gate": "G12",
+      "refuse_codecs": [
+        "lossy hybrid without correction"
+      ]
+    },
+    {
+      "id": "rf64",
+      "extensions": [
+        ".wav"
+      ],
+      "container": "RF64 / BWF",
+      "accepted_codecs": [
+        "integer PCM"
+      ],
+      "stage": "planned",
+      "verification": "not-implemented",
+      "gate": "G12"
+    },
+    {
+      "id": "ogg-flac",
+      "extensions": [
+        ".oga",
+        ".ogg"
+      ],
+      "container": "Ogg",
+      "accepted_codecs": [
+        "FLAC"
+      ],
+      "stage": "later",
+      "verification": "not-implemented",
+      "gate": "future",
+      "refuse_codecs": [
+        "Vorbis",
+        "Opus"
+      ]
+    },
+    {
+      "id": "native-dsd",
+      "extensions": [
+        ".dsf",
+        ".dff"
+      ],
+      "container": "DSF/DSDIFF",
+      "accepted_codecs": [
+        "native DSD"
+      ],
+      "stage": "optional",
+      "verification": "not-implemented",
+      "gate": "future"
+    },
+    {
+      "id": "ape",
+      "extensions": [
+        ".ape"
+      ],
+      "container": "APE",
+      "accepted_codecs": [
+        "Monkey's Audio lossless"
+      ],
+      "stage": "optional",
+      "verification": "not-implemented",
+      "gate": "future"
+    }
+  ],
+  "excluded_lossy_codecs": [
+    "MP3",
+    "AAC",
+    "Opus",
+    "Vorbis",
+    "lossy WMA",
+    "AC-3",
+    "ADPCM",
+    "A-law",
+    "mu-law"
+  ],
+  "reference_documentation": "docs/G10_AUDIOPHILE_FORMATS.md"
+}
