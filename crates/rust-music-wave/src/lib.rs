@@ -59,12 +59,12 @@ fn parse_format(data: &[u8]) -> Result<WaveFormat> {
     }
     let valid_bits = match code {
         1 => {
-            if data.len() != 16 {
-                if data.len() < 18 || usize::from(u16le(&data[16..18])) > data.len() - 18 {
-                    return Err(MusicError::Invalid(
-                        "WAVE PCM extra format bytes are inconsistent",
-                    ));
-                }
+            if data.len() != 16
+                && (data.len() < 18 || usize::from(u16le(&data[16..18])) > data.len() - 18)
+            {
+                return Err(MusicError::Invalid(
+                    "WAVE PCM extra format bytes are inconsistent",
+                ));
             }
             container_bits
         }

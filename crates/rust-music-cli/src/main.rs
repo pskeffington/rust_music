@@ -76,7 +76,7 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
             match sample_bytes {
                 1 => bytes.push((value + 128) as u8),
                 2 => bytes.extend_from_slice(&(value as i16).to_le_bytes()),
-                3 => bytes.extend_from_slice(&(value as i32).to_le_bytes()[..3]),
+                3 => bytes.extend_from_slice(&value.to_le_bytes()[..3]),
                 4 => bytes.extend_from_slice(&value.to_le_bytes()),
                 _ => return Err(MusicError::Unsupported("unsupported integer PCM width")),
             }

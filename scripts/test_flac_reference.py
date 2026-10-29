@@ -80,7 +80,10 @@ def command(*args, ok=True):
 
 
 def decoder(*args, ok=True):
-    return command("cargo", "run", "--quiet", "-p", "rust-music-cli", "--", *map(str, args), ok=ok)
+    return command(
+        "cargo", "run", "--locked", "--offline", "--quiet", "-p", "rust-music-cli",
+        "--", *map(str, args), ok=ok
+    )
 
 
 def flac_md5(data):
