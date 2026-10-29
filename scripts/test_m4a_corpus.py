@@ -22,6 +22,10 @@ CASES = {
     "ia-mazurka-op17-no3.m4a": ("3b59179aec77376f5609a7130ad7cd9a19d9ae484b98f3a6f4c80152922d0d10", 44100, 16),
     "ia-mazurka-op17-no4.m4a": ("e231321ea7671950c16edd0d5bd93863479efbd1cb8acae183d2d9c5c16eb3bb", 44100, 16),
 }
+AAC_ARCHIVE = (
+    "ia-stificash-starstedede-aac.m4a",
+    "b3735fba8acf607bf51438fa43ad4c314da46c07d75482eae99629bc3d422857",
+)
 
 
 def command(args, *, ok=True):
@@ -79,23 +83,37 @@ def run():
         scan_root.mkdir()
         mp4a_alias = scan_root / "archive-alias.mp4a"
         shutil.copyfile(UPSTREAM / next(iter(CASES)), mp4a_alias)
-        for path in [*(UPSTREAM / name for name in CASES), FIXTURES / "generated_aac.m4a"]:
+        for path in [
+            *(UPSTREAM / name for name in CASES),
+            UPSTREAM / AAC_ARCHIVE[0],
+            FIXTURES / "generated_aac.m4a",
+        ]:
             shutil.copyfile(path, scan_root / path.name)
         scan = rust_cli("scan", scan_root).stdout
         if (
-            f"{len(CASES) + 2} tracks" not in scan
+            f"{len(CASES) + 3} tracks" not in scan
             or "Mp4" not in scan
             or any(name not in scan for name in CASES)
+            or AAC_ARCHIVE[0] not in scan
             or "archive-alias.mp4a" not in scan
         ):
             raise AssertionError(f"M4A signature ingestion failed: {scan}")
-        aac_details = dict(line.split("=", 1) for line in codec(FIXTURES / "generated_aac.m4a").splitlines())
-        if aac_details.get("codec_name") != "aac":
-            raise AssertionError(f"negative fixture is not AAC: {aac_details}")
-        denied = rust_cli("inspect", FIXTURES / "generated_aac.m4a", ok=False)
-        if denied.returncode == 0:
-            raise AssertionError(f"AAC negative fixture was not rejected: {denied.stderr}")
-        print("PASS ingestion: upstream ALAC M4As and AAC container catalogued; AAC decode rejected")
+        archive_aac = UPSTREAM / AAC_ARCHIVE[0]
+        if hashlib.sha256(archive_aac.read_bytes()).hexdigest() != AAC_ARCHIVE[1]:
+            raise AssertionError("Archive.org AAC fixture hash mismatch")
+        for aac in (FIXTURES / "generated_aac.m4a", archive_aac):
+            aac_details = dict(line.split("=", 1) for line in codec(aac).splitlines())
+            if aac_details.get("codec_name") != "aac":
+                raise AssertionError(f"negative fixture is not AAC: {aac}: {aac_details}")
+            if aac == archive_aac and any(
+                aac_details.get(key) != value
+                for key, value in {"sample_rate": "44100", "channels": "2"}.items()
+            ):
+                raise AssertionError(f"unexpected Archive.org AAC stream details: {aac_details}")
+            denied = rust_cli("inspect", aac, ok=False)
+            if denied.returncode == 0:
+                raise AssertionError(f"AAC negative fixture was not rejected: {aac}")
+        print("PASS ingestion: Archive.org ALAC/AAC M4As and .mp4a alias catalogued; both AAC fixtures rejected")
     print(f"PASS: {len(CASES)}/{len(CASES)} checked-in Internet Archive ALAC/M4A parity cases; temporary PCM outputs removed")
 
 

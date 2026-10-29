@@ -24,3 +24,18 @@ real-world packet/table coverage to generated vectors, but all come from one
 collection and do not establish compatibility across independent encoders or
 devices. Two tracks expand same-source coverage; they do not close the
 independent-source/encoder gap.
+
+## AAC ingestion-denial sample
+
+`ia-stificash-starstedede-aac.m4a` was downloaded from Internet Archive item
+[`starstedede`](https://archive.org/details/starstedede), credited to
+Stificash and labeled CC0 1.0 in the item's metadata. The item describes it as
+a remix. The checked-in 3.5 MB file is verified as AAC, 44,100 Hz, stereo by
+the optional corpus script. It is an ingestion/codec-denial fixture only: AAC
+is lossy and must never be decoded for playback by Rust Music. SHA-256:
+`b3735fba8acf607bf51438fa43ad4c314da46c07d75482eae99629bc3d422857`.
+
+The AAC sample exercises real MP4-family container ingestion and fail-closed
+codec admission. It does not expand ALAC decoder parity coverage. The item's
+rights label is uploader-supplied Archive.org metadata, not an independent
+rights audit.

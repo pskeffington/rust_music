@@ -4,6 +4,28 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-29 — Archive.org AAC ingestion-denial sample
+
+Added `ia-stificash-starstedede-aac.m4a` from Archive.org item
+[`starstedede`](https://archive.org/details/starstedede), credited to
+Stificash. The item labels the upload CC0 1.0; that uploader-supplied rights
+claim is recorded as provenance, not independently audited. The checked-in
+file is 3.5 MB, SHA-256
+`b3735fba8acf607bf51438fa43ad4c314da46c07d75482eae99629bc3d422857`, and
+`ffprobe` identifies AAC, 44.1 kHz stereo. It is only a real-world container
+ingestion and lossy-codec denial fixture; it is not playback or ALAC parity
+evidence.
+
+Extended `scripts/test_m4a_corpus.py` to verify this sample's hash and actual
+AAC codec, catalog it alongside the six existing Archive.org ALAC samples and
+the generated AAC sample, preserve the `.mp4a` alias check, and require AAC
+inspection to fail closed for both AAC files. The script passed all six exact
+ALAC PCM comparisons, scanner checks and both AAC denials. Roadmap and
+literature validators and `git diff --check` passed. The new corpus fixture
+adds a second Archive.org item and a different uploader, but does not close
+the independent lossless encoder/ALAC source gap; it retains the stated
+metadata license without claiming a separate rights audit.
+
 ## 2026-10-29 — offline release gate and private FLAC parity
 
 **Branch hygiene:** work stayed on the existing `build/native-codecs-g0`
