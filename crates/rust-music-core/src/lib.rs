@@ -77,6 +77,9 @@ impl PcmBlock {
 /// One decoded audio block at a time; no output device or GUI is implied.
 pub trait Decoder: Send {
     fn format(&self) -> AudioFormat;
+    /// Container-declared PCM sample frames per channel, not a proof that the
+    /// entire file is present or valid. None means unknown, never an estimate.
+    fn total_frames(&self) -> Option<u64> { None }
     fn next_block(&mut self) -> Result<Option<PcmBlock>>;
 }
 
