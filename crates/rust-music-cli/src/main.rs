@@ -1,6 +1,6 @@
 //! Offline decoder acceptance harness. Native device output is a separate gate.
 use rust_music::{open_file, AudioFormat, Decoder, MusicError, NullSink, Result};
-use std::{env, fs::File, io::{Seek, SeekFrom, Write}};
+use std::{env, fs::OpenOptions, io::{Seek, SeekFrom, Write}};
 
 const PCM_GUID: [u8; 16] = [1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71];
 
@@ -45,7 +45,7 @@ fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -
 }
 fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
     let format = decoder.format();
-    let mut file = File::create(dest)?;
+    let mut file = OpenOptions::new().write(true).create_new(true).open(dest)?;
     write_header(&mut file, format, 0)?;
     let sample_bytes = usize::from(format.bits_per_sample / 8);
     let mut bytes_written = 0u64;
@@ -144,7 +144,7 @@ fn run() -> Result<()> {
             let library = scan(&path, ScanLimits::default())?;
             let slot = MusicSlot::new(NullSink::default(), library);
             let frame = render(PanelView::from_slot(&slot));
-            let mut dest = File::create(&output)?;
+            let mut dest = OpenOptions::new().write(true).create_new(true).open(&output)?;
             dest.write_all(b"P4\n128 64\n")?;
             dest.write_all(frame.pixels())?;
             println!("128x64 monochrome MUSIC preview: {output}; playback not started");
@@ -188,6 +188,24 @@ mod tests {
         assert_eq!(u32::from_le_bytes(h[4..8].try_into().unwrap()), 42);
         assert_eq!(&h[36..40], b"data");
         assert_eq!(u32::from_le_bytes(h[40..44].try_into().unwrap()), 5);
+    }
+
+    struct EmptyDecoder(AudioFormat);
+    impl Decoder for EmptyDecoder {
+        fn format(&self) -> AudioFormat { self.0 }
+        fn next_block(&mut self) -> Result<Option<rust_music::PcmBlock>> { Ok(None) }
+    }
+
+    #[test]
+    fn export_refuses_to_overwrite_existing_audio() {
+        use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("rust-music-no-clobber-{}-{stamp}.wav", std::process::id()));
+        fs::write(&path, b"KEEP_EXISTING_MUSIC").unwrap();
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        assert!(export_wav(Box::new(EmptyDecoder(format)), path.to_str().unwrap()).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"KEEP_EXISTING_MUSIC");
+        fs::remove_file(path).unwrap();
     }
 
     #[test]

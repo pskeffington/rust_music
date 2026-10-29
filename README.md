@@ -29,7 +29,7 @@ those checks.
 - **Local music library**: bounded, explicit directory scan; FLAC/WAV signature detection, stable filename ordering, symlink rejection and no background scanner.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
-- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, 1-bit PBM screen preview, and optional native output.
+- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
