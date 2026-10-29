@@ -6,11 +6,19 @@ version = 4
 name = "rust-music"
 version = "0.1.0"
 dependencies = [
+ "rust-music-aiff",
  "rust-music-core",
  "rust-music-engine",
  "rust-music-flac",
  "rust-music-native",
  "rust-music-wave",
+]
+
+[[package]]
+name = "rust-music-aiff"
+version = "0.1.0"
+dependencies = [
+ "rust-music-core",
 ]
 
 [[package]]
