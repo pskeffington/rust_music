@@ -48,10 +48,19 @@ pub struct MusicSlot<S: PcmSink> {
 impl<S: PcmSink> MusicSlot<S> {
     pub fn new(sink: S, library: Library) -> Self {
         let selected = (!library.is_empty()).then_some(0);
-        Self { player: Player::new(sink), library, selected, focus_lease: None }
+        Self {
+            player: Player::new(sink),
+            library,
+            selected,
+            focus_lease: None,
+        }
     }
-    pub fn library(&self) -> &Library { &self.library }
-    pub fn sink(&self) -> &S { self.player.sink() }
+    pub fn library(&self) -> &Library {
+        &self.library
+    }
+    pub fn sink(&self) -> &S {
+        self.player.sink()
+    }
     pub fn status(&self) -> SlotSnapshot {
         SlotSnapshot {
             selection: self.selected,
@@ -65,7 +74,9 @@ impl<S: PcmSink> MusicSlot<S> {
     /// always stops playback, preserves the previous relative path if present,
     /// and never starts a different song automatically.
     pub fn replace_library(&mut self, catalog: Library) -> Result<SlotSnapshot> {
-        let old_path = self.selected.and_then(|i| self.library.track(i))
+        let old_path = self
+            .selected
+            .and_then(|i| self.library.track(i))
             .map(|t| t.relative_path.clone());
         self.stop()?;
         self.selected = old_path
@@ -75,7 +86,11 @@ impl<S: PcmSink> MusicSlot<S> {
         Ok(self.status())
     }
 
-    pub fn handle(&mut self, command: Command, audio_focus: &dyn AudioFocus) -> Result<SlotSnapshot> {
+    pub fn handle(
+        &mut self,
+        command: Command,
+        audio_focus: &dyn AudioFocus,
+    ) -> Result<SlotSnapshot> {
         match command {
             Command::Select(index) => self.select(index)?,
             Command::Next => self.move_selection(true)?,
@@ -99,7 +114,9 @@ impl<S: PcmSink> MusicSlot<S> {
     }
     fn move_selection(&mut self, forwards: bool) -> Result<()> {
         let count = self.library.len();
-        if count == 0 { return Ok(()); }
+        if count == 0 {
+            return Ok(());
+        }
         let next = match self.selected {
             Some(i) if forwards => (i + 1) % count,
             Some(0) if !forwards => count - 1,
@@ -112,13 +129,16 @@ impl<S: PcmSink> MusicSlot<S> {
         if self.player.status().state == PlaybackState::Playing {
             return Ok(()); // A repeated Play must not open a second sink.
         }
-        let selection = self.selected.ok_or(MusicError::Invalid("no track selected"))?;
+        let selection = self
+            .selected
+            .ok_or(MusicError::Invalid("no track selected"))?;
         if self.player.status().state != PlaybackState::Ready {
             let path = self.library.checked_path(selection)?;
             self.player.load(open_file(path)?)?;
         }
-        let lease = audio_focus.try_acquire_music()
-            .ok_or_else(|| MusicError::Output("audio focus belongs to another Rust_Boy module".into()))?;
+        let lease = audio_focus.try_acquire_music().ok_or_else(|| {
+            MusicError::Output("audio focus belongs to another Rust_Boy module".into())
+        })?;
         self.focus_lease = Some(lease);
         if let Err(error) = self.player.play() {
             self.focus_lease = None;
@@ -127,10 +147,14 @@ impl<S: PcmSink> MusicSlot<S> {
         Ok(())
     }
     fn poll(&mut self) -> Result<()> {
-        if self.player.status().state != PlaybackState::Playing { return Ok(()); }
+        if self.player.status().state != PlaybackState::Playing {
+            return Ok(());
+        }
         match self.player.step() {
             Ok(snapshot) => {
-                if snapshot.state != PlaybackState::Playing { self.focus_lease = None; }
+                if snapshot.state != PlaybackState::Playing {
+                    self.focus_lease = None;
+                }
                 Ok(())
             }
             Err(error) => {
@@ -158,26 +182,44 @@ mod tests {
     use super::*;
     use rust_music::NullSink;
     use rust_music_library::{scan, ScanLimits};
-    use std::{fs, path::PathBuf, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     #[derive(Clone, Default)]
-    struct TestFocus { claimed: Arc<AtomicBool> }
+    struct TestFocus {
+        claimed: Arc<AtomicBool>,
+    }
     struct TestLease(Arc<AtomicBool>);
     impl AudioLease for TestLease {}
     impl Drop for TestLease {
-        fn drop(&mut self) { self.0.store(false, Ordering::Release); }
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::Release);
+        }
     }
     impl AudioFocus for TestFocus {
         fn try_acquire_music(&self) -> Option<Box<dyn AudioLease>> {
-            self.claimed.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                .ok().map(|_| Box::new(TestLease(self.claimed.clone())) as Box<dyn AudioLease>)
+            self.claimed
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .ok()
+                .map(|_| Box::new(TestLease(self.claimed.clone())) as Box<dyn AudioLease>)
         }
     }
     struct Temp(PathBuf);
     impl Temp {
         fn new() -> Self {
-            let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-            let path = std::env::temp_dir().join(format!("rust-music-slot-{}-{stamp}", std::process::id()));
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = std::env::temp_dir()
+                .join(format!("rust-music-slot-{}-{stamp}", std::process::id()));
             fs::create_dir(&path).unwrap();
             Self(path)
         }
@@ -214,9 +256,15 @@ mod tests {
             bytes.extend_from_slice(&[128, 0]);
             fs::write(self.0.join(name), bytes).unwrap();
         }
-        fn scan(&self) -> Library { scan(&self.0, ScanLimits::default()).unwrap() }
+        fn scan(&self) -> Library {
+            scan(&self.0, ScanLimits::default()).unwrap()
+        }
     }
-    impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
 
     #[test]
     fn below_cd_quality_source_never_claims_radio_focus_or_opens_sink() {
@@ -225,7 +273,10 @@ mod tests {
         let focus = TestFocus::default();
         let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
         assert_eq!(slot.status().tracks, 1);
-        assert!(matches!(slot.handle(Command::Play, &focus), Err(MusicError::Unsupported(_))));
+        assert!(matches!(
+            slot.handle(Command::Play, &focus),
+            Err(MusicError::Unsupported(_))
+        ));
         assert!(!focus.claimed.load(Ordering::Acquire));
         assert!(!slot.status().has_audio_focus);
         assert_eq!(slot.status().playback.state, PlaybackState::Empty);
@@ -234,7 +285,9 @@ mod tests {
 
     #[test]
     fn no_autoplay_and_focus_released_at_end_of_file() {
-        let temp = Temp::new(); temp.wav("b.wav"); temp.wav("a.wav");
+        let temp = Temp::new();
+        temp.wav("b.wav");
+        temp.wav("a.wav");
         let focus = TestFocus::default();
         let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
         assert_eq!(slot.status().tracks, 2);
@@ -252,7 +305,8 @@ mod tests {
 
     #[test]
     fn focus_denial_does_not_start_output_or_displace_radio() {
-        let temp = Temp::new(); temp.wav("a.wav");
+        let temp = Temp::new();
+        temp.wav("a.wav");
         let focus = TestFocus::default();
         focus.claimed.store(true, Ordering::Release); // RADIO already owns audio.
         let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
@@ -269,7 +323,9 @@ mod tests {
 
     #[test]
     fn next_previous_never_autoplay_and_drop_releases_lease() {
-        let temp = Temp::new(); temp.wav("a.wav"); temp.wav("b.wav");
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        temp.wav("b.wav");
         let focus = TestFocus::default();
         let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
         slot.handle(Command::Previous, &focus).unwrap();

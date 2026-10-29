@@ -34,7 +34,9 @@ const BUFFER_SIZE: usize = 9;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-struct Mask { bits: [u32; 8] }
+struct Mask {
+    bits: [u32; 8],
+}
 impl Mask {
     fn only(&mut self, value: u32) {
         self.bits = [0; 8];
@@ -44,10 +46,26 @@ impl Mask {
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-struct Interval { min: u32, max: u32, flags: u32 }
+struct Interval {
+    min: u32,
+    max: u32,
+    flags: u32,
+}
 impl Interval {
-    fn exact(&mut self, value: u32) { *self = Self { min: value, max: value, flags: EXACT_INTEGER }; }
-    fn range(&mut self, min: u32, max: u32) { *self = Self { min, max, flags: EXACT_INTEGER }; }
+    fn exact(&mut self, value: u32) {
+        *self = Self {
+            min: value,
+            max: value,
+            flags: EXACT_INTEGER,
+        };
+    }
+    fn range(&mut self, min: u32, max: u32) {
+        *self = Self {
+            min,
+            max,
+            flags: EXACT_INTEGER,
+        };
+    }
 }
 
 // ABI snapshot: /usr/include/sound/asound.h snd_pcm_hw_params (Linux 64 bit).
@@ -73,9 +91,15 @@ impl HwParams {
     fn new(format: AudioFormat) -> Self {
         let mut value = Self {
             flags: NO_RESAMPLE,
-            masks: [Mask { bits: [u32::MAX; 8] }; 3],
+            masks: [Mask {
+                bits: [u32::MAX; 8],
+            }; 3],
             mres: [Mask::default(); 5],
-            intervals: [Interval { min: 0, max: u32::MAX, flags: 0 }; 12],
+            intervals: [Interval {
+                min: 0,
+                max: u32::MAX,
+                flags: 0,
+            }; 12],
             ires: [Interval::default(); 9],
             rmask: u32::MAX,
             cmask: 0,
@@ -98,7 +122,8 @@ impl HwParams {
         value.masks[1].only(sample_format);
         value.masks[2].only(0); // PCM subformat STD
         value.intervals[SAMPLE_BITS].exact(u32::from(format.bits_per_sample));
-        value.intervals[FRAME_BITS].exact(u32::from(format.bits_per_sample) * u32::from(format.channels));
+        value.intervals[FRAME_BITS]
+            .exact(u32::from(format.bits_per_sample) * u32::from(format.channels));
         value.intervals[CHANNELS].exact(u32::from(format.channels));
         value.intervals[RATE].exact(format.sample_rate);
         value.intervals[PERIOD_SIZE].range(128, 8192);
@@ -107,13 +132,19 @@ impl HwParams {
         value
     }
     fn exact_format(&self, format: AudioFormat) -> bool {
-        [(SAMPLE_BITS, u32::from(format.bits_per_sample)),
-         (FRAME_BITS, u32::from(format.bits_per_sample) * u32::from(format.channels)),
-         (CHANNELS, u32::from(format.channels)),
-         (RATE, format.sample_rate)]
-            .into_iter().all(|(idx, expected)| {
-                self.intervals[idx].min == expected && self.intervals[idx].max == expected
-            })
+        [
+            (SAMPLE_BITS, u32::from(format.bits_per_sample)),
+            (
+                FRAME_BITS,
+                u32::from(format.bits_per_sample) * u32::from(format.channels),
+            ),
+            (CHANNELS, u32::from(format.channels)),
+            (RATE, format.sample_rate),
+        ]
+        .into_iter()
+        .all(|(idx, expected)| {
+            self.intervals[idx].min == expected && self.intervals[idx].max == expected
+        })
     }
 }
 
@@ -165,24 +196,40 @@ struct Transfer {
 }
 
 // ioctl is part of the target OS's C ABI, not a downloaded sound library.
-unsafe extern "C" { fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int; }
+unsafe extern "C" {
+    fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int;
+}
 
 const fn ioc(dir: u64, number: u8, size: usize) -> c_ulong {
     ((dir << 30) | ((size as u64) << 16) | ((b'A' as u64) << 8) | number as u64) as c_ulong
 }
-const fn readwrite<T>(number: u8) -> c_ulong { ioc(3, number, size_of::<T>()) }
-const fn write<T>(number: u8) -> c_ulong { ioc(1, number, size_of::<T>()) }
-const fn none(number: u8) -> c_ulong { ioc(0, number, 0) }
+const fn readwrite<T>(number: u8) -> c_ulong {
+    ioc(3, number, size_of::<T>())
+}
+const fn write<T>(number: u8) -> c_ulong {
+    ioc(1, number, size_of::<T>())
+}
+const fn none(number: u8) -> c_ulong {
+    ioc(0, number, 0)
+}
 
 fn call<T>(file: &File, request: c_ulong, data: &mut T) -> io::Result<()> {
     // SAFETY: data is an initialized repr(C) buffer and remains live for ioctl.
     let rc = unsafe { ioctl(file.as_raw_fd(), request, data as *mut T) };
-    if rc < 0 { Err(io::Error::last_os_error()) } else { Ok(()) }
+    if rc < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 fn command(file: &File, request: c_ulong) -> io::Result<()> {
     // SAFETY: zero-argument ALSA ioctls consume no user pointer.
     let rc = unsafe { ioctl(file.as_raw_fd(), request) };
-    if rc < 0 { Err(io::Error::last_os_error()) } else { Ok(()) }
+    if rc < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 fn as_output(operation: &'static str, error: io::Error) -> MusicError {
     MusicError::Output(format!("ALSA kernel {operation}: {error}"))
@@ -192,9 +239,11 @@ fn device_path(device: &str) -> Result<PathBuf> {
     // Reject ALSA plugin names (`default`, `plughw`, `dmix`) and raw filesystem
     // paths. Accept only an explicit, bounded hardware-card/device pair.
     let pair = device.strip_prefix("hw:").ok_or(MusicError::Unsupported(
-        "native Linux output needs an explicit hw:CARD,DEVICE; ALSA plugins are not used"
+        "native Linux output needs an explicit hw:CARD,DEVICE; ALSA plugins are not used",
     ))?;
-    let (card, item) = pair.split_once(',').ok_or(MusicError::Invalid("expected hw:CARD,DEVICE"))?;
+    let (card, item) = pair
+        .split_once(',')
+        .ok_or(MusicError::Invalid("expected hw:CARD,DEVICE"))?;
     fn component(value: &str) -> Option<u16> {
         if value.is_empty() || value.len() > 3 || !value.bytes().all(|b| b.is_ascii_digit()) {
             return None;
@@ -215,29 +264,43 @@ pub struct AlsaSink {
 }
 impl AlsaSink {
     pub fn new(device: &str, _strict_hw: bool) -> Result<Self> {
-        Ok(Self { device: device_path(device)?, handle: None, format: None })
+        Ok(Self {
+            device: device_path(device)?,
+            handle: None,
+            format: None,
+        })
     }
 }
 impl PcmSink for AlsaSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
-        if self.handle.is_some() { return Err(MusicError::Invalid("ALSA output already open")); }
+        if self.handle.is_some() {
+            return Err(MusicError::Invalid("ALSA output already open"));
+        }
         if !matches!(format.bits_per_sample, 8 | 16 | 24 | 32) {
-            return Err(MusicError::Unsupported("Linux kernel ALSA supports packed 8/16/24/32-bit PCM only"));
+            return Err(MusicError::Unsupported(
+                "Linux kernel ALSA supports packed 8/16/24/32-bit PCM only",
+            ));
         }
         let file = OpenOptions::new().write(true).open(&self.device)?;
         let mut hw = HwParams::new(format);
         call(&file, readwrite::<HwParams>(0x10), &mut hw).map_err(|e| as_output("HW_REFINE", e))?;
         if !hw.exact_format(format) {
-            return Err(MusicError::Unsupported("hardware cannot negotiate source PCM format exactly"));
+            return Err(MusicError::Unsupported(
+                "hardware cannot negotiate source PCM format exactly",
+            ));
         }
         call(&file, readwrite::<HwParams>(0x11), &mut hw).map_err(|e| as_output("HW_PARAMS", e))?;
         if !hw.exact_format(format) {
-            return Err(MusicError::Unsupported("hardware altered the requested PCM parameters"));
+            return Err(MusicError::Unsupported(
+                "hardware altered the requested PCM parameters",
+            ));
         }
         let period = hw.intervals[PERIOD_SIZE].min as usize;
         let buffer = hw.intervals[BUFFER_SIZE].min as usize;
         if period == 0 || buffer < period || buffer > 65_536 {
-            return Err(MusicError::Unsupported("invalid hardware period/buffer negotiation"));
+            return Err(MusicError::Unsupported(
+                "invalid hardware period/buffer negotiation",
+            ));
         }
         let mut sw = SwParams::new(period, buffer);
         call(&file, readwrite::<SwParams>(0x13), &mut sw).map_err(|e| as_output("SW_PARAMS", e))?;
@@ -248,11 +311,20 @@ impl PcmSink for AlsaSink {
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
         if self.format != Some(block.format) {
-            return Err(MusicError::Invalid("Linux sink not open or PCM format changed"));
+            return Err(MusicError::Invalid(
+                "Linux sink not open or PCM format changed",
+            ));
         }
-        let file = self.handle.as_ref().ok_or(MusicError::Invalid("Linux sink is closed"))?;
+        let file = self
+            .handle
+            .as_ref()
+            .ok_or(MusicError::Invalid("Linux sink is closed"))?;
         let width = usize::from(block.format.bits_per_sample / 8);
-        let capacity = block.samples.len().checked_mul(width).ok_or(MusicError::Limit("output size overflow"))?;
+        let capacity = block
+            .samples
+            .len()
+            .checked_mul(width)
+            .ok_or(MusicError::Limit("output size overflow"))?;
         let mut packed = Vec::with_capacity(capacity);
         for &sample in &block.samples {
             match width {
@@ -276,7 +348,9 @@ impl PcmSink for AlsaSink {
             match call(file, write::<Transfer>(0x50), &mut transfer) {
                 Ok(()) if transfer.result > 0 => {
                     let frames = transfer.result as usize;
-                    if frames > left { return Err(MusicError::Invalid("ALSA reported excess frames")); }
+                    if frames > left {
+                        return Err(MusicError::Invalid("ALSA reported excess frames"));
+                    }
                     left -= frames;
                     offset += frames * frame_bytes;
                 }
@@ -290,7 +364,9 @@ impl PcmSink for AlsaSink {
                     };
                     if !recoverable || recoveries >= 2 {
                         return Err(MusicError::Output(format!(
-                            "ALSA direct PCM write failed: {:?}, frames={}", failed.err(), transfer.result
+                            "ALSA direct PCM write failed: {:?}, frames={}",
+                            failed.err(),
+                            transfer.result
                         )));
                     }
                     command(file, none(0x40)).map_err(|e| as_output("underrun recovery", e))?;
@@ -310,7 +386,9 @@ impl PcmSink for AlsaSink {
     }
 }
 impl Drop for AlsaSink {
-    fn drop(&mut self) { let _ = self.finish(); }
+    fn drop(&mut self) {
+        let _ = self.finish();
+    }
 }
 
 #[cfg(test)]
@@ -329,8 +407,20 @@ mod tests {
     }
     #[test]
     fn accepts_only_direct_bounded_pcm_devices() {
-        assert_eq!(device_path("hw:2,1").unwrap().to_str(), Some("/dev/snd/pcmC2D1p"));
-        for wrong in ["default", "plughw:0,0", "dmix", "hw:0", "hw:0,0/../x", "hw:a,0", "hw:256,0", "hw:0,0,1"] {
+        assert_eq!(
+            device_path("hw:2,1").unwrap().to_str(),
+            Some("/dev/snd/pcmC2D1p")
+        );
+        for wrong in [
+            "default",
+            "plughw:0,0",
+            "dmix",
+            "hw:0",
+            "hw:0,0/../x",
+            "hw:a,0",
+            "hw:256,0",
+            "hw:0,0,1",
+        ] {
             assert!(device_path(wrong).is_err(), "{wrong}");
         }
     }
