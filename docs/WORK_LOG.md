@@ -446,6 +446,24 @@ runtime device-write error in the local slot contract, not real device behavior.
   release build, and macOS feature check passed.
 - `git diff --check`: **pass**.
 
+## 2026-10-29 — RM-014 real-stream framing coverage
+
+Added a 626-byte synthetic WavPack stream produced by the local FFmpeg encoder
+and verified its codec, mono channel count, 44.1 kHz rate, 16-bit sample depth,
+and 882-frame duration with `ffprobe`. The Rust framing test parses its complete
+audio block and consumes every metadata sub-block. This exercises a real
+encoder-produced stream while leaving all entropy/sample decoding unimplemented.
+Fixture generation, SHA-256, and scope limits are recorded alongside the file.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 8/8 unit
+  tests.
+- `shasum -a 256` matched the recorded fixture digest; `ffprobe` confirmed the
+  expected WavPack/mono/44.1 kHz/16-bit/882-frame stream properties.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 local
+  dependency edges, formatting, warnings-denied Clippy, workspace tests,
+  release build, and macOS feature check passed.
+- `git diff --check`: **pass**.
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:

@@ -235,6 +235,31 @@ mod tests {
     }
 
     #[test]
+    fn parses_ffmpeg_generated_lossless_block_and_all_metadata_lengths() {
+        let fixture = include_bytes!("../tests/fixtures/ffmpeg-synthetic-mono16.wv");
+        let (header, block) = read_block(&mut Cursor::new(fixture.as_slice()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(header.version, 0x410);
+        assert_eq!(header.total_samples, Some(882));
+        assert_eq!(header.block_index, 0);
+        assert_eq!(header.block_samples, 882);
+        assert_eq!(header.channels(), 1);
+        header.validate_integer_mono_stereo().unwrap();
+
+        let mut cursor = HEADER_BYTES;
+        let mut metadata_blocks = 0;
+        while cursor < block.len() {
+            let (_, used) = parse_metadata(&block[cursor..]).unwrap();
+            assert!(used >= 2);
+            cursor += used;
+            metadata_blocks += 1;
+        }
+        assert_eq!(cursor, block.len());
+        assert!(metadata_blocks >= 2);
+    }
+
+    #[test]
     fn v4_uses_32_bit_lengths_and_indices_only() {
         let mut bytes = block(128, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
         bytes[8..10].copy_from_slice(&0x406u16.to_le_bytes());
