@@ -9,6 +9,7 @@ use std::io::{self, Read};
 pub const MAX_BLOCK_BYTES: usize = 1024 * 1024;
 pub const MAX_BLOCK_SAMPLES: u32 = 131_072;
 const HEADER_BYTES: usize = 32;
+const MAX_BIT_READ: u8 = 32;
 
 const FLAG_MONO: u32 = 1 << 2;
 const FLAG_HYBRID: u32 = 1 << 3;
@@ -224,6 +225,70 @@ pub fn parse_metadata(input: &[u8]) -> Result<(MetadataBlock<'_>, usize)> {
         },
         end,
     ))
+}
+
+/// Bounded least-significant-bit-first reader for a WavPack metadata bitstream.
+/// Failed multi-bit reads leave the cursor unchanged.
+pub struct BitReader<'a> {
+    bytes: &'a [u8],
+    bit_offset: usize,
+}
+
+impl<'a> BitReader<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        Self {
+            bytes,
+            bit_offset: 0,
+        }
+    }
+
+    pub fn remaining_bits(&self) -> usize {
+        self.bytes.len() * 8 - self.bit_offset
+    }
+
+    pub fn read_bit(&mut self) -> Result<bool> {
+        if self.remaining_bits() == 0 {
+            return Err(MusicError::Invalid("WavPack bitstream is truncated"));
+        }
+        let byte = self.bytes[self.bit_offset / 8];
+        let bit = (byte >> (self.bit_offset % 8)) & 1 != 0;
+        self.bit_offset += 1;
+        Ok(bit)
+    }
+
+    /// Read up to 32 bits, with the first stream bit becoming bit zero.
+    pub fn read_bits(&mut self, width: u8) -> Result<u32> {
+        if width > MAX_BIT_READ {
+            return Err(MusicError::Limit(
+                "WavPack bit read exceeds 32-bit result width",
+            ));
+        }
+        if usize::from(width) > self.remaining_bits() {
+            return Err(MusicError::Invalid("WavPack bitstream is truncated"));
+        }
+        let mut value = 0u32;
+        for bit_index in 0..width {
+            if self.read_bit()? {
+                value |= 1u32 << bit_index;
+            }
+        }
+        Ok(value)
+    }
+
+    /// Read a unary run of one bits terminated by zero, bounded by both the
+    /// caller's cap and the remaining block payload.
+    pub fn read_unary_ones(&mut self, max_ones: u32) -> Result<u32> {
+        let mut count = 0u32;
+        while self.read_bit()? {
+            if count == max_ones {
+                return Err(MusicError::Limit(
+                    "WavPack unary code exceeds configured bound",
+                ));
+            }
+            count += 1;
+        }
+        Ok(count)
+    }
 }
 
 /// Read one complete WavPack block without exceeding the 1 MiB format limit.
@@ -561,6 +626,48 @@ mod tests {
 
         assert!(parse_metadata(&[0x80, 0xff, 0xff, 0xff]).is_err());
         assert!(parse_metadata(&[0x40, 0]).is_err());
+    }
+
+    #[test]
+    fn bit_reader_is_lsb_first_and_handles_width_boundaries() {
+        let mut bits = BitReader::new(&[0b1001_0110, 0b0000_0001]);
+        assert_eq!(bits.read_bits(4).unwrap(), 0b0110);
+        assert_eq!(bits.read_bits(4).unwrap(), 0b1001);
+        assert_eq!(bits.read_bits(1).unwrap(), 1);
+        assert_eq!(bits.read_bits(7).unwrap(), 0);
+        assert_eq!(bits.remaining_bits(), 0);
+        assert!(bits.read_bit().is_err());
+        assert_eq!(BitReader::new(&[0xff; 4]).read_bits(32).unwrap(), u32::MAX);
+    }
+
+    #[test]
+    fn bit_reader_rejects_oversized_and_truncated_reads_without_consuming() {
+        let mut bits = BitReader::new(&[0b1010_0101]);
+        assert!(matches!(
+            bits.read_bits(33),
+            Err(MusicError::Limit(
+                "WavPack bit read exceeds 32-bit result width"
+            ))
+        ));
+        assert_eq!(bits.remaining_bits(), 8);
+        assert!(bits.read_bits(9).is_err());
+        assert_eq!(bits.remaining_bits(), 8);
+        assert_eq!(bits.read_bits(8).unwrap(), 0b1010_0101);
+    }
+
+    #[test]
+    fn unary_codes_are_terminated_and_bounded() {
+        let mut valid = BitReader::new(&[0b0000_0101]);
+        assert_eq!(valid.read_unary_ones(3).unwrap(), 1);
+        let mut overlong = BitReader::new(&[0b0000_0111]);
+        assert!(matches!(
+            overlong.read_unary_ones(2),
+            Err(MusicError::Limit(
+                "WavPack unary code exceeds configured bound"
+            ))
+        ));
+        let mut unterminated = BitReader::new(&[0xff]);
+        assert!(unterminated.read_unary_ones(8).is_err());
     }
 
     #[test]

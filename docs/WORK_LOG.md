@@ -512,6 +512,27 @@ block CRC check, facade registration, or WavPack playback admission.
 - `python3 scripts/check_literature.py`: **exit 0**.
 - `git diff --check`: **pass**.
 
+## 2026-10-29 — RM-014 bounded entropy bit reader
+
+Added a bounded least-significant-bit-first reader for the compressed WavPack
+metadata stream, including capped unary reads. Multi-bit truncation and
+over-width requests fail without advancing the cursor. Tests cover bit order,
+32-bit reads, exhausted input, atomic failures, terminated unary values, and
+configured unary limits. The behavior follows the official published WavPack
+algorithm description and is an original, small Rust implementation; no
+reference decoder code was copied. This still does not implement entropy-word
+decoding or expose WavPack to the playback facade.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 15/15
+  unit tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 local
+  dependency edges, formatter, warnings-denied Clippy, workspace tests,
+  release build, and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`: **exit 0**.
+- `python3 scripts/check_literature.py`: **exit 0**.
+- `git diff --check`: **pass**.
+- Algorithm reference: [WavPack compression algorithm, section 7.11](https://www.wavpack.com/WavPack.pdf).
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:
