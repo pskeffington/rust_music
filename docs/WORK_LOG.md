@@ -517,6 +517,16 @@ encoder/source coverage.
 - The M4A/MP4 ingestion implementation was already present; this change extends
   its corpus regression coverage rather than changing container recognition.
 
+## 2026-10-29 — Archive.org corpus source recheck
+
+Rechecked Archive.org's public item search for CC0 audio tagged as Apple
+Lossless or M4A. The existing six-file Musopen CC0 ALAC corpus remains the only
+verified ALAC source in this search; the two additional items tagged Apple
+Lossless were previously probed and found to contain AAC. No files were added
+from an unverified label. Expanding beyond this collection requires finding
+and verifying an independent M4A/ALAC source, rather than counting AAC files as
+ALAC decoder coverage.
+
 ## 2026-10-29 — RM-012 real-world FLAC seek parity
 
 Added a bounded `decode-range` CLI action for seek-capable inputs. It requires a
