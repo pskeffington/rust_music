@@ -186,11 +186,13 @@ mod tests {
         fs,
         path::PathBuf,
         sync::{
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicU64, Ordering},
             Arc,
         },
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
     #[derive(Clone, Default)]
     struct TestFocus {
@@ -238,10 +240,18 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let path = std::env::temp_dir()
-                .join(format!("rust-music-slot-{}-{stamp}", std::process::id()));
-            fs::create_dir(&path).unwrap();
-            Self(path)
+            loop {
+                let sequence = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+                let path = std::env::temp_dir().join(format!(
+                    "rust-music-slot-{}-{stamp}-{sequence}",
+                    std::process::id()
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Self(path),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => panic!("failed to create test temp directory: {error}"),
+                }
+            }
         }
         fn wav(&self, name: &str) {
             let mut bytes = b"RIFF".to_vec();

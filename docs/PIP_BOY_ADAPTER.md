@@ -7,10 +7,13 @@ Pip-Boy adapter is already implemented or hardware-tested.
 
 ## Universal dock and Radio replacement model
 
-Treat Pip-Boy's universal package host as the **dock**: Rust Music is a
-replaceable package that enters the shared foreground slot, while the shell
-continues to own device access, Settings, navigation, and package lifecycle.
-Rust Music must have its own stable package identity (for example,
+Treat Pip-Boy's universal package host as the **dock/container**, not as a
+module merger. Every module keeps its own stable identity, package metadata,
+state, controls, and lifecycle; Rust Music, Radio, and TV remain distinct
+packages even when the container changes which one is foreground. Rust Music
+is a replaceable package that enters the shared foreground slot, while the
+shell continues to own device access, Settings, navigation, and package
+lifecycle. Rust Music must have its own stable package identity (for example,
 `org.rustboy.music`) and must not impersonate or overwrite Radio's identity.
 
 For the common “replace Radio with Music” operation, install/register both

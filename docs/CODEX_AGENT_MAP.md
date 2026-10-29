@@ -9,7 +9,7 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 | Role | Codex file | Mode | Owned scope | Purpose |
 | --- | --- | --- | --- | --- |
 | `gate_verifier` | `.codex/agents/gate-verifier.toml` | read only | read-only | Offline gate and sample-parity evidence; no edits |
-| `codec_engineer` | `.codex/agents/codec-engineer.toml` | write scoped | `crates/rust-music-flac/`, `crates/rust-music-wave/`, `crates/rust-music-aiff/`, approved future codec crates | Own independent codec/container decoding and rigorous PCM tests |
+| `codec_engineer` | `.codex/agents/codec-engineer.toml` | write scoped | `crates/rust-music-flac/`, `crates/rust-music-wave/`, `crates/rust-music-aiff/`, `crates/rust-music-alac/`, approved future codec crates | Own independent codec/container decoding and rigorous PCM tests |
 | `audio_backend` | `.codex/agents/audio-backend.toml` | write scoped | `crates/rust-music-native/` | OS PCM adapters and hardware-format acceptance |
 | `host_integrator` | `.codex/agents/host-integrator.toml` | write scoped | `crates/rust-music-host/`, `crates/rust-music-library/`, `crates/rust-music-panel/` | Rust_Boy audio lease, bounded library and 1KiB interface |
 | `index_curator` | `.codex/agents/index-curator.toml` | write scoped | `docs/ROADMAP.md`, `docs/CODEX_AGENT_MAP.md`, `docs/REPOSITORY_INDEX.md`, `docs/roadmap-index.json`, `scripts/check_roadmap_index.py` | Stable roadmap IDs, evidence routing, docs and JSON index |

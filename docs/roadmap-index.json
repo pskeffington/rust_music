@@ -228,7 +228,7 @@
       "title": "ALAC decoder and M4A/CAF demultiplexers",
       "owner_agent": "codec_engineer",
       "status": "planned",
-      "next_evidence": "Independent ALAC decode golden PCM and strict AAC rejection needed",
+      "next_evidence": "Raw ALAC 16/24/32-bit and nonzero stereo-matrix packet parity is independently verified; strict M4A/CAF demux and AAC rejection remain before format admission",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -396,19 +396,18 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "planned",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
       "focus_paths": [
+        "crates/rust-music-alac/src/lib.rs",
         "crates/rust-music-core/src/lib.rs",
         "docs/lossless-formats.json"
       ],
-      "create_paths": [
-        "crates/rust-music-alac/"
-      ],
+      "create_paths": [],
       "acceptance": "New local ALAC crate handles predictor/entropy, bounded cookies, malformed input, exact 16/24/32-bit PCM parity; no third-party codec",
-      "blocker": "None; RM-001 is complete. Keep ALAC unadmitted until independent PCM parity and malformed-input tests pass"
+      "blocker": "Raw decoder acceptance passed: compressed 16/24/32-bit and nonzero stereo-matrix parity, all compressed byte-prefix truncations, malformed-cookie checks, and a full-packet bit-flip no-panic/bounds sweep. ALAC remains unadmitted until separate M4A/CAF demux tasks pass"
     },
     {
       "id": "RM-009",
@@ -417,7 +416,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-008"
       ],
@@ -429,7 +428,7 @@
         "crates/rust-music-mp4/"
       ],
       "acceptance": "Strict ISO BMFF box bounds and ALAC stsd identification; reject AAC/DRM and wrong codec regardless of .m4a suffix",
-      "blocker": "Requires ALAC decoder and independent parity vectors"
+      "blocker": "Raw decoder and independent 16/24/32-bit packet parity are complete; implement strict ISO BMFF demux and AAC/DRM rejection"
     },
     {
       "id": "RM-010",
@@ -438,7 +437,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-008"
       ],
@@ -450,7 +449,7 @@
         "crates/rust-music-caf/"
       ],
       "acceptance": "CAF descriptor, magic cookie, sample and chunk bounds verified with ALAC/PCM golden tests; no AudioToolbox decoder fallback",
-      "blocker": "Requires native ALAC packet decoding"
+      "blocker": "Raw decoder and independent packet parity are complete; implement bounded CAF ALAC/integer-PCM demux without OS codec fallback"
     },
     {
       "id": "RM-011",

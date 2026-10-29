@@ -4,6 +4,7 @@ members = [
   "crates/rust-music-core",
   "crates/rust-music-flac",
   "crates/rust-music-aiff",
+  "crates/rust-music-alac",
   "crates/rust-music-wave",
   "crates/rust-music-engine",
   "crates/rust-music-native",

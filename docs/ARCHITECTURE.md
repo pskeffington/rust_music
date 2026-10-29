@@ -12,6 +12,7 @@ The source tree is MIT licensed. Specifications and comparison projects are cite
 rust-music-core        integer PCM, decoder/sink traits, typed errors, null test sink
 rust-music-flac        native RFC 9639 decoder: STREAMINFO, CRC, fixed/LPC, Rice, channel stereo
 rust-music-aiff        native uncompressed AIFF / PCM AIFF-C FORM + COMM + SSND reader
+rust-music-alac        bounded ALAC cookie/raw-packet decoder; generated 16/24/32-bit and stereo-matrix compressed PCM parity, no container demux; ALAC remains unadmitted
 rust-music-wave        native PCM RIFF/WAVE parser and bounded frame decoder
 rust-music-engine      explicit Load -> Ready -> Play -> Step -> Finish/Stop state machine
 rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shims

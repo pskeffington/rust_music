@@ -17,7 +17,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Six generated native CLI vectors pass PCM parity; physical output pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
 | .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
 | .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
-| .m4a | ALAC | Planned; no native decoder yet | AAC in identical container prohibited |
+| .m4a | ALAC | Bounded raw-packet decoder passes generated 16/24/32-bit and nonzero stereo-matrix PCM vectors; malformed-input breadth and container demux remain incomplete, so ALAC is not admitted | AAC in identical container prohibited |
 | .caf | ALAC or verified integer PCM | Planned | Reject other CAF codecs |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
 | RF64/BWF .wav | Extended large-file PCM | Planned | ds64 and exact bounds required |
