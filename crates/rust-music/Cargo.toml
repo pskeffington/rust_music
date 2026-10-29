@@ -14,6 +14,7 @@ native-alsa = ["dep:rust-music-native", "rust-music-native/alsa"]
 [dependencies]
 rust-music-core = { path = "../rust-music-core" }
 rust-music-flac = { path = "../rust-music-flac" }
+rust-music-aiff = { path = "../rust-music-aiff" }
 rust-music-wave = { path = "../rust-music-wave" }
 rust-music-engine = { path = "../rust-music-engine" }
 rust-music-native = { path = "../rust-music-native", optional = true }
