@@ -47,7 +47,7 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play /p
 | --- | --- | --- | --- |
 | All Cargo dependencies are workspace paths | Pass (static) | Pending (cargo unavailable here) | N/A |
 | No third-party native audio library | Removed libasound; static pass | Pending feature compile | Pending ALSA hardware |
-| Headless FLAC/WAV output offline | No network paths in decoder | Pending tests | N/A |
+| Headless FLAC/WAV/AIFF output offline | No network paths in decoder | Pending tests | N/A |
 | macOS system AudioQueue | System framework only | Pending macOS feature compile | Pending physical DAC |
 | Windows and Android playback | Not yet implemented | Not represented as supported | Pending |
 | Optional reference FLAC comparison | Outside offline gate | Pending differential corpus | N/A |
@@ -56,4 +56,4 @@ All-gates-green or bit-perfect claims are prohibited until measured.
 
 ## G5 local-only modules
 
-`rust-music-library` and `rust-music-host` are additional locally authored workspace packages. The library scan never creates a network client, database, daemon, or background thread; it examines explicitly selected regular files under strict limits. The host slot requires the Rust_Boy host to furnish a single-owner RAII lease shared with Radio/TV. Both crates have only local path Cargo edges. The workspace now contains **10** crates. Refer to [HOST_CONTRACT.md](HOST_CONTRACT.md) for focus and filesystem boundaries. Offline Cargo builds still require a preinstalled Rust toolchain and remain unverified in this environment.
+`rust-music-library` and `rust-music-host` are additional locally authored workspace packages. The library scan never creates a network client, database, daemon, or background thread; it examines explicitly selected regular files under strict limits. The host slot requires the Rust_Boy host to furnish a single-owner RAII lease shared with Radio/TV. Both crates have only local path Cargo edges. The workspace now contains **12** crates as of G10 (including the native AIFF decoder). Refer to [HOST_CONTRACT.md](HOST_CONTRACT.md) for focus and filesystem boundaries. Offline Cargo builds still require a preinstalled Rust toolchain and remain unverified in this environment.
