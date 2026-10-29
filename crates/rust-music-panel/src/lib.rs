@@ -136,20 +136,48 @@ pub fn render(view: PanelView<'_>) -> MonoFrame {
         Some(AudioContainer::Wave) => { frame.text(99, 28, "WAV", 3); }
         None => {}
     }
+    // Show exact sample-derived elapsed/duration clocks only when declared.
+    // No duration guesses when FLAC STREAMINFO has an unknown sample count.
+    if let Some(elapsed) = view.status.playback.elapsed_seconds() {
+        frame.text(2, 40, "TIME", 4);
+        clock(&mut frame, 32, 40, elapsed);
+        if let Some(total) = view.status.playback.duration_seconds() {
+            frame.text(74, 40, "/", 1);
+            clock(&mut frame, 83, 40, total);
+        }
+    }
+    if let Some(progress) = view.status.playback.progress_per_mille() {
+        for x in 2..126 {
+            if x <= 2 + (u32::from(progress) * 123 / 1000) as usize {
+                frame.put(x, 50);
+            }
+        }
+    }
     if let Some(format) = view.status.playback.format {
-        let x = frame.number(2, 40, u64::from(format.sample_rate));
-        let x = frame.text(x, 40, "HZ", 2);
-        let x = x.saturating_add(6);
-        let x = frame.number(x, 40, u64::from(format.bits_per_sample));
-        let x = frame.text(x, 40, "B", 1);
-        let x = x.saturating_add(6);
-        let x = frame.number(x, 40, u64::from(format.channels));
-        frame.text(x, 40, "CH", 2);
+        // Duration occupies this row during playback; otherwise show PCM format.
+        if view.status.playback.elapsed_seconds().is_none() {
+            let x = frame.text(x, 40, "HZ", 2).saturating_add(6);
+            let x = frame.number(x, 40, u64::from(format.bits_per_sample));
+            let x = frame.text(x, 40, "B", 1).saturating_add(6);
+            let x = frame.number(x, 40, u64::from(format.channels));
+            frame.text(x, 40, "CH", 2);
+        }
     } else {
         frame.text(2, 40, "OFFLINE / LOSSLESS", 18);
     }
-    frame.text(2, 53, "<   PLAY  STOP   >", 18);
+    frame.text(2, 55, "<   PLAY  STOP   >", 18);
     frame
+}
+
+// Compact mm:ss clock. Saturate to 99:59 to preserve fixed display geometry.
+fn clock(frame: &mut MonoFrame, x: usize, y: usize, seconds: u64) {
+    let capped = seconds.min(99 * 60 + 59);
+    let mins = capped / 60;
+    let secs = capped % 60;
+    let next = frame.number(x, y, mins);
+    let next = frame.text(next, y, ":", 1);
+    if secs < 10 { frame.text(next, y, "0", 1); }
+    frame.number(next + if secs < 10 { 6 } else { 0 }, y, secs);
 }
 
 /// Buttons are translated into host actions, not executed by the renderer.
@@ -252,7 +280,7 @@ mod tests {
     fn empty_snapshot() -> SlotSnapshot {
         SlotSnapshot { selection: None, tracks: 0, has_audio_focus: false,
             playback: PlaybackSnapshot { state: PlaybackState::Empty, generation: 0,
-                frames_delivered: 0, format: None } }
+                frames_delivered: 0, total_frames: None, format: None } }
     }
 
     #[test]
