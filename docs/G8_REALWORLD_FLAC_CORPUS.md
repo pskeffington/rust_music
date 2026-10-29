@@ -4,19 +4,29 @@ Observed 2026-10-29. Test data are six **user-provided FLAC recordings**, intent
 
 ## Verified local evidence
 
-| Case | Encoded bytes | Frames/channel | Duration | `flac -t` | FLAC vs FFmpeg raw s16le |
-| --- | ---: | ---: | ---: | --- | --- |
-| L1 | 3,836,026 | 2,981,991 | 1:07.619 | PASS | exact SHA-256 match |
-| L2 | 11,239,886 | 6,231,348 | 2:21.300 | PASS | exact SHA-256 match |
-| L3 | 3,482,121 | 1,942,524 | 0:44.048 | PASS | exact SHA-256 match |
-| G4 | 15,801,340 | 8,540,061 | 3:13.652 | PASS | exact SHA-256 match |
-| G5 | 5,130,940 | 3,203,723 | 1:12.647 | PASS | exact SHA-256 match |
-| G6 | 5,975,108 | 4,411,670 | 1:40.038 | PASS | exact SHA-256 match |
-| **Total** | **45,465,421** | **27,311,317** | **10:19.304** | **6/6** | **6/6** |
+| Case | Encoded bytes | Frames/channel | Duration | `flac -t` | FLAC vs FFmpeg raw s16le | Rust_Music native PCM |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| L1 | 3,836,026 | 2,981,991 | 1:07.619 | PASS | exact SHA-256 match | exact SHA-256 match |
+| L2 | 11,239,886 | 6,231,348 | 2:21.300 | PASS | exact SHA-256 match | exact SHA-256 match |
+| L3 | 3,482,121 | 1,942,524 | 0:44.048 | PASS | exact SHA-256 match | exact SHA-256 match |
+| G4 | 15,801,340 | 8,540,061 | 3:13.652 | PASS | exact SHA-256 match | exact SHA-256 match |
+| G5 | 5,130,940 | 3,203,723 | 1:12.647 | PASS | exact SHA-256 match | exact SHA-256 match |
+| G6 | 5,975,108 | 4,411,670 | 1:40.038 | PASS | exact SHA-256 match | exact SHA-256 match |
+| **Total** | **45,465,421** | **27,311,317** | **10:19.304** | **6/6** | **6/6** | **6/6** |
 
 All recordings: native FLAC, 44,100 Hz, 16-bit, 2 channels. Each contains STREAMINFO, SEEKTABLE, VORBIS_COMMENT and PICTURE metadata blocks. Total independently decoded PCM: 109,245,268 bytes (104.18 MiB). `flac -t` verified the reference streams' frame integrity and STREAMINFO MD5. `flac --decode ...` and `ffmpeg -f s16le` produced identical raw PCM hashes, stored in [`tests/corpus/guiezio-flac-sha256.json`](../tests/corpus/guiezio-flac-sha256.json).
 
-**This is not Rust_Music decoder acceptance:** `cargo`/`rustc` are absent in the examination environment. Reference programs were used solely as test oracles and are not linked or required by Rust_Music.
+**Reference evidence:** the earlier reference-only run used `flac` and FFmpeg solely as test oracles; neither is linked or required by Rust_Music.
+
+**Current decoder checkpoint:** On 2026-10-29, the authorized run
+`CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all --require-complete <six supplied file paths>`
+exited 0. All six files passed reference FLAC integrity, FLAC/FFmpeg PCM
+equality, compressed-file SHA-256 and STREAMINFO/metadata checks, Rust CLI
+inspection, and complete Rust decoded PCM SHA-256 and byte-count parity
+against the manifest. The six recordings were read from their supplied
+locations; none were copied into the worktree or committed. Separately,
+`CARGO_NET_OFFLINE=true python3 scripts/test_flac_reference.py` passed seven
+generated native Rust PCM vectors with digest, CRC and truncation rejection.
 
 ## Reproduce with the locally retained recordings
 
@@ -37,10 +47,10 @@ The script matches files by their entire compressed-file SHA-256 rather than by 
 ## Acceptance distinctions and limitations
 
 - **PASS**: supplied original files verified by FLAC; `flac` and FFmpeg reference PCM output match bit-for-bit on all six tracks; manifest/profile integrity checks; reference-only harness.
-- **BLOCKED**: actual `rust-music-cli` compilation, `inspect`, and decoded PCM parity. Do not count this corpus as passing the Rust native decoder until `--mode rust`/`--mode all` is run successfully on a machine with Cargo.
+- **PASS**: Rust_Music native `inspect` and complete decoded PCM parity on all six supplied files, confirmed in the combined `--mode all` run. The private recordings remain outside the repository.
 - **NOT TESTED**: any audible playback, DAC bit-perfect status, 24/32-bit real recordings, multichannel real recordings, Ogg FLAC, seeking or MP4/ALAC.
 - **SCOPE**: audio files are never shipped, committed, bundled, or fetched by the normal build or test. Only local operators with these exact recordings can rerun these six vectors; separately generated public-domain/synthetic test fixtures remain necessary for universal CI.
 
 ## Next targeted pass
 
-Run the existing offline Cargo gate, then this corpus in `--mode rust` to diagnose any frame/metadata errors. Compare failing files one at a time and preserve the original checksums. If Rust parity succeeds, run long-playback and audio-focus tests without claiming bit-perfect DAC output unless physically measured.
+The offline Cargo gate and all six private-file native PCM parity checks have passed locally. Next, qualify shared host audio-focus and target panel behavior, then run long-playback and physical output tests. Do not claim bit-perfect DAC output unless it is physically measured.

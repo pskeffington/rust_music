@@ -1,17 +1,17 @@
 # Rust Music G5 headless host foundation: validation ledger
 
-Recorded 2026-10-29. New source is unmerged, and all tests that require an installed Rust toolchain remain **pending**, not passed.
+Recorded 2026-10-29. Local workspace build, Clippy, tests and release build pass; actual Rust_Boy/Rust_Radio/Rust_TV arbitration and physical audio remain **unverified**.
 
 | Check | Result | Evidence / reproducible command |
 | --- | --- | --- |
-| Workspace closure | PASS (static) | Ten Cargo workspace crates; Cargo.lock lists the same ten; all internal dependencies are relative workspace paths; no registry/source/checksum entries |
+| Workspace closure | PASS (static and offline audit) | 12 Cargo workspace crates; 21 internal path edges; no registry/Git crates |
 | Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (19 sources, 16 rules, exact generated markdown parity) |
 | Reference FLAC fixture validity | PASS (reference-only) | `python3 scripts/test_flac_reference.py --fixtures-only` (seven FLAC files, 8/16/24/32-bit mono/stereo/six-channel, reference MD5) |
-| Bounded library tests | NOT RUN | `cargo test --locked --offline -p rust-music-library` (signature detection, symlink avoidance, budget failure, stable ordering) |
-| Host slot and exclusive focus tests | NOT RUN | `cargo test --locked --offline -p rust-music-host` (no autoplay, EOF/Stop/Drop release, focus denial) |
-| Playback engine failure tests | NOT RUN | `cargo test --locked --offline -p rust-music-engine` (format mismatch and drain failure safety) |
-| All workspace fmt, clippy, test and build | BLOCKED | `sh scripts/offline-gate.sh` requires preinstalled Cargo/Rust 1.85+ and lint components. They are absent in this execution environment |
-| Rust_Radio/Rust_TV real audio focus | PENDING | Rust_Boy integration uses same arbiter; not yet implemented in parent shell |
+| Bounded library tests | PASS | Local `sh scripts/offline-gate.sh`; symlink avoidance, scan limits, stable ordering |
+| Host slot and exclusive focus tests | PASS (mock focus) | Local `sh scripts/offline-gate.sh`; no autoplay, EOF/Stop/Drop release, denial before output, and device-open failure releases the host lease |
+| Playback engine failure tests | PASS | Local `sh scripts/offline-gate.sh`; format mismatch, low-quality denial, and drain failure safety |
+| All workspace fmt, clippy, test and build | PASS locally | Rust/Cargo 1.99.1/macOS; audit, rustfmt, Clippy, workspace tests, release build and macOS feature check |
+| Rust_Radio/Rust_TV real audio focus | PENDING | Unit tests use a mock lease; actual shared host arbiter integration is not in this repository |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink or structural tests |
 
 ## Operational requirements
@@ -24,4 +24,4 @@ Recorded 2026-10-29. New source is unmerged, and all tests that require an insta
 
 ## Next gate
 
-Provision a preinstalled offline toolchain, run `sh scripts/offline-gate.sh`, repair actual compiler warnings/errors, then verify real cross-module audio focus and DAC behavior. Do not merge or claim bit-perfect until acceptance evidence is recorded.
+Run the private six-track native FLAC parity command on the operator-owned files, then implement and test the host-side shared focus bridge and qualify physical DAC behavior. Do not merge or claim bit-perfect until acceptance evidence is recorded.

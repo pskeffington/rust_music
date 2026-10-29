@@ -1,6 +1,6 @@
 # G7: Strict RIFF/WAVE and PCM round-trip engineering ledger
 
-Date: 2026-10-29. Scope: **source implementation and reference-fixture validation**, not hardware or Rust-compiler certification.
+Date: 2026-10-29. Scope: **source implementation, locally executed Rust compilation, and reference PCM parity**, not hardware certification.
 
 The decoder and exporter remain locally authored; all Cargo packages use local workspace paths. No multimedia library, registry package, codec plugin or service is introduced.
 
@@ -33,7 +33,7 @@ python3 scripts/check_literature.py
 python3 scripts/test_flac_reference.py --fixtures-only
 ```
 
-Passing `--fixtures-only` **does not run the Rust decoder**. As of this change, fixture generation and structural checks pass; no Rust compilation, true PCM parity, bit-perfect DAC validation or real Rust_Boy deployment is claimed.
+Passing `--fixtures-only` **does not run the Rust decoder**. The full native harness was later run locally: all six vectors matched exact PCM and the malformed RIFF, missing-pad, and nonzero-padding cases were rejected. This does not establish bit-perfect DAC behavior or real Rust_Boy deployment.
 
 ## Documented exclusions
 
@@ -50,9 +50,9 @@ Passing `--fixtures-only` **does not run the Rust decoder**. As of this change, 
 
 | Gate | Requirement | Status |
 | --- | --- | --- |
-| G7-01 | RIFF and chunk bounds checked before PCM | Implemented; Rust test pending |
-| G7-02 | WAVE_FORMAT_EXTENSIBLE PCM supported without precision loss | Implemented; Rust test pending |
-| G7-03 | Odd WAV data exported with required padding | Implemented; Rust test pending |
+| G7-01 | RIFF and chunk bounds checked before PCM | Implemented; workspace and malformed-input tests pass |
+| G7-02 | WAVE_FORMAT_EXTENSIBLE PCM supported without precision loss | Implemented; workspace and native parity tests pass |
+| G7-03 | Odd WAV data exported with required padding | Implemented; workspace and native parity tests pass |
 | G7-04 | Six stdlib WAV reference fixtures are structurally sound | PASS (fixtures-only) |
-| G7-05 | Actual Rust decoder/export PCM parity | BLOCKED (no cargo here) |
+| G7-05 | Actual Rust decoder/export PCM parity | PASS (6 generated native CLI vectors) |
 | G7-06 | Native 24/32-bit DAC and 6-channel routing | NOT TESTED |

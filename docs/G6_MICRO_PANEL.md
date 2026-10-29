@@ -1,6 +1,6 @@
 # G6 - tiny offline MUSIC panel (128 x 64)
 
-Status: source implemented; Rust compilation and hardware display integration not yet verified.
+Status: local Rust build and unit tests pass; hardware display integration not yet verified.
 
 ## Design
 
@@ -80,7 +80,7 @@ after the header to the embedded screen. No image library or network is needed.
 - Verify empty library, maximum sample-rate/track-count and edge pixels.
 - Verify UI render does not change selection, output, or audio focus.
 - Verify `Previous`/`Next` never become a play command.
-- Complete `cargo fmt`, Clippy, tests and the zero-dependency audit on a local
-  Rust toolchain (still unavailable in this execution environment).
+- The offline fmt, Clippy, workspace test, release build and zero-dependency
+  audit now pass locally on Rust/Cargo 1.99.1/macOS.
 - Integrate physical screen color/contrast and exclusive Radio/TV audio focus
   in Rust_Boy separately; do not claim interoperability before those tests.

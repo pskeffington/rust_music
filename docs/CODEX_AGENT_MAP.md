@@ -9,7 +9,7 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 | Role | Codex file | Mode | Owned scope | Purpose |
 | --- | --- | --- | --- | --- |
 | `gate_verifier` | `.codex/agents/gate-verifier.toml` | read only | read-only | Offline gate and sample-parity evidence; no edits |
-| `codec_engineer` | `.codex/agents/codec-engineer.toml` | write scoped | `crates/rust-music-flac/`, `crates/rust-music-wave/`, `crates/rust-music-aiff/` | Own independent codec/container decoding and rigorous PCM tests |
+| `codec_engineer` | `.codex/agents/codec-engineer.toml` | write scoped | `crates/rust-music-flac/`, `crates/rust-music-wave/`, `crates/rust-music-aiff/`, approved future codec crates | Own independent codec/container decoding and rigorous PCM tests |
 | `audio_backend` | `.codex/agents/audio-backend.toml` | write scoped | `crates/rust-music-native/` | OS PCM adapters and hardware-format acceptance |
 | `host_integrator` | `.codex/agents/host-integrator.toml` | write scoped | `crates/rust-music-host/`, `crates/rust-music-library/`, `crates/rust-music-panel/` | Rust_Boy audio lease, bounded library and 1KiB interface |
 | `index_curator` | `.codex/agents/index-curator.toml` | write scoped | `docs/ROADMAP.md`, `docs/CODEX_AGENT_MAP.md`, `docs/REPOSITORY_INDEX.md`, `docs/roadmap-index.json`, `scripts/check_roadmap_index.py` | Stable roadmap IDs, evidence routing, docs and JSON index |
@@ -31,18 +31,18 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 - `codec_engineer` handles own FLAC/WAVE/AIFF and future ALAC/CAF/MP4/WavPack decoders, with `safety_reviewer` inspecting codec confusion and bounds.
 - `audio_backend` owns native PCM output and the physical evidence ladder; `host_integrator` owns the music socket, library and panel. Each must separately verify source ABI vs actual hardware behavior.
 - `index_curator` reconciles evidence and routing, but **must not** promote gate outcomes just because a source commit landed.
-- Current starting task is `RM-001` (fresh complete offline gate after rustfmt fixes); after its exit 0, native six-track FLAC parity is `RM-002`. G11 ALAC remains planned, not implemented.
+- Current evidence: `RM-001` and `RM-002` are done. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on external hardware/host work; under this goal, sibling repositories stay read-only. `RM-008` is the next planned P1 implementation task whose prerequisites are satisfied. ALAC remains unsupported until its decoder and parity gates pass.
 
 ## Codex kickoff prompt
 
 ```text
-Read AGENTS.md and docs/roadmap-index.json. Work on RM-001 only.
-Have gate_verifier inspect available gate evidence, and safety_reviewer
-check for zero-dependency and lossless-policy regressions in parallel.
-Wait for their reports. Do not change product code unless the fresh
-offline gate yields a concrete failing compiler/test diagnostic. Preserve
-any local edits, record exact commands/exit status, update the roadmap
-only for evidence actually observed, and keep draft PR #1 unmerged.
+Read AGENTS.md and docs/roadmap-index.json. Select the highest-priority
+planned task whose prerequisites are complete; verify the current status
+before starting. As of 2026-10-29, RM-001 and RM-002 are done and RM-008 is
+the next planned P1 task. Preserve local edits, use one writer per overlapping
+scope, request a read-only safety review for product changes, record exact
+commands/exit status, update the roadmap only for evidence actually observed,
+and keep PR #1 draft and unmerged.
 ```
 
 ## Maintaining the index

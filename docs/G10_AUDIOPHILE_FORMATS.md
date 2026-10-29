@@ -13,10 +13,10 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 
 | Files | Actual audio codec | Implementation status | Quality restrictions |
 | --- | --- | --- | --- |
-| .flac | Native FLAC | Source implemented; cargo and native PCM parity pending | Stream CRC + decoded-PCM MD5 at EOF, 16-bit/44.1k+ for playback |
-| .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Source implemented; cargo parity pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
-| .aif, .aiff | AIFF signed integer PCM | G10 operator-run CLI PCM parity: PASS (7-case mixed corpus); full workspace gate pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
-| .aifc | AIFF-C signed PCM | G10 operator-run CLI PCM parity: PASS (7-case mixed corpus); full workspace gate pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
+| .flac | Native FLAC | Seven generated vectors and six private real-world tracks pass native PCM/integrity checks | Stream CRC + decoded-PCM MD5 at EOF, 16-bit/44.1k+ for playback |
+| .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Six generated native CLI vectors pass PCM parity; physical output pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
+| .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
+| .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
 | .m4a | ALAC | Planned; no native decoder yet | AAC in identical container prohibited |
 | .caf | ALAC or verified integer PCM | Planned | Reject other CAF codecs |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
@@ -36,7 +36,7 @@ Parser rules: checked FORM length, bounded IFF chunks, odd-byte padding, max 512
 
 The AIFF 80-bit extended rate is decoded with integer math and must represent an exact whole number of Hz, never rounded. The renderer labels AIFF and remains exactly 128×64 pixels / 1,024 bytes.
 
-Known limits: chunks following the audio SSND are not exhaustively parsed; the operator-run AIFF CLI parity tests passed, but a full workspace test/Clippy/release build is not established. The quick scanner may include a provisional file that the full decoder later rejects.
+Known limits: chunks following the audio SSND are not exhaustively parsed. Local workspace build, Clippy, tests and release build now pass, but this does not certify a physical DAC. The quick scanner may include a provisional file that the full decoder later rejects.
 
 ## Reproduction and evidence
 
@@ -58,7 +58,7 @@ The operator ran the checked-in Python-stdlib fixture harness on a macOS machine
 - Passed cases: `mono-16`, `stereo-24-192k`, `stereo-32`, `aifc-none`, `aifc-sowt-24`, `offset-16`, and `parser-only-8`. The 8-bit example tests the decoder, not permitted playback.
 - The native-harness output also reports rejection of corrupt FORM boundaries, contradictory COMM frame counts, truncated data and lossy AIFF-C.
 
-**Evidence basis:** user-supplied terminal transcript, not a CI artifact. This resolves the G10 fixture/decoder PCM parity checkpoint for the enumerated synthetic cases, but does **not** prove the full `sh scripts/offline-gate.sh` completed, that native host tests passed, that the six real FLACs passed native Rust parity, or that audio reaches a physical DAC bit-perfect. Continue to keep PR #1 draft.
+**Evidence basis:** the original seven-vector transcript was user-supplied, not a CI artifact. A later local run of the same harness confirmed the seven synthetic PCM parity cases. This does **not** prove that the six real FLACs passed native Rust parity or that audio reaches a physical DAC bit-perfect. Continue to keep PR #1 draft.
 
 Note for interactive Zsh: pasted comment lines may cause `zsh: command not found: #` unless `setopt interactivecomments` is enabled. These shell-comment messages are unrelated to the Rust decoder test outcomes.
 
@@ -86,11 +86,23 @@ An operator's macOS gate log reports that the local-only dependency audit passed
 
 The exact 252 rustfmt hunks supplied by the operator were matched against GitHub source and applied without intentionally changing decoder algorithms. Three compiler warnings for unnecessary Boolean-expression parentheses in `crates/rust-music-audit/src/main.rs` were also removed. The changes are published in four commits ending at `13f8e85975f7b4cae921593df2ab0e7f310b8d30`. A GitHub commit comparison confirms only the expected 14 Rust files changed.
 
-**This is a source-level formatting repair, not a claim that the full gate has passed.** Rerun on the operator's Mac after pulling the branch:
+At the time of that operator report, the full gate had not passed. A subsequent local gate run is recorded below. The earlier operator run command was:
 
     cd /Users/null/GitHub/rust_music
     git pull --ff-only origin build/native-codecs-g0
     sh scripts/offline-gate.sh
 
-If format passes and Clippy finds new warnings/errors, record the first diagnostic and repair those separately. Keep PR #1 draft until full offline, FLAC corpus, audio focus and device gates pass.
+Keep PR #1 draft until private FLAC corpus, actual shared audio focus and device gates pass.
+
+## G10 local offline quality-gate follow-up (2026-10-29)
+
+The current PR head `b8c7de527fa3c0cfb95a33000a3e71f51df842e5` plus current local worktree changes was checked with Rust/Cargo 1.99.1 on macOS. `sh scripts/offline-gate.sh` exited **0**. The gate passed the dependency audit (12 local crates, 21 local edges, zero registry/Git crates), rustfmt, Clippy with warnings denied, workspace unit tests, the optimized workspace build, and the macOS output-feature check. The current host regression also verifies that a sink-open failure releases the host focus lease.
+
+Additional local native CLI parity evidence:
+
+- `python3 scripts/test_wave_reference.py` exited **0**: 6/6 WAVE vectors matched exact PCM; RIFF overrun, missing odd pad and nonzero extensible low bits were rejected.
+- `python3 scripts/test_aiff_reference.py` exited **0**: 7/7 AIFF/AIFF-C vectors matched exact PCM; corrupt FORM, contradictory COMM frame count, truncation and lossy AIFF-C were rejected.
+- `CARGO_NET_OFFLINE=true python3 scripts/test_flac_reference.py` exited **0**: 7/7 generated FLAC vectors matched exact PCM, and each rejected altered STREAMINFO MD5, CRC16 corruption and truncation.
+
+These results establish local build, generated-vector parity and six-track private FLAC reference/native parity. No Rust_Boy/Rust_Radio/Rust_TV integration, physical DAC loopback, device underrun/drain measurement or bit-perfect claim is established. Keep PR #1 draft.
 

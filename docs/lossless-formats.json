@@ -28,7 +28,7 @@
         "FLAC"
       ],
       "stage": "native-source-implemented",
-      "verification": "cargo-and-full-PCM-parity-pending",
+      "verification": "generated-native-parity-7-pass; private-six-file-reference-and-native-parity-pass",
       "gate": "G2"
     },
     {
@@ -42,7 +42,7 @@
         "WAVE_FORMAT_EXTENSIBLE integer PCM"
       ],
       "stage": "native-source-implemented",
-      "verification": "cargo-and-full-PCM-parity-pending",
+      "verification": "generated-native-parity-6-pass",
       "gate": "G7"
     },
     {
@@ -56,7 +56,7 @@
         "signed integer PCM"
       ],
       "stage": "native-source-implemented",
-      "verification": "cargo-and-full-PCM-parity-pending",
+      "verification": "generated-native-parity-7-pass",
       "gate": "G10"
     },
     {
@@ -71,7 +71,7 @@
         "sowt"
       ],
       "stage": "native-source-implemented",
-      "verification": "cargo-and-full-PCM-parity-pending",
+      "verification": "generated-native-parity-7-pass",
       "gate": "G10",
       "refuse_codecs": [
         "alaw",

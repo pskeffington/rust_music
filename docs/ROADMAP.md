@@ -14,17 +14,17 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 
 | Gate | Scope | Codex owner | Evidence state | Next acceptance |
 | --- | --- | --- | --- | --- |
-| **G0** | Ownership, standards and offline audit | `index_curator` | partial evidence | Dependency audit 12 local crates/21 edges passed; full Rust gate recheck pending |
-| **G1** | Integer PCM core and explicit playback state | `codec_engineer` | source implemented | Unit tests and output behavior require full offline gate |
-| **G2** | Native FLAC with CRC, Rice/LPC, PCM MD5 | `codec_engineer` | partial evidence | Source present; own-decoder real-corpus parity not reported |
+| **G0** | Ownership, standards and offline audit | `index_curator` | partial evidence | Offline dependency audit, fmt, Clippy, workspace tests, release build and macOS feature check pass locally on Rust 1.99.1; target hardware and host integration remain open |
+| **G1** | Integer PCM core and explicit playback state | `codec_engineer` | source implemented | Workspace tests pass, including lossless playback floor and fail-closed output state; actual device behavior remains unverified |
+| **G2** | Native FLAC with CRC, Rice/LPC, PCM MD5 | `codec_engineer` | partial evidence | Seven generated vectors and six private real-world tracks pass native PCM parity; wider codec/hardware claims remain separate |
 | **G3** | Mac AudioQueue / Linux kernel PCM output | `audio_backend` | source implemented | Source present; DAC format, drain and underrun measurement pending |
 | **G4** | Expanded lossless umbrella | `codec_engineer` | planned | Implemented AIFF is G10; ALAC and later formats are G11/G12 work |
-| **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | source implemented | Unit slot exists; real Radio/TV integration and field gate pending |
+| **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | source implemented | Unit slot and Pip-Boy bridge contract exist; host-side adapter, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain open |
 | **G6** | 128x64 monochrome 1KiB panel | `host_integrator` | source implemented | Renderer exists; hardware screen/controls pending |
-| **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six reference fixtures; native full workspace gate/parity pending |
-| **G8** | Six-file private FLAC differential corpus | `gate_verifier` | partial evidence | Reference decoder 6/6; Rust decoder parity on those six files pending |
-| **G9** | Exact declared-frame timing and display progress | `host_integrator` | source implemented | Source present; full gate and physical display behavior pending |
-| **G10** | Audiophile-only admission and AIFF/AIFF-C | `codec_engineer` | partial evidence | Operator-reported 7/7 native CLI cases PASS; full gate stopped at rustfmt; repair needs retest |
+| **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified |
+| **G8** | Six-file private FLAC differential corpus | `gate_verifier` | partial evidence | Reference FLAC/FFmpeg and native Rust PCM hashes match on all six private files; artwork and hardware stress remain separate |
+| **G9** | Exact declared-frame timing and display progress | `host_integrator` | source implemented | Workspace tests pass; physical display and Rust_Boy button behavior remain unverified |
+| **G10** | Audiophile-only admission and AIFF/AIFF-C | `codec_engineer` | partial evidence | Local offline gate passes on Rust 1.99.1/macOS and seven AIFF/AIFF-C native PCM vectors pass; physical DAC and host integration remain open |
 | **G11** | ALAC decoder and M4A/CAF demultiplexers | `codec_engineer` | planned | Independent ALAC decode golden PCM and strict AAC rejection needed |
 | **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | planned | Per-format independent parity and malicious-input rejection needed |
 | **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | planned | Never claim seek or album tags without indexed code and tests |
@@ -34,24 +34,24 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 
 | Task | Priority | Gate | Owner | State | Prerequisite |
 | --- | --- | --- | --- | --- | --- |
-| `RM-001` — Rerun full offline Rust quality gate after formatter repair | P0 | G10 | `gate_verifier` | needs operator | None |
-| `RM-002` — Replay six private FLACs through native Rust decoder | P0 | G8 | `gate_verifier` | blocked | RM-001 |
-| `RM-003` — Prove native RIFF/WAVE decoded PCM roundtrip | P0 | G7 | `gate_verifier` | blocked | RM-001 |
-| `RM-004` — Verify lossless-only floor and focus denial through Rust_Boy | P0 | G10 | `host_integrator` | blocked | RM-001 |
-| `RM-005` — Qualify macOS AudioQueue output with physical DAC | P1 | G3 | `audio_backend` | blocked | RM-001 |
+| `RM-001` — Rerun full offline Rust quality gate after formatter repair | P0 | G10 | `gate_verifier` | done | None |
+| `RM-002` — Replay six private FLACs through native Rust decoder | P0 | G8 | `gate_verifier` | done | RM-001 |
+| `RM-003` — Prove native RIFF/WAVE decoded PCM roundtrip | P0 | G7 | `gate_verifier` | done | RM-001 |
+| `RM-004` — Verify lossless-only floor and focus denial through Rust_Boy | P0 | G10 | `host_integrator` | done | RM-001 |
+| `RM-005` — Qualify macOS AudioQueue output with physical DAC | P1 | G3 | `audio_backend` | blocked | RM-001 (done); physical DAC required |
 | `RM-006` — Integrate independent MUSIC socket with Radio and TV ownership | P1 | G5 | `host_integrator` | blocked | RM-004 |
 | `RM-007` — Validate fixed 1KiB panel on actual Rust_Boy display | P1 | G6 | `host_integrator` | blocked | RM-006 |
-| `RM-008` — Develop independent ALAC bitstream and PCM decoder | P1 | G11 | `codec_engineer` | blocked | RM-001 |
+| `RM-008` — Develop independent ALAC bitstream and PCM decoder | P1 | G11 | `codec_engineer` | planned | RM-001 |
 | `RM-009` — Implement M4A/MP4 ALAC-only demux and AAC denial | P1 | G11 | `codec_engineer` | blocked | RM-008 |
 | `RM-010` — Implement CAF ALAC and integer LPCM demux | P2 | G11 | `codec_engineer` | blocked | RM-008 |
-| `RM-011` — Add bounded local metadata without cover-art memory spikes | P2 | G13 | `codec_engineer` | blocked | RM-001 |
-| `RM-012` — Implement validated sample-accurate FLAC seek | P2 | G13 | `codec_engineer` | blocked | RM-002 |
-| `RM-013` — Implement RF64 large PCM files with ds64 limits | P2 | G12 | `codec_engineer` | blocked | RM-003 |
-| `RM-014` — Implement WavPack only in verified lossless modes | P2 | G12 | `codec_engineer` | blocked | RM-001 |
+| `RM-011` — Add bounded local metadata without cover-art memory spikes | P2 | G13 | `codec_engineer` | planned | RM-001 |
+| `RM-012` — Implement validated sample-accurate FLAC seek | P2 | G13 | `codec_engineer` | planned | RM-002 |
+| `RM-013` — Implement RF64 large PCM files with ds64 limits | P2 | G12 | `codec_engineer` | planned | RM-003 |
+| `RM-014` — Implement WavPack only in verified lossless modes | P2 | G12 | `codec_engineer` | planned | RM-001 |
 | `RM-015` — Port native output to Windows and Android without codec dependencies | P2 | G14 | `audio_backend` | blocked | RM-005, RM-006 |
-| `RM-016` — Keep code, literature, agent roles and format registry indexed | P1 | G0 | `index_curator` | planned | None |
+| `RM-016` — Keep code, literature, agent roles and format registry indexed | P1 | G0 | `index_curator` | done | None |
 
-**Priority order:** Complete the fresh G10 offline gate first (`RM-001`). While it is blocked, read-only review can proceed, but dependent implementation and certification tasks must not be promoted to verified. After it passes, qualify the private real-world FLACs (`RM-002`), WAVE parity (`RM-003`) and fail-closed playback/focus (`RM-004`) before calling the baseline complete.
+**Priority order:** The local G10 offline gate (`RM-001`), native WAVE parity (`RM-003`), lossless admission/focus-denial unit evidence (`RM-004`) and six-file native FLAC parity (`RM-002`) now pass. RM-008 is the next planned P1 implementation task. Physical output and actual Rust_Boy shared-focus/display acceptance remain separate production gates; do not infer those from host mocks or source review.
 
 ## Acceptance ladder (no skipped proofs)
 
@@ -65,11 +65,11 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 
 ## Current evidence snapshot — 2026-10-29
 
-- **Audit:** Operator-run `rust-music-audit` passed **12 local crates, 21 internal edges, no registry/Git crates, no third-party system libraries and one approved OS framework**. The subsequent full gate stopped at rustfmt. Exact formatter diffs were repaired in four commits through `13f8e85975f7b4cae921593df2ab0e7f310b8d30`; no fresh full-gate PASS has been supplied.
-- **AIFF/AIFF-C:** Seven native CLI PCM differential tests passed on the operator's Mac (including signed 24-bit/192 kHz, 32-bit, little-endian AIFF-C and malformed inputs); this does not certify audio hardware. [G10 evidence](G10_AUDIOPHILE_FORMATS.md).
-- **FLAC:** Six user-provided private FLAC files passed reference-decoder parity; native Rust replay on those files remains open. Do not commit audio. [G8 ledger](G8_REALWORLD_FLAC_CORPUS.md).
-- **WAVE:** Six deterministic reference cases previously passed; compiled full workspace parity remains open. [G7 ledger](G7_RIFF_CONFORMANCE.md).
-- **Host and hardware:** NullSink and pure render paths are not actual shared focus, screen wiring or DAC tests. [Host contract](HOST_CONTRACT.md).
+- **Offline gate:** Local `sh scripts/offline-gate.sh` exited 0 on Rust/Cargo 1.99.1 and macOS on the PR head plus local worktree changes. It passed audit (12 local crates/21 path edges, no registry/Git packages), rustfmt, Clippy, workspace tests, release build, and macOS feature check. This is build/test evidence, not physical audio acceptance. [G10 evidence](G10_AUDIOPHILE_FORMATS.md).
+- **AIFF/AIFF-C:** Local native CLI PCM differential tests passed 7/7, including signed 24-bit/192 kHz, 32-bit, little-endian AIFF-C and malformed-input rejection; this does not certify audio hardware. [G10 evidence](G10_AUDIOPHILE_FORMATS.md).
+- **FLAC:** Six user-provided private FLAC files passed reference FLAC/FFmpeg parity and native Rust full-PCM hash/byte-count parity. Do not commit audio. [G8 ledger](G8_REALWORLD_FLAC_CORPUS.md).
+- **WAVE:** Local native CLI PCM parity passed 6/6, with malformed RIFF boundary, missing pad and nonzero precision-padding rejection. Physical device output remains untested. [G7 ledger](G7_RIFF_CONFORMANCE.md).
+- **Host and hardware:** NullSink and pure render paths are not actual shared focus, screen wiring or DAC tests. Read-only inspection of Pip-Boy's v1 development adapter found no MUSIC roster entry or verified audio lease bridge; the [Pip-Boy adapter contract](PIP_BOY_ADAPTER.md) records the integration work still required. [Host contract](HOST_CONTRACT.md).
 
 ## Next expansion
 

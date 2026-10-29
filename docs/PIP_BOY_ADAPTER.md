@@ -1,0 +1,76 @@
+# Rust Music in Pip-Boy's universal package host
+
+This is the Rust Music side of the integration contract. It describes how an
+independent Rust Music build can be hosted by Pip-Boy without taking ownership
+of the shell, Settings, or the shared audio device. It does not claim that a
+Pip-Boy adapter is already implemented or hardware-tested.
+
+## Keep the product crate independent
+
+`rust-music-host` exposes the framework-free `MusicSlot`, typed commands,
+read-only playback snapshots, and the `AudioFocus` / RAII `AudioLease`
+boundary. `rust_music` must remain buildable offline with workspace-local
+dependencies; it should not depend on Pip-Boy's SDK or import Pip-Boy internals.
+The thin `UniversalPackageAdapter` wrapper belongs on the host side and should
+depend on a reviewed, explicitly pinned SDK revision.
+
+Pip-Boy's current v1 SDK is documented as a development preview, not a stable
+Rust ABI, sandbox, or external package loader. Its package view is bounded,
+inert display data (`heading`, `text`, `status`, and `list` blocks). The
+128x64/1024-byte `rust-music-panel` framebuffer is a separate renderer for
+hosts that expose that exact display surface; it is not a `PackageView`.
+
+## Required wrapper behavior
+
+| Pip-Boy lifecycle or intent | Rust Music behavior |
+| --- | --- |
+| `Activate`, `Resume`, `Resize` | Return a view from the current snapshot. Do not scan a directory, load a track, acquire focus, or start output. |
+| Authorized `play` intent with `media.audio` | Call `slot.handle(Command::Play, &audio_focus_bridge)`. `MusicSlot` loads first, then obtains its sole RAII lease through `AudioFocus::try_acquire_music()`, then starts output. If loading fails before lease acquisition, the host must release its pre-authorized media reservation when the intent returns an error. |
+| Authorized `stop` intent with `media.audio` | Issue `Command::Stop`; release focus even if native drain/close returns an error. |
+| `Suspend`, `Shutdown`, adapter drop | Stop playback and release the lease. Never leave a stream running in the background. |
+| Decoder `Poll` | Schedule on a worker, one bounded block at a time. Never run it on the UI/render thread or native audio callback. |
+| `Next`, `Previous`, `Select` | Deliver only through a host-reviewed user input path. They stop the current track and never autoplay. |
+| Settings | Ask the shell to open its existing Settings screen; Rust Music does not render a Settings substitute. |
+
+The wrapper must map a snapshot to bounded plain text, such as filename,
+container, PCM format, playback state, and sample-derived elapsed time. Do not
+invent artist tags, cover art, seeking, pause/resume, or duration. The current
+Rust Music `MusicSlot` supports Play/Stop and Previous/Next/Select; it does not
+implement pause/resume.
+
+## Audio ownership boundary
+
+The Pip-Boy host must arbitrate Music against Radio and TV as one device owner.
+Its current `media.audio` intent policy accepts only `play`, `resume`, `pause`,
+and `stop`; Music should expose only operations it implements. Authorization
+and the `MusicSlot` lease must form one ownership path: deny Play before a DAC
+opens, release a pending grant when startup fails, and release the active owner
+on Stop, EOF, decoder/output failure, Suspend, Shutdown, and Drop. Do not add a
+second music-only mutex that can disagree with the host's owner.
+
+The adapter boundary needs a host-side lease bridge: Pip-Boy's authorization
+policy is not itself an `AudioLease`. Do not acquire a claim separately in the
+wrapper and then pass it to `MusicSlot`; that would create two acquisition
+paths. After the host authorizes Play, the wrapper passes the bridge to
+`MusicSlot::handle`, and the bridge's `try_acquire_music()` performs the one
+lease transfer. Its RAII token releases that same host-owned claim on EOF,
+output/decoder errors, Stop, or drop. The host must also release a pre-authorized
+reservation when loading fails before `MusicSlot` calls the bridge, so failed
+Play cannot strand the package as media owner.
+
+## Current compatibility gaps
+
+- The v1 `PackageView` is display-only. The inspected host documentation says
+  package input actions are deferred, so Play/Stop/track-navigation controls
+  are not yet wired from the package view to `Intent`.
+- The host's audio policy has play/stop vocabulary, but there is no verified
+  adapter that bridges it to `AudioFocus` and handles failed start/stop paths.
+- `MusicSlot::Poll` requires a worker scheduler; the synchronous adapter trait
+  does not by itself provide one.
+- No actual Music package is in Pip-Boy's current package roster, and no
+  Radio/TV/Music interoperability or physical display/audio test is recorded.
+
+These gaps require host-side implementation and acceptance. Until that work is
+authorized and complete, Rust Music is **adapter-ready at its public host API**
+but is not installed or production-integrated in Pip-Boy. See the
+[host slot contract](HOST_CONTRACT.md) and [G5 validation ledger](G5_VALIDATION.md).

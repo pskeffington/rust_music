@@ -7,7 +7,7 @@ Date: 2026-10-29. Six user-supplied real-world FLAC files were tested **locally*
 - All 6: native FLAC, 44,100 Hz, 16-bit, stereo.
 - All 6 contain embedded image metadata. Parsing must skip large metadata blocks while respecting allocation limits.
 - Total: 45,465,421 bytes of FLAC data; 27,311,317 PCM sample frames across the corpus.
-- No claim of custom Rust decoder parity: `cargo` and `rustc` were unavailable in the testing environment.
+- The six private files pass combined reference and native Rust_Music validation: `CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all --require-complete <six supplied file paths>` exited 0. Reference FLAC integrity, FLAC/FFmpeg PCM equality, Rust inspection, complete PCM hashes and byte counts all matched. Seven separately generated FLAC vectors also pass native Rust parity.
 
 ## Reproducible test without shipping music
 
@@ -21,8 +21,7 @@ The second command runs `rust-music-cli decode` through `cargo run --offline --l
 Use a preinstalled Rust toolchain and local reference FLAC executable. Do not add copyrighted source tracks, decoded PCM, cover art, or exact source paths to version control. Hashes may be kept in private operator audit records to match previously tested inputs; do not represent hashes as permission to redistribute any audio.
 
 ## Next gates
-1. Run the custom decoder on all six files and compare all samples.
-2. Capture first failing frame and classify bitstream, metadata, CRC, MD5, and sample mismatch separately.
-3. Test decode with an artwork-heavy file and a metadata size above the configured limit; report explicit rejection instead of silently skipping a failed file.
-4. Add fuzzed/truncated copies generated only in a local temporary directory; retain no distributed source material.
-5. Run physical DAC tests separately; PCM parity alone cannot certify bit-perfect hardware output.
+1. Test decode with an artwork-heavy file and a metadata size above the configured limit; report explicit rejection instead of silently skipping a failed file.
+2. Add fuzzed/truncated copies generated only in a local temporary directory; retain no distributed source material.
+3. Integrate and exercise the host-owned shared audio-focus bridge.
+4. Run physical DAC tests separately; PCM parity alone cannot certify bit-perfect hardware output.

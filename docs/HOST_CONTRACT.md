@@ -52,7 +52,7 @@ without starting audio or opening a device. This is **not** a hardware UI test.
 - No pause/resume, sample-accurate seek, playlist persistence, embedded album art, artist/tag parser or asynchronous library watcher yet. Do not expose fake controls.
 - A path recheck rejects symlink replacement before file open, but cannot rule out a malicious local filesystem race without a platform-specific no-follow open; trust/permission boundaries must be set by the host.
 - Host tests use `NullSink` and synthetic WAV files. Passing them proves neither CoreAudio nor ALSA kernel playback, nor exclusive focus interoperability until integrated with Rust_Radio/Rust_TV.
-- `rust-music-library` and `rust-music-host` must build and test with `cargo --locked --offline` using only the local Rust toolchain. The current execution environment does not provide `cargo`; build status is unverified here.
+- `rust-music-library` and `rust-music-host` must build and test with `cargo --locked --offline` using only the local Rust toolchain. The full offline gate passed locally on Rust/Cargo 1.99.1 and macOS; this does not verify shared Rust_Boy audio-focus behavior or physical output.
 
 ## Integration acceptance checklist
 

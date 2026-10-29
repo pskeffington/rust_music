@@ -19,6 +19,10 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - When a toolchain/hardware/private corpus is unavailable, mark the task **blocked or unverified**, with explicit required operator command. Source implemented ≠ compiled ≠ PCM parity ≠ measured DAC.
 - Do not advance a dependent gate while its prerequisite evidence is still blocked. Do not automatically create schedules, install dependencies, change sibling repositories, push/merge branches, or configure hardware outside the user-authorized task.
 
-## Recorded checkpoint (2026-10-29)
+## Historical checkpoint (2026-10-29; superseded below)
 
-Branch `build/native-codecs-g0`, draft PR #1. Operator reported 7/7 AIFF/AIFF-C native CLI golden PCM cases PASS. Operator audit passed for 12 local crates/21 local edges; full offline gate stopped at rustfmt. The 14-file rustfmt diff and three audit warnings were repaired in commits ending `13f8e85975f7b4cae921593df2ab0e7f310b8d30`, but a **fresh complete offline gate** has not been reported. Native private FLAC corpus and physical DAC/host-focus acceptance remain open. Validate live status before repeating these claims.
+At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft PR #1. Operator-reported AIFF/AIFF-C native CLI golden PCM parity was 7/7. The operator audit passed for 12 local crates/21 local edges, but the full offline gate stopped at rustfmt. The 14-file rustfmt diff and three audit warnings were subsequently repaired in commits ending `13f8e85975f7b4cae921593df2ab0e7f310b8d30`. The later complete offline-gate result is recorded below and supersedes the gate status in this historical checkpoint.
+
+## Latest verified checkpoint (2026-10-29)
+
+The PR head `b8c7de527fa3c0cfb95a33000a3e71f51df842e5` plus the current local worktree changes passed `sh scripts/offline-gate.sh` on Rust/Cargo 1.99.1/macOS. The gate passed the 12-crate/21-edge dependency audit, rustfmt, Clippy with warnings denied, workspace tests, release build and macOS feature check. Generated FLAC/WAVE/AIFF PCM parity passes are recorded in their gate ledgers. The host regression verifies that a sink-open failure releases the host focus lease. On 2026-10-29, all six supplied private FLAC files passed combined reference and native Rust validation; their recordings remain outside Git. Actual shared Rust_Boy/Pip-Boy focus and panel integration, and physical output, remain unverified; keep PR #1 draft.

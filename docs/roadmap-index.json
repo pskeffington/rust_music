@@ -140,7 +140,7 @@
       "title": "Ownership, standards and offline audit",
       "owner_agent": "index_curator",
       "status": "partial_evidence",
-      "next_evidence": "Dependency audit 12 local crates/21 edges passed; full Rust gate recheck pending",
+      "next_evidence": "Offline dependency audit, fmt, Clippy, workspace tests, release build and macOS feature check pass locally on Rust 1.99.1; target hardware and host integration remain open",
       "evidence_doc": "docs/DEPENDENCY_POLICY.md"
     },
     {
@@ -148,7 +148,7 @@
       "title": "Integer PCM core and explicit playback state",
       "owner_agent": "codec_engineer",
       "status": "source_implemented",
-      "next_evidence": "Unit tests and output behavior require full offline gate",
+      "next_evidence": "Workspace tests pass, including lossless playback floor and fail-closed output state; actual device behavior remains unverified",
       "evidence_doc": "docs/ARCHITECTURE.md"
     },
     {
@@ -156,7 +156,7 @@
       "title": "Native FLAC with CRC, Rice/LPC, PCM MD5",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Source present; own-decoder real-corpus parity not reported",
+      "next_evidence": "Seven generated FLAC vectors and six private real-world files pass native PCM parity; broader codec and hardware evidence remains separate",
       "evidence_doc": "docs/G2_VALIDATION.md"
     },
     {
@@ -180,7 +180,7 @@
       "title": "Rust_Boy socket and shared audio-focus",
       "owner_agent": "host_integrator",
       "status": "source_implemented",
-      "next_evidence": "Unit slot exists; real Radio/TV integration and field gate pending",
+      "next_evidence": "Unit slot and a Pip-Boy bridge contract exist; host-side adapter, worker scheduling, shared Radio/TV/Music arbitration and field acceptance are still unverified",
       "evidence_doc": "docs/HOST_CONTRACT.md"
     },
     {
@@ -196,7 +196,7 @@
       "title": "Strict RIFF/WAVE PCM and extensible WAV",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Six reference fixtures; native full workspace gate/parity pending",
+      "next_evidence": "Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified",
       "evidence_doc": "docs/G7_RIFF_CONFORMANCE.md"
     },
     {
@@ -204,7 +204,7 @@
       "title": "Six-file private FLAC differential corpus",
       "owner_agent": "gate_verifier",
       "status": "partial_evidence",
-      "next_evidence": "Reference decoder 6/6; Rust decoder parity on those six files pending",
+      "next_evidence": "Six private tracks pass reference FLAC/FFmpeg parity and native Rust PCM SHA-256/byte-count parity; keep private audio out of Git",
       "evidence_doc": "docs/G8_REALWORLD_FLAC_CORPUS.md"
     },
     {
@@ -212,7 +212,7 @@
       "title": "Exact declared-frame timing and display progress",
       "owner_agent": "host_integrator",
       "status": "source_implemented",
-      "next_evidence": "Source present; full gate and physical display behavior pending",
+      "next_evidence": "Workspace tests and synthetic CLI PBM preview pass with a 1024-byte framebuffer; physical display and Rust_Boy button behavior remain unverified",
       "evidence_doc": "docs/G9_TIMING_PROGRESS.md"
     },
     {
@@ -220,7 +220,7 @@
       "title": "Audiophile-only admission and AIFF/AIFF-C",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Operator-reported 7/7 native CLI cases PASS; full gate stopped at rustfmt; repair needs retest",
+      "next_evidence": "Local offline gate passes on Rust 1.99.1/macOS and seven AIFF/AIFF-C native PCM vectors pass; physical DAC and host integration remain open",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -264,7 +264,7 @@
       "owner_agent": "gate_verifier",
       "review_agent": "safety_reviewer",
       "priority": "P0",
-      "status": "needs_operator",
+      "status": "done",
       "depends_on": [],
       "focus_paths": [
         "scripts/offline-gate.sh",
@@ -272,7 +272,7 @@
       ],
       "create_paths": [],
       "acceptance": "sh scripts/offline-gate.sh returns exit 0; record rustfmt, Clippy, all tests, release build and native macOS check",
-      "blocker": "Last reported gate halted at rustfmt; four formatting commits made; fresh operator exit status absent"
+      "blocker": "None for local RM-001 acceptance: sh scripts/offline-gate.sh exited 0 on Rust 1.99.1/macOS; physical device acceptance is tracked separately"
     },
     {
       "id": "RM-002",
@@ -281,7 +281,7 @@
       "owner_agent": "gate_verifier",
       "review_agent": "safety_reviewer",
       "priority": "P0",
-      "status": "blocked",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
@@ -291,7 +291,7 @@
       ],
       "create_paths": [],
       "acceptance": "python3 scripts/test_flac_user_corpus.py --mode rust --require-complete \"$PRIVATE_FLAC_DIRECTORY\" passes 6/6 with independent PCM parity",
-      "blocker": "Needs complete offline gate and operator-owned private corpus"
+      "blocker": "None; all six supplied private FLACs passed combined reference and offline Rust metadata, inspection and full PCM parity on 2026-10-29; files remain outside Git"
     },
     {
       "id": "RM-003",
@@ -300,7 +300,7 @@
       "owner_agent": "gate_verifier",
       "review_agent": "safety_reviewer",
       "priority": "P0",
-      "status": "blocked",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
@@ -310,7 +310,7 @@
       ],
       "create_paths": [],
       "acceptance": "python3 scripts/test_wave_reference.py passes source-to-export PCM comparisons and malformed RIFF rejection",
-      "blocker": "Full offline gate must pass before native acceptance claim"
+      "blocker": "Native acceptance passed: six generated WAVE vectors were PCM-identical and malformed RIFF/padding cases were rejected; physical output is a separate gate"
     },
     {
       "id": "RM-004",
@@ -319,7 +319,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P0",
-      "status": "blocked",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
@@ -329,8 +329,8 @@
         "docs/HOST_CONTRACT.md"
       ],
       "create_paths": [],
-      "acceptance": "cargo test --locked --offline --workspace proves below-16-bit/44.1k source cannot open sink or acquire lease; lossy containers rejected",
-      "blocker": "Full Rust workspace test completion not yet reported"
+      "acceptance": "cargo test --locked --offline --workspace proves below-16-bit/44.1k source cannot open sink or acquire lease; content-sniffing tests reject unsupported MP4/ID3/ADTS-like signatures independent of a .flac suffix",
+      "blocker": "Local acceptance passed for the playback floor, mock-focus denial before output, and fail-closed signature handling; valid encoded lossy streams are not a supported codec corpus, and real Rust_Boy arbitration remains RM-006"
     },
     {
       "id": "RM-005",
@@ -349,7 +349,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator captures negotiated PCM format, rate/channel accuracy, drain/stop, device changes and loopback evidence; does not infer bit-perfect from CLI",
-      "blocker": "Requires a complete offline toolchain gate and physical audio hardware"
+      "blocker": "RM-001 passed; physical audio hardware and measured DAC acceptance are still required"
     },
     {
       "id": "RM-006",
@@ -368,7 +368,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
-      "blocker": "Sibling repositories must not be edited without separate authorization"
+      "blocker": "Pip-Boy has no Music package or verified MusicSlot/AudioFocus bridge; this goal permits read-only host inspection but not sibling-repository edits"
     },
     {
       "id": "RM-007",
@@ -396,7 +396,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-001"
       ],
@@ -408,7 +408,7 @@
         "crates/rust-music-alac/"
       ],
       "acceptance": "New local ALAC crate handles predictor/entropy, bounded cookies, malformed input, exact 16/24/32-bit PCM parity; no third-party codec",
-      "blocker": "Do not begin dependent format admission until base offline gate is green"
+      "blocker": "None; RM-001 is complete. Keep ALAC unadmitted until independent PCM parity and malformed-input tests pass"
     },
     {
       "id": "RM-009",
@@ -459,7 +459,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-001"
       ],
@@ -469,7 +469,7 @@
       ],
       "create_paths": [],
       "acceptance": "FLAC Vorbis comments and optional AIFF tags have deterministic size/UTF-8 tests; artwork never decoded into 1KiB UI",
-      "blocker": "Must preserve strict memory/resource bounds"
+      "blocker": "None; planned implementation must preserve strict memory/resource bounds and keep artwork out of the 1KiB UI"
     },
     {
       "id": "RM-012",
@@ -478,7 +478,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "gate_verifier",
       "priority": "P2",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-002"
       ],
@@ -488,7 +488,7 @@
       ],
       "create_paths": [],
       "acceptance": "Seektable and frame-boundary tests compare exact expected PCM frames; invalid seeks fail closed",
-      "blocker": "Requires real FLAC native corpus parity before seek claims"
+      "blocker": "None; RM-002 passed. Seeking remains unsupported until exact frame-boundary and invalid-seek tests pass"
     },
     {
       "id": "RM-013",
@@ -497,7 +497,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-003"
       ],
@@ -506,7 +506,7 @@
       ],
       "create_paths": [],
       "acceptance": "RF64 large-size fields and metadata limits verified; legacy RIFF remains byte-correct",
-      "blocker": "Native WAVE parity is prerequisite"
+      "blocker": "None; RM-003 passed. RF64 remains unsupported until ds64 bounds and large-file PCM parity pass"
     },
     {
       "id": "RM-014",
@@ -515,7 +515,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "blocked",
+      "status": "planned",
       "depends_on": [
         "RM-001"
       ],
@@ -526,7 +526,7 @@
         "crates/rust-music-wavpack/"
       ],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "No lossy-only playback and no external codec"
+      "blocker": "None; future support must reject lossy-only modes and pass independent parity without an external codec"
     },
     {
       "id": "RM-015",
@@ -555,7 +555,7 @@
       "owner_agent": "index_curator",
       "review_agent": "gate_verifier",
       "priority": "P1",
-      "status": "planned",
+      "status": "done",
       "depends_on": [],
       "focus_paths": [
         "docs/roadmap-index.json",
@@ -565,7 +565,7 @@
       ],
       "create_paths": [],
       "acceptance": "python3 scripts/check_roadmap_index.py and python3 scripts/check_literature.py pass offline without extra Python packages",
-      "blocker": "Any new gate, codec or ownership handoff requires index update and observed evidence"
+      "blocker": "None; roadmap, literature and format registries pass their offline consistency checks"
     }
   ]
 }

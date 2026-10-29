@@ -1,6 +1,6 @@
 # Rust_Music: zero third-party dependency policy
 
-Status: source and manifest audit implemented 2026-10-29; Rust compiler and hardware verification still pending. Applies to **every** Rust_Music crate, including codecs, CLI, engine, future panels and platform adapters.
+Status: local-only source/manifest audit and offline Rust gate pass on Rust/Cargo 1.99.1/macOS (2026-10-29); physical hardware verification remains pending. Applies to **every** Rust_Music crate, including codecs, CLI, engine, future panels and platform adapters.
 
 ## Definition
 
@@ -45,15 +45,15 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play /p
 
 | Requirement | Source audit | Cargo validation | Physical validation |
 | --- | --- | --- | --- |
-| All Cargo dependencies are workspace paths | Pass (static) | Pending (cargo unavailable here) | N/A |
-| No third-party native audio library | Removed libasound; static pass | Pending feature compile | Pending ALSA hardware |
-| Headless FLAC/WAV/AIFF output offline | No network paths in decoder | Pending tests | N/A |
-| macOS system AudioQueue | System framework only | Pending macOS feature compile | Pending physical DAC |
+| All Cargo dependencies are workspace paths | Pass (static) | Pass (offline gate: 12 crates, 21 local edges) | N/A |
+| No third-party native audio library | Removed libasound; static pass | Pass (audit and native feature checks) | Pending ALSA hardware |
+| Headless FLAC/WAV/AIFF output offline | No network paths in decoder | Pass for generated vectors and local gate | Physical output is a separate gate |
+| macOS system AudioQueue | System framework only | Pass (macOS feature check) | Pending physical DAC |
 | Windows and Android playback | Not yet implemented | Not represented as supported | Pending |
-| Optional reference FLAC comparison | Outside offline gate | Pending differential corpus | N/A |
+| Optional reference FLAC comparison | Outside offline gate | Seven generated vectors and six private tracks pass reference/native PCM parity | N/A |
 
 All-gates-green or bit-perfect claims are prohibited until measured.
 
 ## G5 local-only modules
 
-`rust-music-library` and `rust-music-host` are additional locally authored workspace packages. The library scan never creates a network client, database, daemon, or background thread; it examines explicitly selected regular files under strict limits. The host slot requires the Rust_Boy host to furnish a single-owner RAII lease shared with Radio/TV. Both crates have only local path Cargo edges. The workspace now contains **12** crates as of G10 (including the native AIFF decoder). Refer to [HOST_CONTRACT.md](HOST_CONTRACT.md) for focus and filesystem boundaries. Offline Cargo builds still require a preinstalled Rust toolchain and remain unverified in this environment.
+`rust-music-library` and `rust-music-host` are additional locally authored workspace packages. The library scan never creates a network client, database, daemon, or background thread; it examines explicitly selected regular files under strict limits. The host slot requires the Rust_Boy host to furnish a single-owner RAII lease shared with Radio/TV. Both crates have only local path Cargo edges. The workspace contains **12** crates (including the native AIFF decoder). The offline gate passed locally with Rust/Cargo 1.99.1; real shared host focus and physical hardware remain unverified. Refer to [HOST_CONTRACT.md](HOST_CONTRACT.md) and the [Pip-Boy adapter contract](PIP_BOY_ADAPTER.md) for integration boundaries.
