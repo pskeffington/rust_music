@@ -504,6 +504,9 @@ impl<R: Read + Send> FlacDecoder<R> {
 }
 impl<R: Read + Send> Decoder for FlacDecoder<R> {
     fn format(&self) -> AudioFormat { self.info.format }
+    fn total_frames(&self) -> Option<u64> {
+        (self.info.total_samples != 0).then_some(self.info.total_samples)
+    }
     fn next_block(&mut self) -> Result<Option<PcmBlock>> { self.next_frame() }
 }
 
@@ -538,10 +541,21 @@ mod tests {
         let mut f = fixture_header(1, 16);
         add_frame(&mut f, 0, &[0, 0x12, 0x34]);
         let mut d = FlacDecoder::new(Cursor::new(f)).unwrap();
+        assert_eq!(d.total_frames(), Some(16));
         let b = d.next_frame().unwrap().unwrap();
         assert_eq!(b.samples, vec![0x1234; 16]);
         assert_eq!(d.next_frame().unwrap(), None);
     }
+    #[test]
+    fn unknown_streaminfo_total_remains_unknown() {
+        let mut file = fixture_header(1, 0);
+        add_frame(&mut file, 0, &[0, 0, 1]);
+        let mut decoder = FlacDecoder::new(Cursor::new(file)).unwrap();
+        assert_eq!(decoder.total_frames(), None);
+        assert_eq!(decoder.next_frame().unwrap().unwrap().frames(), 16);
+        assert_eq!(decoder.next_frame().unwrap(), None);
+    }
+
     #[test]
     fn left_side_restores_stereo() {
         let mut f = fixture_header(2, 16);
