@@ -257,6 +257,19 @@
       "gate": "G0",
       "license_note": "Rust toolchain itself is an explicit prerequisite; no dependencies are downloaded",
       "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-020",
+      "title": "WavPack 4 and 5 binary file/block format",
+      "category": "standards",
+      "url": "https://www.wavpack.com/WavPack5FileFormat.pdf",
+      "evidence_level": "official-spec",
+      "priority": "high",
+      "decision": "Use the block header and metadata layout to implement bounded, original WavPack parsing; accept only independently verified lossless profiles.",
+      "validation": "Header/sub-block bounds, codec rejection, and independent integer PCM parity with missing/corrupt correction-stream cases.",
+      "gate": "G12",
+      "license_note": "Format documentation; all decoder code remains original Rust",
+      "dependency_policy": "reference-only"
     }
   ],
   "standards": [

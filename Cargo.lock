@@ -116,3 +116,10 @@ version = "0.1.0"
 dependencies = [
  "rust-music-core",
 ]
+
+[[package]]
+name = "rust-music-wavpack"
+version = "0.1.0"
+dependencies = [
+ "rust-music-core",
+]

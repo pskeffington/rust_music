@@ -228,7 +228,7 @@
       "title": "ALAC decoder and M4A/CAF demultiplexers",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Raw ALAC parity, generated M4A parity plus four Internet Archive ALAC corpus cases, M4A scanner ingestion/AAC denial, and five generated CAF ALAC/LPCM parity vectors pass; broader ALAC source/encoder, CAF, and host/output validation remain",
+      "next_evidence": "Raw ALAC parity, generated M4A parity plus six Internet Archive ALAC corpus cases, M4A scanner ingestion/AAC denial, and five generated CAF ALAC/LPCM parity vectors pass; broader ALAC source/encoder, CAF, and host/output validation remain",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -236,7 +236,7 @@
       "title": "RF64 and WavPack lossless extensions",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Bounded RF64/ds64 and synthetic large-size streaming pass; independent WavPack implementation and parity remain",
+      "next_evidence": "Bounded RF64/ds64 and synthetic large-size streaming pass; WavPack bounded framing parser exists, while independent PCM decode/parity and correction handling remain",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -519,13 +519,15 @@
         "RM-001"
       ],
       "focus_paths": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/rust-music-wavpack/src/lib.rs",
+        "crates/rust-music/src/lib.rs",
         "docs/lossless-formats.json"
       ],
-      "create_paths": [
-        "crates/rust-music-wavpack/"
-      ],
+      "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "None; future support must reject lossy-only modes and pass independent parity without an external codec"
+      "blocker": "Only a bounded block-header/metadata parser foundation exists and is not exposed by the facade. Entropy decoding, sample reconstruction/CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
     },
     {
       "id": "RM-015",
@@ -585,8 +587,8 @@
         "docs/lossless-formats.json"
       ],
       "create_paths": [],
-      "acceptance": "Bounded library scan recognizes .m4a/.mp4 by ftyp and panel labels M4A; four licensed Archive.org ALAC fixtures at 16/44.1 and 24/48 pass exact PCM parity against FFmpeg; AAC remains rejected; fixture hashes and license provenance are recorded",
-      "blocker": "Acceptance passed locally: four Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (three 16-bit/44.1 kHz and one 24-bit/48 kHz); scan ingests MP4-family containers and AAC decoder refusal passed. Wider independent source/encoder coverage remains an ALAC admission qualification"
+      "acceptance": "Bounded library scan recognizes .m4a/.mp4 by ftyp and panel labels M4A; six licensed Archive.org ALAC fixtures at 16/44.1 and 24/48 pass exact PCM parity against FFmpeg; AAC remains rejected; fixture hashes and license provenance are recorded",
+      "blocker": "Acceptance passed locally: six Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (five 16-bit/44.1 kHz and one 24-bit/48 kHz); scan ingests MP4-family containers and AAC decoder refusal passed. Wider independent source/encoder coverage remains an ALAC admission qualification"
     }
   ]
 }

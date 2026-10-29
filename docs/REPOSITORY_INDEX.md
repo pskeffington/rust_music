@@ -25,6 +25,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | PCM types, sink contracts | `crates/rust-music-core/` | `codec_engineer` | G1; G10 floor |
 | FLAC decoder and MD5 | `crates/rust-music-flac/` | `codec_engineer` | G2 / G8 |
 | WAVE integer PCM and RIFF | `crates/rust-music-wave/` | `codec_engineer` | G7 |
+| WavPack block/metadata parser foundation (not yet a decoder) | `crates/rust-music-wavpack/` | `codec_engineer` | G12 / RM-014 |
 | AIFF/AIFF-C signed PCM | `crates/rust-music-aiff/` | `codec_engineer` | G10 |
 | ALAC raw-packet decoder and synthetic vectors | `crates/rust-music-alac/`, `crates/rust-music-alac/tests/fixtures/` | `codec_engineer` | G11 (16/24/32-bit plus stereo-matrix parity; not admitted; malformed coverage and demux remain) |
 | M4A/MP4 ALAC-only demux and corpus | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/`, `scripts/test_m4a_corpus.py` | `codec_engineer` | G11 / RM-009, RM-017 (bounded demux; generated and CC0 corpus parity; AAC/DRM denial) |

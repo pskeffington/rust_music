@@ -8,6 +8,7 @@ members = [
   "crates/rust-music-caf",
   "crates/rust-music-mp4",
   "crates/rust-music-wave",
+  "crates/rust-music-wavpack",
   "crates/rust-music-engine",
   "crates/rust-music-native",
   "crates/rust-music",

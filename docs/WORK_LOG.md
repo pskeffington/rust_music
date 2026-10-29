@@ -355,3 +355,47 @@ PCM block output for a 4 GiB data size without allocating that file.
 - Read-only `safety_reviewer`: no blocking RF64 bounds or RIFF regression
   findings. Roadmap/literature validators and `git diff --check` pass.
 - Real large-file corpus and physical playback remain unverified.
+
+## 2026-10-29 — RM-014 WavPack framing foundation
+
+Added a locally authored WavPack crate with bounded 32-byte v4/v5 block header
+parsing, a 1 MiB block cap, a 131,072-frame block cap, safe metadata sub-block
+length parsing, and strict refusal for hybrid-without-correction, float, DSD,
+and multichannel profiles. The crate is deliberately not wired into the player:
+entropy decoding, sample reconstruction/CRC checks, independent PCM parity,
+and validated `.wvc` pairing are still missing. RM-014 remains planned.
+
+- `cargo test --offline -p rust-music-wavpack`: **exit 0**, 5/5 framing tests.
+- Official WavPack 4/5 block documentation is indexed as LIT-020. The project's
+  no-reference-code-reuse rule remains in force.
+- Read-only `safety_reviewer` found that the optional metadata flag was included
+  in the parsed metadata ID. The parser now masks the ID to five bits; the
+  corrected test and full workspace gate pass. No other framing/bounds finding.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 local crates, 29 path-only
+  edges, fmt, warnings-denied Clippy, workspace tests, release build and macOS
+  feature check passed. `check_roadmap_index.py`, `check_literature.py`, and
+  `git diff --check` pass.
+
+The Archive.org CC0 ALAC search surfaced two additional items reporting
+“Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
+found AAC, so neither is retained as an ALAC corpus fixture:
+
+- [La Primavera De Chile: Audio](https://archive.org/details/klv20200302laprimaveradechileaudio02032020), `AUDIO-2020-01-04-22-30-41.m4a`, SHA-256 `b0833c83d6c1858cf1c60a00f26c6ae3ec5ff98d5562bd696f370b3c6e4337ed`.
+- [La Primavera de Chile. Unidos por la paz de Chile](https://archive.org/details/klvArc.Cl.O2019.upc_202001), `AUDIO-2020-01-11-08-52-40.m4a`, SHA-256 `fd5deaa2e5ef1dd5f2cf11da8bde9fb19031ca92f28c1acdd59ac424bb037920`.
+
+## 2026-10-29 — Archive.org M4A corpus expansion
+
+Added two more M4A ALAC tracks from the existing Musopen Chopin Archive.org
+item. The CC0 license is recorded in item metadata and supported by Musopen's
+project FAQ; the exact downloaded filenames, stream details, and SHA-256 values
+are in `crates/rust-music-mp4/tests/fixtures/upstream/README.md`. The six-file
+corpus still comes from one collection and does not expand independent
+encoder/source coverage.
+
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, all six files passed
+  `ffprobe` codec/profile checks and exact Rust/FFmpeg PCM equality; the scanner
+  indexed the M4A corpus and AAC negative fixture, and AAC decode was rejected.
+- Downloaded fixtures are public CC0 source files, not private audio. The test
+  removes decoded temporary WAV files on exit.
+- The M4A/MP4 ingestion implementation was already present; this change extends
+  its corpus regression coverage rather than changing container recognition.
