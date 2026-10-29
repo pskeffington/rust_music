@@ -156,6 +156,7 @@ pub fn render(view: PanelView<'_>) -> MonoFrame {
     if let Some(format) = view.status.playback.format {
         // Duration occupies this row during playback; otherwise show PCM format.
         if view.status.playback.elapsed_seconds().is_none() {
+            let x = frame.number(2, 40, u64::from(format.sample_rate));
             let x = frame.text(x, 40, "HZ", 2).saturating_add(6);
             let x = frame.number(x, 40, u64::from(format.bits_per_sample));
             let x = frame.text(x, 40, "B", 1).saturating_add(6);
