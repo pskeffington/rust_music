@@ -26,15 +26,18 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 ## Latest verified checkpoint (2026-10-29)
 
 Branch `build/native-codecs-g0`; the latest verified checkpoint includes
-RM-017 M4A ingestion and corpus work. Rust/Cargo 1.99.1/macOS:
+RM-017 M4A ingestion/corpus work and RM-011 bounded local tags. Rust/Cargo
+1.99.1/macOS:
 `sh scripts/offline-gate.sh` exited 0 on 15 local crates and 28 path-only
 edges, with zero registry/Git crates and zero third-party system links. Fmt,
 warnings-denied Clippy, workspace tests, release build and macOS feature check
 passed. The optional `python3 scripts/test_caf_reference.py` exited 0 on five
 FFmpeg-generated exact-PCM vectors (CAF LPCM 16/24/32 and ALAC 16/24); this
 does not make FFmpeg a runtime dependency. `scripts/test_m4a_corpus.py` also
-passes two Archive.org ALAC M4As with exact 16/44.1 and 24/48 PCM parity and
-confirms M4A catalog ingestion/AAC refusal. Roadmap/literature validators and
+passes four Archive.org ALAC M4As with exact three 16/44.1 and one 24/48 PCM
+parity and confirms M4A catalog ingestion/AAC refusal. Bounded FLAC Vorbis and
+AIFF text tags pass deterministic size/UTF-8 tests, and a 2 MiB artwork value
+is skipped without being retained or decoded. Roadmap/literature validators and
 `git diff --check` pass. Generated FLAC/WAVE/AIFF parity and six private FLAC
 reference/native parity remain recorded in their ledgers; private audio stays
 outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual

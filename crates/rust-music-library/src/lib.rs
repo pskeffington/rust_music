@@ -8,9 +8,17 @@
 use rust_music_core::{MusicError, Result};
 use std::{
     fs::{self, File},
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
 };
+
+const MAX_TAG_BLOCKS: usize = 128;
+const MAX_TAG_BLOCK_BYTES: u32 = 16 * 1024 * 1024;
+const MAX_TAG_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_TAG_VALUE_BYTES: usize = 512;
+const MAX_TAG_ITEMS: u32 = 4096;
+const MAX_TAG_CHARS: usize = 120;
+const MAX_TAG_CHUNKS: usize = 512;
 
 /// Limits are application policy, not a promise to index an unlimited disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,8 +66,29 @@ pub struct Track {
     pub relative_path: PathBuf,
     /// Local filename only, not an untrusted embedded tag or network result.
     pub title: String,
+    /// Small allowlisted text metadata. Cover art and unknown fields are never
+    /// decoded or retained; malformed/oversized values fall back to filename.
+    pub tags: Option<TrackTags>,
     pub container: AudioContainer,
     pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrackTags {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+}
+
+impl Track {
+    /// Prefer sanitized embedded title metadata while keeping `title` as the
+    /// deterministic filename fallback for hosts that do not want tags.
+    pub fn display_title(&self) -> &str {
+        self.tags
+            .as_ref()
+            .and_then(|tags| tags.title.as_deref())
+            .unwrap_or(&self.title)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -124,8 +153,8 @@ fn supported_extension(path: &Path) -> bool {
             .any(|allowed| x.eq_ignore_ascii_case(allowed))
     })
 }
-fn probe_container(path: &Path) -> Result<Option<AudioContainer>> {
-    let mut input = File::open(path)?;
+fn probe_container(input: &mut File) -> Result<Option<AudioContainer>> {
+    input.seek(SeekFrom::Start(0))?;
     let mut head = [0u8; 12];
     let mut len = 0;
     while len < head.len() {
@@ -151,6 +180,187 @@ fn probe_container(path: &Path) -> Result<Option<AudioContainer>> {
         Ok(Some(AudioContainer::Mp4))
     } else {
         Ok(None)
+    }
+}
+
+fn add_tag(slot: &mut Option<String>, raw: &[u8]) {
+    if slot.is_some() || raw.len() > MAX_TAG_VALUE_BYTES {
+        return;
+    }
+    let Ok(text) = std::str::from_utf8(raw) else {
+        return;
+    };
+    let text = text
+        .trim()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .take(MAX_TAG_CHARS)
+        .collect::<String>();
+    if !text.is_empty() {
+        *slot = Some(text);
+    }
+}
+
+fn tag_slot<'a>(tags: &'a mut TrackTags, key: &[u8]) -> Option<&'a mut Option<String>> {
+    if key.eq_ignore_ascii_case(b"TITLE") {
+        Some(&mut tags.title)
+    } else if key.eq_ignore_ascii_case(b"ARTIST") {
+        Some(&mut tags.artist)
+    } else if key.eq_ignore_ascii_case(b"ALBUM") {
+        Some(&mut tags.album)
+    } else {
+        None
+    }
+}
+
+fn read_flac_tags(file: &mut File) -> Option<TrackTags> {
+    file.seek(SeekFrom::Start(4)).ok()?;
+    let mut tags = TrackTags::default();
+    let mut total = 0u64;
+    let mut saw_last = false;
+    let mut items_left = MAX_TAG_ITEMS;
+    for _ in 0..MAX_TAG_BLOCKS {
+        let mut header = [0; 4];
+        file.read_exact(&mut header).ok()?;
+        let last = header[0] & 0x80 != 0;
+        let kind = header[0] & 0x7f;
+        let length =
+            (u32::from(header[1]) << 16) | (u32::from(header[2]) << 8) | u32::from(header[3]);
+        if length > MAX_TAG_BLOCK_BYTES {
+            return None;
+        }
+        total = total.checked_add(u64::from(length) + 4)?;
+        if total > MAX_TAG_TOTAL_BYTES {
+            return None;
+        }
+        let end = file
+            .stream_position()
+            .ok()?
+            .checked_add(u64::from(length))?;
+        if kind == 4 && length >= 8 {
+            let mut field = [0; 4];
+            file.read_exact(&mut field).ok()?;
+            let vendor = u32::from_le_bytes(field);
+            if u64::from(vendor) > end.checked_sub(file.stream_position().ok()?)? {
+                return None;
+            }
+            file.seek(SeekFrom::Current(i64::from(vendor))).ok()?;
+            file.read_exact(&mut field).ok()?;
+            let count = u32::from_le_bytes(field).min(items_left);
+            items_left -= count;
+            let mut remaining = end.checked_sub(file.stream_position().ok()?)?;
+            for _ in 0..count {
+                if remaining < 4 {
+                    break;
+                }
+                file.read_exact(&mut field).ok()?;
+                remaining -= 4;
+                let size = u32::from_le_bytes(field);
+                if u64::from(size) > remaining {
+                    break;
+                }
+                let mut prefix = [0u8; 64];
+                let prefix_len = (size as usize).min(prefix.len());
+                file.read_exact(&mut prefix[..prefix_len]).ok()?;
+                remaining -= prefix_len as u64;
+                let value_start = prefix[..prefix_len].iter().position(|b| *b == b'=');
+                let target = value_start.and_then(|sep| tag_slot(&mut tags, &prefix[..sep]));
+                if let (Some(slot), Some(sep)) = (target, value_start) {
+                    let value_len = size as usize - sep - 1;
+                    if value_len <= MAX_TAG_VALUE_BYTES {
+                        let already_read = prefix_len.saturating_sub(sep + 1);
+                        let mut value = prefix[sep + 1..prefix_len].to_vec();
+                        if already_read < value_len {
+                            let mut suffix = vec![0; value_len - already_read];
+                            file.read_exact(&mut suffix).ok()?;
+                            value.extend_from_slice(&suffix);
+                        }
+                        add_tag(slot, &value);
+                    } else {
+                        file.seek(SeekFrom::Current(i64::from(size) - prefix_len as i64))
+                            .ok()?;
+                    }
+                } else {
+                    file.seek(SeekFrom::Current(i64::from(size) - prefix_len as i64))
+                        .ok()?;
+                }
+                remaining = remaining.checked_sub(u64::from(size) - prefix_len as u64)?;
+            }
+        }
+        file.seek(SeekFrom::Start(end)).ok()?;
+        if last {
+            saw_last = true;
+            break;
+        }
+    }
+    (saw_last && !tags.is_empty()).then_some(tags)
+}
+
+fn read_aiff_tags(file: &mut File) -> Option<TrackTags> {
+    file.seek(SeekFrom::Start(0)).ok()?;
+    let mut form = [0u8; 12];
+    file.read_exact(&mut form).ok()?;
+    if &form[..4] != b"FORM" || (&form[8..12] != b"AIFF" && &form[8..12] != b"AIFC") {
+        return None;
+    }
+    let mut remaining =
+        u64::from(u32::from_be_bytes(form[4..8].try_into().ok()?)).checked_sub(4)?;
+    let mut tags = TrackTags::default();
+    let mut total = 0u64;
+    for _ in 0..MAX_TAG_CHUNKS {
+        if remaining < 8 {
+            break;
+        }
+        let mut header = [0u8; 8];
+        file.read_exact(&mut header).ok()?;
+        remaining -= 8;
+        let length = u64::from(u32::from_be_bytes(header[4..8].try_into().ok()?));
+        let padded = length.checked_add(length & 1)?;
+        if padded > remaining {
+            return None;
+        }
+        total = total.checked_add(padded + 8)?;
+        if total > MAX_TAG_TOTAL_BYTES {
+            return None;
+        }
+        let slot = match &header[..4] {
+            b"NAME" => Some(&mut tags.title),
+            b"AUTH" => Some(&mut tags.artist),
+            _ => None,
+        };
+        if let Some(slot) = slot {
+            if length <= MAX_TAG_VALUE_BYTES as u64 {
+                let mut value = vec![0; length as usize];
+                file.read_exact(&mut value).ok()?;
+                add_tag(slot, &value);
+            } else {
+                file.seek(SeekFrom::Current(length as i64)).ok()?;
+            }
+        } else {
+            file.seek(SeekFrom::Current(length as i64)).ok()?;
+        }
+        if padded != length {
+            file.seek(SeekFrom::Current(1)).ok()?;
+        }
+        remaining -= padded;
+        if &header[..4] == b"SSND" {
+            break;
+        }
+    }
+    (!tags.is_empty()).then_some(tags)
+}
+
+impl TrackTags {
+    fn is_empty(&self) -> bool {
+        self.title.is_none() && self.artist.is_none() && self.album.is_none()
+    }
+}
+
+fn read_tags(file: &mut File, container: AudioContainer) -> Option<TrackTags> {
+    match container {
+        AudioContainer::Flac => read_flac_tags(file),
+        AudioContainer::Aiff => read_aiff_tags(file),
+        _ => None,
     }
 }
 
@@ -190,7 +400,8 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
                 }
             } else if file_type.is_file() && supported_extension(&item.path()) {
                 let path = item.path();
-                if let Some(container) = probe_container(&path)? {
+                let mut file = File::open(&path)?;
+                if let Some(container) = probe_container(&mut file)? {
                     if tracks.len() >= limits.max_tracks {
                         return Err(MusicError::Limit("music library track budget exceeded"));
                     }
@@ -205,10 +416,11 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
                         .chars()
                         .take(120)
                         .collect::<String>();
-                    let size_bytes = item.metadata()?.len();
+                    let size_bytes = file.metadata()?.len();
                     tracks.push(Track {
                         relative_path,
                         title,
+                        tags: read_tags(&mut file, container),
                         container,
                         size_bytes,
                     });
@@ -256,6 +468,44 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    fn flac_with_comments(comments: &[Vec<u8>]) -> Vec<u8> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&4u32.to_le_bytes());
+        block.extend_from_slice(b"test");
+        block.extend_from_slice(&(comments.len() as u32).to_le_bytes());
+        for comment in comments {
+            block.extend_from_slice(&(comment.len() as u32).to_le_bytes());
+            block.extend_from_slice(comment);
+        }
+        let mut bytes = b"fLaC".to_vec();
+        bytes.extend_from_slice(&[0, 0, 0, 34]); // STREAMINFO, non-final
+        bytes.extend_from_slice(&[0; 34]);
+        bytes.extend_from_slice(&[
+            0x84,
+            ((block.len() >> 16) & 0xff) as u8,
+            ((block.len() >> 8) & 0xff) as u8,
+            (block.len() & 0xff) as u8,
+        ]);
+        bytes.extend_from_slice(&block);
+        bytes
+    }
+
+    fn aiff_with_text_chunks(chunks: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
+        let mut body = b"AIFF".to_vec();
+        for (id, value) in chunks {
+            body.extend_from_slice(*id);
+            body.extend_from_slice(&(value.len() as u32).to_be_bytes());
+            body.extend_from_slice(value);
+            if value.len() % 2 != 0 {
+                body.push(0);
+            }
+        }
+        let mut bytes = b"FORM".to_vec();
+        bytes.extend_from_slice(&(body.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(&body);
+        bytes
     }
 
     #[test]
@@ -317,6 +567,77 @@ mod tests {
             }
         )
         .is_err());
+    }
+
+    #[test]
+    fn flac_tags_are_allowlisted_utf8_bounded_and_artwork_is_skipped() {
+        let t = Temp::new();
+        let mut picture = b"METADATA_BLOCK_PICTURE=".to_vec();
+        picture.extend(std::iter::repeat_n(b'A', 2 * 1024 * 1024));
+        fs::write(
+            t.0.join("fallback.flac"),
+            flac_with_comments(&[
+                picture,
+                "TITLE=Bach – aria".as_bytes().to_vec(),
+                b"ARTIST=Kimiko\nIshizaka".to_vec(),
+                b"ALBUM=Open Goldberg Variations".to_vec(),
+                b"COMMENT=unexposed".to_vec(),
+            ]),
+        )
+        .unwrap();
+        let lib = scan(&t.0, ScanLimits::default()).unwrap();
+        let track = lib.track(0).unwrap();
+        assert_eq!(track.title, "fallback");
+        assert_eq!(track.display_title(), "Bach – aria");
+        assert_eq!(
+            track.tags,
+            Some(TrackTags {
+                title: Some("Bach – aria".into()),
+                artist: Some("KimikoIshizaka".into()),
+                album: Some("Open Goldberg Variations".into()),
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_or_oversized_flac_values_do_not_poison_other_tags() {
+        let t = Temp::new();
+        let oversized = [b"TITLE=".as_slice(), &vec![b'x'; MAX_TAG_VALUE_BYTES + 1]].concat();
+        fs::write(
+            t.0.join("fallback.flac"),
+            flac_with_comments(&[
+                b"TITLE=\xff".to_vec(),
+                oversized,
+                b"ARTIST=Valid artist".to_vec(),
+            ]),
+        )
+        .unwrap();
+        let lib = scan(&t.0, ScanLimits::default()).unwrap();
+        let track = lib.track(0).unwrap();
+        assert_eq!(track.display_title(), "fallback");
+        assert_eq!(
+            track.tags.as_ref().unwrap().artist.as_deref(),
+            Some("Valid artist")
+        );
+    }
+
+    #[test]
+    fn aiff_name_and_author_tags_are_utf8_bounded_and_ignore_unknown_chunks() {
+        let t = Temp::new();
+        fs::write(
+            t.0.join("fallback.aiff"),
+            aiff_with_text_chunks(&[
+                (b"NAME", &vec![b'x'; MAX_TAG_VALUE_BYTES + 1]),
+                (b"NAME", "Piano – nocturne".as_bytes()),
+                (b"AUTH", b"Artist\xff"),
+                (b"ANNO", b"not displayed"),
+            ]),
+        )
+        .unwrap();
+        let lib = scan(&t.0, ScanLimits::default()).unwrap();
+        let track = lib.track(0).unwrap();
+        assert_eq!(track.display_title(), "Piano – nocturne");
+        assert_eq!(track.tags.as_ref().unwrap().artist, None);
     }
 
     #[cfg(unix)]

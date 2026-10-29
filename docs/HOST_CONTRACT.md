@@ -38,7 +38,7 @@ while slot.status().playback.state == PlaybackState::Playing {
 
 ## Micro-UI mapping
 
-The host owns the phosphor-green, low-refresh CRT-like panel. It can display `MUSIC`, `track.title`, `track.container`, `playback.state`, and `frames_delivered/sample_rate` as integer-derived elapsed time. The primary controls are `PREV`, `PLAY`, `STOP`, `NEXT`, with a single slim settings affordance. Track titles are **filenames only**, not album/artist tags: those are later parser modules and must not be invented.
+The host owns the phosphor-green, low-refresh CRT-like panel. It can display `MUSIC`, `track.display_title()`, `track.container`, `playback.state`, and `frames_delivered/sample_rate` as integer-derived elapsed time. The library preserves a filename title as fallback and exposes only bounded, UTF-8-validated FLAC Vorbis `TITLE`/`ARTIST`/`ALBUM` and AIFF `NAME`/`AUTH` text tags. Other fields, including artwork, are not decoded into memory or passed to the panel. The primary controls are `PREV`, `PLAY`, `STOP`, `NEXT`, with a single slim settings affordance.
 
 ## G6 native micro panel
 

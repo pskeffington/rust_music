@@ -41,10 +41,13 @@ The host MUST handle `OpenSettings` as navigation to its own settings screen;
 no screen is created inside Music. Buttons should be debounced by the host. The
 panel never calls the host or the audio engine from `render()`.
 
-There is **no fabricated progress bar**: total duration, sample-accurate seek,
-and metadata tags are not yet available to the panel. No play/pause symbol is
-shown until real pause/resume semantics are implemented. The terminal preview
-path is read-only and uses `NullSink`, not a hardware or second audio backend.
+There is **no fabricated progress bar**: total duration and sample-accurate
+seek are not available to the panel. The displayed title prefers sanitized
+FLAC Vorbis or AIFF text metadata and falls back to the filename; artwork and
+other metadata fields are not decoded into the 1KiB panel. No play/pause symbol
+is shown until real pause/resume semantics are implemented. The terminal
+preview path is read-only and uses `NullSink`, not a hardware or second audio
+backend.
 
 ## API example
 

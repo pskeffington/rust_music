@@ -14,7 +14,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 - **Why these algorithms and standards?** [Literature registry](literature-index.json), [independent literature matrix](LITERATURE_MATRIX.md).
 - **May this crate depend on a library or call network?** [Offline dependency policy](DEPENDENCY_POLICY.md), [offline gate](../scripts/offline-gate.sh).
 - **How does MUSIC pop into Rust_Boy/Pip-Boy?** [Host contract](HOST_CONTRACT.md), [Pip-Boy adapter contract](PIP_BOY_ADAPTER.md), and [1KiB panel](G6_MICRO_PANEL.md).
-- **What is actually verified?** Per-gate ledgers [G2](G2_VALIDATION.md), [G5](G5_VALIDATION.md), [G6](G6_VALIDATION.md), [G7](G7_RIFF_CONFORMANCE.md), [G8](G8_REALWORLD_FLAC_CORPUS.md), [G9](G9_TIMING_PROGRESS.md), [G10](G10_AUDIOPHILE_FORMATS.md).
+- **What is actually verified?** Per-gate ledgers [G2](G2_VALIDATION.md), [G5](G5_VALIDATION.md), [G6](G6_VALIDATION.md), [G7](G7_RIFF_CONFORMANCE.md), [G8](G8_REALWORLD_FLAC_CORPUS.md), [G9](G9_TIMING_PROGRESS.md), [G10](G10_AUDIOPHILE_FORMATS.md), [G13](G13_METADATA_AND_SEEK.md).
 - **Which Codex guidance loads?** Root [AGENTS.md](../AGENTS.md) and `.codex/agents/` definitions documented in [CODEX_AGENT_MAP.md](CODEX_AGENT_MAP.md).
 - **What changed and what was verified?** [Work log](WORK_LOG.md); task status remains authoritative in [roadmap JSON](roadmap-index.json).
 
@@ -49,7 +49,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | Architecture and host integration | `docs/ARCHITECTURE.md`, `docs/HOST_CONTRACT.md`, `docs/PIP_BOY_ADAPTER.md`, `docs/G6_MICRO_PANEL.md` | Crate boundaries, host lease, Pip-Boy adapter gaps and panel contract |
 | Roadmap, progress and this index | `docs/ROADMAP.md`, `docs/roadmap-index.json`, `docs/REPOSITORY_INDEX.md`, `docs/WORK_LOG.md` | Stable task state, gate order, dated evidence and file navigation |
 | Format and dependency policy | `docs/G10_AUDIOPHILE_FORMATS.md`, `docs/DEPENDENCY_POLICY.md`, `docs/lossless-formats.json` | Playback admission, format status and offline dependency rules |
-| Validation ledgers | `docs/G2_VALIDATION.md`, `docs/G5_VALIDATION.md`, `docs/G6_VALIDATION.md`, `docs/G7_RIFF_CONFORMANCE.md`, `docs/G8_EXTERNAL_FLAC_CORPUS.md`, `docs/G8_REALWORLD_FLAC_CORPUS.md`, `docs/G9_TIMING_PROGRESS.md` | Per-gate commands, results and outstanding acceptance |
+| Validation ledgers | `docs/G2_VALIDATION.md`, `docs/G5_VALIDATION.md`, `docs/G6_VALIDATION.md`, `docs/G7_RIFF_CONFORMANCE.md`, `docs/G8_EXTERNAL_FLAC_CORPUS.md`, `docs/G8_REALWORLD_FLAC_CORPUS.md`, `docs/G9_TIMING_PROGRESS.md`, `docs/G13_METADATA_AND_SEEK.md` | Per-gate commands, results and outstanding acceptance |
 | Literature | `docs/literature-index.json`, `docs/LITERATURE_INDEX.md`, `docs/LITERATURE_MATRIX.md` | Source registry, generated index and human rationale |
 | Root files and CI configuration | `README.md`, `Cargo.toml`, `Cargo.lock`, `.cargo/config.toml`, `.github/workflows/ci.yml`, `.gitignore`, `LICENSE` | User entrypoint, workspace, offline mode, operator-owned CI, exclusions and license |
 | Scripts | `scripts/offline-gate.sh`, `scripts/build_literature.py`, `scripts/check_literature.py`, `scripts/check_roadmap_index.py`, `scripts/test_*` | Required offline gate and optional developer validation/reference harnesses |

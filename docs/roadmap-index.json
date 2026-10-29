@@ -243,9 +243,9 @@
       "id": "G13",
       "title": "Bounded metadata and sample-accurate seek",
       "owner_agent": "codec_engineer",
-      "status": "planned",
-      "next_evidence": "Never claim seek or album tags without indexed code and tests",
-      "evidence_doc": "docs/G9_TIMING_PROGRESS.md"
+      "status": "partial_evidence",
+      "next_evidence": "FLAC Vorbis and AIFF text tags pass deterministic size/UTF-8 validation and omit artwork; validated sample-accurate FLAC seek remains planned",
+      "evidence_doc": "docs/G13_METADATA_AND_SEEK.md"
     },
     {
       "id": "G14",
@@ -458,7 +458,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "planned",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
@@ -468,7 +468,7 @@
       ],
       "create_paths": [],
       "acceptance": "FLAC Vorbis comments and optional AIFF tags have deterministic size/UTF-8 tests; artwork never decoded into 1KiB UI",
-      "blocker": "None; planned implementation must preserve strict memory/resource bounds and keep artwork out of the 1KiB UI"
+      "blocker": "Acceptance passed locally: allowlisted FLAC Vorbis TITLE/ARTIST/ALBUM and AIFF NAME/AUTH are UTF-8 validated and bounded; oversized and malformed values fall back safely, 2 MiB picture data is skipped without materializing it, and the panel uses sanitized title/fallback only. One-handle signature and metadata reads reduce the scanner reopen race. Sample-accurate FLAC seek remains separate under RM-012"
     },
     {
       "id": "RM-012",

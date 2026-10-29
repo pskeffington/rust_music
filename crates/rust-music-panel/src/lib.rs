@@ -118,7 +118,7 @@ impl<'a> PanelView<'a> {
             .and_then(|index| slot.library().track(index));
         Self {
             status,
-            title: track.map(|item| item.title.as_str()),
+            title: track.map(|item| item.display_title()),
             container: track.map(|item| item.container),
         }
     }

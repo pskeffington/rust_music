@@ -289,3 +289,28 @@ encoder compatibility.
   M4A ingestion and AAC decode refusal pass.
 - `python3 scripts/check_roadmap_index.py`,
   `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
+
+## 2026-10-29 — RM-011 bounded local metadata
+
+The explicit library scan now extracts only bounded, valid UTF-8 display tags:
+FLAC Vorbis `TITLE`, `ARTIST`, `ALBUM` and AIFF `NAME`, `AUTH`. It keeps the
+filename title as fallback, strips control characters, caps retained values,
+and does not decode or retain embedded artwork. The 1KiB panel uses the
+sanitized display title. Signature sniffing and metadata extraction share one
+open file handle, addressing the safety review's reopen-race observation.
+
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 local crates, 28 local edges,
+  fmt, warnings-denied Clippy, workspace tests (library 6/6, panel 5/5,
+  host 6/6), release build and macOS feature check passed.
+- Read-only `safety_reviewer`: no blocking findings; its one low-priority race
+  observation was addressed.
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, 4/4 exact PCM ALAC cases;
+  M4A ingestion and AAC refusal pass.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
+
+Archive.org's item format label was not treated as codec evidence during the
+independent-source search: two separately CC0-marked candidates labeled
+"Apple Lossless Audio" were actually AAC/mp4a by `ffprobe`; Rust Music refused
+the AAC at its ALAC sample-entry check. Neither is included as ALAC evidence
+or retained as a corpus fixture.
