@@ -77,7 +77,7 @@ fn play(input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
 #[cfg(all(target_os = "linux", feature = "alsa-output"))]
 fn play(input: Box<dyn Decoder>, device: Option<&str>) -> Result<()> {
     use rust_music::{AlsaSink, PlaybackState, Player};
-    let device = device.unwrap_or("default");
+    let device = device.ok_or(MusicError::Invalid("Linux playback requires explicit hw:CARD,DEVICE"))?;
     let mut player = Player::new(AlsaSink::new(device, device.starts_with("hw:"))?);
     player.load(input)?;
     player.play()?;

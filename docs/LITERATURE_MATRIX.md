@@ -1,6 +1,6 @@
 # Rust Music independent-codec literature matrix
 
-Updated: 2026-10-28
+Updated: 2026-10-29
 
 All sources are research references **only**. No third-party decoder/player implementation is copied or linked.
 Project claims are not a hardware benchmark; status is recorded in the registry.
@@ -28,6 +28,8 @@ Project claims are not a hardware benchmark; status is recorded in the registry.
 | **LIT-015** | [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) | Typed errors and portable Read-driven decoders with explicit no-panics. | Fmt/clippy/test plus public rustdoc review. | G0 | Guidance, not a runtime dependency |
 | **LIT-016** | [Rust cargo features](https://doc.rust-lang.org/cargo/reference/features.html) | Keep optional OS backends gated and dependency-free core default. | Cargo tree and MSRV target matrices. | G0 | Official Rust documentation |
 | **LIT-017** | [Rust Radio standalone embedding](https://github.com/pskeffington/rust_radio/blob/main/docs/EMBEDDING.md) | Reuse module shape: independent lib, explicit Play, host-owned storage and output focus. | Rust Boy adapter can load and unload without second audio stream. | G5 | Sibling repository interface reference only |
+| **LIT-018** | [Linux ALSA kernel PCM UAPI](https://github.com/torvalds/linux/blob/master/include/uapi/sound/asound.h) | Use local Rust ioctl structs against /dev/snd device nodes, not the libasound sound library or a daemon. | 64-bit ABI layout tests plus playback hardware negotiation and underrun testing. | G3 | Linux kernel interface, not a bundled decoder or userspace sound SDK |
+| **LIT-019** | [Cargo offline and locked builds](https://doc.rust-lang.org/cargo/reference/config.html#netoffline) | Require offline locked workspace builds with no registry/git packages and no build.rs hooks. | Run the built-in Rust audit and offline build gate from disconnected workstation. | G0 | Rust toolchain itself is an explicit prerequisite; no dependencies are downloaded |
 
 ## Independent Rust coding standards
 
@@ -47,3 +49,5 @@ Project claims are not a hardware benchmark; status is recorded in the registry.
 | **RUST-012** | Pure headless core compiles independent of macOS/Windows/Linux/Android OS backends. | G0 | implemented | LIT-010, LIT-011, LIT-013, LIT-016 | cross-target no-default-feature check |
 | **RUST-013** | Every source and standard is uniquely identified with evidence and validation gates. | G0 | implemented | LIT-015 | scripts/check_literature.py succeeds offline |
 | **RUST-014** | Do not mark ALAC as supported until demux and decoder pass corpus comparison. | G4 | planned | LIT-009 | ALAC source/PCM signed comparison with golden tests |
+| **RUST-015** | Every Cargo dependency stays inside this workspace; reject crates.io, git, build.rs and undeclared native libraries. | G0 | implemented | LIT-016, LIT-019 | cargo run --locked --offline -p rust-music-audit proves manifest, lock and FFI boundaries |
+| **RUST-016** | Do not link libasound, PulseAudio, JACK or PipeWire; Linux PCM sink must use only a /dev/snd kernel device. | G3 | implemented | LIT-014, LIT-018 | Feature-gated native ABI size checks, real PCM device setup and DAC loopback evidence |

@@ -46,7 +46,7 @@ Decoder blocks preserve original signed sample values. 8-bit unsigned WAVE is no
 
 ## Output adapters and capability honesty
 
-Mac AudioQueue and ALSA are optional tiny direct native API shims, not decoding libraries. Mac's system audio mixer or ALSA default plugin might resample even when Rust Music returns mathematically exact PCM. `hw:` ALSA permits direct format negotiation, but this still needs loopback or DAC validation. Native adapter compile/device performance is separate from codec parser tests. Windows WASAPI and Android AAudio are planned, not yet implemented.
+Mac AudioQueue and the Linux ALSA **kernel ioctl UAPI** are optional app-owned device shims, not decoding libraries. No libasound or daemon library is linked. Mac's system audio mixer or ALSA default plugin might resample even when Rust Music returns mathematically exact PCM. `hw:CARD,DEVICE` maps directly to `/dev/snd/pcmC*D*p`; no default ALSA plugin, libasound, or sound server is used. This is 64-bit Linux only and still needs actual hardware validation. Native adapter compile/device performance is separate from codec parser tests. Windows WASAPI and Android AAudio are planned, not yet implemented.
 
 ## Micro-interface contract
 
@@ -58,6 +58,10 @@ The host asks for `File -> AudioFormat` and calls `Player::load`, `play`, `step`
 - Automatic network library scanning, microphone permissions, and cloud account code.
 - Synthetic upsampling, equalization, gain correction or crossfade in strict listening mode.
 - Native encoding of new FLAC or ALAC files; decoding is first priority.
+
+## Local-only build and FFI policy
+
+Every crate in the workspace has locally authored source. `Cargo.lock` carries no registry or Git packages. The self-authored `rust-music-audit` crate checks every path edge, build hook, native link and network API; `scripts/offline-gate.sh` builds the full workspace in Cargo offline+locked mode. See [Dependency policy](DEPENDENCY_POLICY.md). CI is optional and uses an operator-provisioned offline runner; it is not required to build or run the player.
 
 ## Research provenance
 

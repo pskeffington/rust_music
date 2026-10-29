@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-28",
+  "updated": "2026-10-29",
   "canonical_matrix": "docs/LITERATURE_MATRIX.md",
   "canonical_index": "docs/LITERATURE_INDEX.md",
   "categories": {
@@ -231,6 +231,32 @@
       "gate": "G5",
       "license_note": "Sibling repository interface reference only",
       "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-018",
+      "title": "Linux ALSA kernel PCM UAPI",
+      "category": "standards",
+      "url": "https://github.com/torvalds/linux/blob/master/include/uapi/sound/asound.h",
+      "evidence_level": "official-spec",
+      "priority": "high",
+      "decision": "Use local Rust ioctl structs against /dev/snd device nodes, not the libasound sound library or a daemon.",
+      "validation": "64-bit ABI layout tests plus playback hardware negotiation and underrun testing.",
+      "gate": "G3",
+      "license_note": "Linux kernel interface, not a bundled decoder or userspace sound SDK",
+      "dependency_policy": "reference-only"
+    },
+    {
+      "id": "LIT-019",
+      "title": "Cargo offline and locked builds",
+      "category": "engineering",
+      "url": "https://doc.rust-lang.org/cargo/reference/config.html#netoffline",
+      "evidence_level": "official-guide",
+      "priority": "high",
+      "decision": "Require offline locked workspace builds with no registry/git packages and no build.rs hooks.",
+      "validation": "Run the built-in Rust audit and offline build gate from disconnected workstation.",
+      "gate": "G0",
+      "license_note": "Rust toolchain itself is an explicit prerequisite; no dependencies are downloaded",
+      "dependency_policy": "reference-only"
     }
   ],
   "standards": [
@@ -406,6 +432,30 @@
         "LIT-009"
       ],
       "acceptance": "ALAC source/PCM signed comparison with golden tests"
+    },
+    {
+      "id": "RUST-015",
+      "title": "Local-only dependency closure",
+      "rule": "Every Cargo dependency stays inside this workspace; reject crates.io, git, build.rs and undeclared native libraries.",
+      "gate": "G0",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-016",
+        "LIT-019"
+      ],
+      "acceptance": "cargo run --locked --offline -p rust-music-audit proves manifest, lock and FFI boundaries"
+    },
+    {
+      "id": "RUST-016",
+      "title": "Direct Linux kernel PCM",
+      "rule": "Do not link libasound, PulseAudio, JACK or PipeWire; Linux PCM sink must use only a /dev/snd kernel device.",
+      "gate": "G3",
+      "status": "implemented",
+      "evidence_ids": [
+        "LIT-014",
+        "LIT-018"
+      ],
+      "acceptance": "Feature-gated native ABI size checks, real PCM device setup and DAC loopback evidence"
     }
   ]
 }

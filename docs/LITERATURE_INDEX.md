@@ -1,6 +1,6 @@
 # Rust Music literature navigation
 
-Updated: 2026-10-28. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literature-index.json).
+Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literature-index.json).
 
 ## Codec, container, and native API standards
 
@@ -10,6 +10,7 @@ Updated: 2026-10-28. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literat
 - **LIT-011** [Windows WASAPI](https://learn.microsoft.com/en-us/windows/win32/coreaudio/wasapi) - Thin Windows audio endpoint adapter with no resampling surprises. Gate G3.
 - **LIT-012** [WASAPI exclusive streams](https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams) - Prefer capability negotiation, warn before exclusive device seizure. Gate G3.
 - **LIT-013** [Android NDK AAudio](https://developer.android.com/ndk/guides/audio/aaudio/aaudio) - Thin Android output ABI for deployable micro player. Gate G5.
+- **LIT-018** [Linux ALSA kernel PCM UAPI](https://github.com/torvalds/linux/blob/master/include/uapi/sound/asound.h) - Use local Rust ioctl structs against /dev/snd device nodes, not the libasound sound library or a daemon. Gate G3.
 
 ## Comparison decoders and conformance tools (never dependencies)
 
@@ -29,6 +30,7 @@ Updated: 2026-10-28. See [matrix](LITERATURE_MATRIX.md) and [JSON index](literat
 - **LIT-014** [MPD ALSA output guidance](https://mpd.readthedocs.io/en/stable/plugins.html) - Avoid implicit dmix/resample for strict audio; request direct hw device explicitly. Gate G3.
 - **LIT-015** [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) - Typed errors and portable Read-driven decoders with explicit no-panics. Gate G0.
 - **LIT-016** [Rust cargo features](https://doc.rust-lang.org/cargo/reference/features.html) - Keep optional OS backends gated and dependency-free core default. Gate G0.
+- **LIT-019** [Cargo offline and locked builds](https://doc.rust-lang.org/cargo/reference/config.html#netoffline) - Require offline locked workspace builds with no registry/git packages and no build.rs hooks. Gate G0.
 
 ## Embedding boundary with Rust Boy and sibling modules
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-UPDATED = "2026-10-28"
+UPDATED = "2026-10-29"
 CATEGORIES = {
     "standards": "Codec, container, and native API standards",
     "reference-codecs": "Comparison decoders and conformance tools (never dependencies)",
@@ -33,6 +33,8 @@ DATA = [
     ("Rust API Guidelines", "engineering", "https://rust-lang.github.io/api-guidelines/", "official-guide", "high", "Typed errors and portable Read-driven decoders with explicit no-panics.", "Fmt/clippy/test plus public rustdoc review.", "G0", "Guidance, not a runtime dependency"),
     ("Rust cargo features", "engineering", "https://doc.rust-lang.org/cargo/reference/features.html", "official-guide", "medium", "Keep optional OS backends gated and dependency-free core default.", "Cargo tree and MSRV target matrices.", "G0", "Official Rust documentation"),
     ("Rust Radio standalone embedding", "host-integration", "https://github.com/pskeffington/rust_radio/blob/main/docs/EMBEDDING.md", "host-contract", "high", "Reuse module shape: independent lib, explicit Play, host-owned storage and output focus.", "Rust Boy adapter can load and unload without second audio stream.", "G5", "Sibling repository interface reference only"),
+    ("Linux ALSA kernel PCM UAPI", "standards", "https://github.com/torvalds/linux/blob/master/include/uapi/sound/asound.h", "official-spec", "high", "Use local Rust ioctl structs against /dev/snd device nodes, not the libasound sound library or a daemon.", "64-bit ABI layout tests plus playback hardware negotiation and underrun testing.", "G3", "Linux kernel interface, not a bundled decoder or userspace sound SDK"),
+    ("Cargo offline and locked builds", "engineering", "https://doc.rust-lang.org/cargo/reference/config.html#netoffline", "official-guide", "high", "Require offline locked workspace builds with no registry/git packages and no build.rs hooks.", "Run the built-in Rust audit and offline build gate from disconnected workstation.", "G0", "Rust toolchain itself is an explicit prerequisite; no dependencies are downloaded"),
 ]
 
 STANDARD_DATA = [
@@ -50,6 +52,8 @@ STANDARD_DATA = [
     ("Portability", "Pure headless core compiles independent of macOS/Windows/Linux/Android OS backends.", "G0", "implemented", [10, 11, 13, 16], "cross-target no-default-feature check"),
     ("Machine index", "Every source and standard is uniquely identified with evidence and validation gates.", "G0", "implemented", [15], "scripts/check_literature.py succeeds offline"),
     ("ALAC truthfulness", "Do not mark ALAC as supported until demux and decoder pass corpus comparison.", "G4", "planned", [9], "ALAC source/PCM signed comparison with golden tests"),
+    ("Local-only dependency closure", "Every Cargo dependency stays inside this workspace; reject crates.io, git, build.rs and undeclared native libraries.", "G0", "implemented", [16, 19], "cargo run --locked --offline -p rust-music-audit proves manifest, lock and FFI boundaries"),
+    ("Direct Linux kernel PCM", "Do not link libasound, PulseAudio, JACK or PipeWire; Linux PCM sink must use only a /dev/snd kernel device.", "G3", "implemented", [14, 18], "Feature-gated native ABI size checks, real PCM device setup and DAC loopback evidence"),
 ]
 
 def records():
