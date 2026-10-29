@@ -193,6 +193,126 @@ fn expand_log_median(encoded: u16) -> Result<u32> {
     Ok(value)
 }
 
+/// Inclusive residual interval selected by one WavPack entropy partition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResidualRange {
+    pub low: u32,
+    pub high: u32,
+}
+
+/// Adaptive Q4 median breakpoints for one encoded channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MedianChannel {
+    values: [u32; 3],
+}
+
+impl MedianChannel {
+    pub fn new(values: [u32; 3]) -> Self {
+        Self { values }
+    }
+
+    /// Select the recursive Golomb interval for an already decoded unary
+    /// partition count, then update the three breakpoints for that partition.
+    pub fn select_range(&mut self, ones_count: u32) -> Result<ResidualRange> {
+        let original = *self;
+        match self.select_range_inner(ones_count) {
+            Ok(range) => Ok(range),
+            Err(error) => {
+                *self = original;
+                Err(error)
+            }
+        }
+    }
+
+    /// Decode one signed residual after the unary partition count has been
+    /// resolved by the caller. Median and bit cursors commit only on success.
+    pub fn decode_residual(&mut self, bits: &mut BitReader<'_>, ones_count: u32) -> Result<i32> {
+        let original_medians = *self;
+        let original_bit_offset = bits.bit_offset;
+        let decoded = (|| {
+            let range = self.select_range(ones_count)?;
+            let code_count = range.high - range.low + 1;
+            let residual = range.low + bits.read_adjusted_binary(code_count)?;
+            let sign = bits.read_bit()?;
+            let magnitude = residual as i32;
+            Ok(if sign { !magnitude } else { magnitude })
+        })();
+        if decoded.is_err() {
+            *self = original_medians;
+            bits.bit_offset = original_bit_offset;
+        }
+        decoded
+    }
+
+    fn select_range_inner(&mut self, ones_count: u32) -> Result<ResidualRange> {
+        let mut low = 0u64;
+        let high;
+        if ones_count == 0 {
+            high = u64::from(self.get(0)) - 1;
+            self.decrease(0)?;
+        } else {
+            low = u64::from(self.get(0));
+            self.increase(0)?;
+            if ones_count == 1 {
+                high = low + u64::from(self.get(1)) - 1;
+                self.decrease(1)?;
+            } else {
+                low += u64::from(self.get(1));
+                self.increase(1)?;
+                if ones_count == 2 {
+                    high = low + u64::from(self.get(2)) - 1;
+                    self.decrease(2)?;
+                } else {
+                    low += u64::from(ones_count - 2) * u64::from(self.get(2));
+                    high = low + u64::from(self.get(2)) - 1;
+                    self.increase(2)?;
+                }
+            }
+        }
+
+        const SAMPLE_MAGNITUDE_MASK: u64 = 0x7fff_ffff;
+        let low = low & SAMPLE_MAGNITUDE_MASK;
+        let mut high = high & SAMPLE_MAGNITUDE_MASK;
+        if low > high {
+            high = low;
+        }
+        Ok(ResidualRange {
+            low: low as u32,
+            high: high as u32,
+        })
+    }
+
+    pub fn fixed_point_medians(&self) -> [u32; 3] {
+        self.values
+    }
+
+    fn get(&self, index: usize) -> u32 {
+        (self.values[index] >> 4) + 1
+    }
+
+    fn increase(&mut self, index: usize) -> Result<()> {
+        const DIVISORS: [u64; 3] = [128, 64, 32];
+        let value = u64::from(self.values[index]);
+        let divisor = DIVISORS[index];
+        let step = ((value + divisor) / divisor) * 5;
+        self.values[index] = u32::try_from(value + step)
+            .map_err(|_| MusicError::Limit("WavPack entropy median update overflows"))?;
+        Ok(())
+    }
+
+    fn decrease(&mut self, index: usize) -> Result<()> {
+        const DIVISORS: [u64; 3] = [128, 64, 32];
+        let value = u64::from(self.values[index]);
+        let divisor = DIVISORS[index];
+        let step = ((value + divisor - 2) / divisor) * 2;
+        self.values[index] = u32::try_from(value.checked_sub(step).ok_or(MusicError::Invalid(
+            "WavPack entropy median update underflows",
+        ))?)
+        .map_err(|_| MusicError::Limit("WavPack entropy median update overflows"))?;
+        Ok(())
+    }
+}
+
 /// Iterate through every metadata sub-block in one complete WavPack block.
 /// The iterator borrows the input and does not allocate or retain payloads.
 pub struct MetadataIter<'a> {
@@ -763,6 +883,65 @@ mod tests {
                 "WavPack entropy median exceeds 32-bit decoder range"
             ))
         ));
+    }
+
+    #[test]
+    fn median_channel_selects_and_adapts_recursive_zones() {
+        let mut medians = MedianChannel::new([79, 62, 229]);
+        assert_eq!(
+            medians.select_range(0).unwrap(),
+            ResidualRange { low: 0, high: 4 }
+        );
+        assert_eq!(medians.fixed_point_medians(), [77, 62, 229]);
+        assert_eq!(
+            medians.select_range(1).unwrap(),
+            ResidualRange { low: 5, high: 8 }
+        );
+        assert_eq!(medians.fixed_point_medians(), [82, 60, 229]);
+        assert_eq!(
+            medians.select_range(2).unwrap(),
+            ResidualRange { low: 10, high: 24 }
+        );
+        assert_eq!(medians.fixed_point_medians(), [87, 65, 213]);
+        assert_eq!(
+            medians.select_range(3).unwrap(),
+            ResidualRange { low: 25, high: 38 }
+        );
+        assert_eq!(medians.fixed_point_medians(), [92, 75, 248]);
+    }
+
+    #[test]
+    fn median_channel_decodes_signed_residual_and_rolls_back_on_truncation() {
+        let mut positive = MedianChannel::new([79, 62, 229]);
+        let positive_bits = stream_bits("000");
+        let mut bits = BitReader::new(&positive_bits);
+        assert_eq!(positive.decode_residual(&mut bits, 0).unwrap(), 0);
+        assert_eq!(positive.fixed_point_medians(), [77, 62, 229]);
+
+        let mut negative = MedianChannel::new([79, 62, 229]);
+        let negative_bits = stream_bits("001");
+        let mut bits = BitReader::new(&negative_bits);
+        assert_eq!(negative.decode_residual(&mut bits, 0).unwrap(), -1);
+
+        let mut state = MedianChannel::new([79, 62, 229]);
+        let original = state;
+        let bytes = stream_bits("00000011");
+        let mut bits = BitReader::new(&bytes);
+        bits.read_bits(6).unwrap();
+        assert!(state.decode_residual(&mut bits, 0).is_err());
+        assert_eq!(state, original);
+        assert_eq!(bits.remaining_bits(), 2);
+    }
+
+    #[test]
+    fn median_update_overflow_fails_without_mutating_state() {
+        let mut medians = MedianChannel::new([u32::MAX, 62, 229]);
+        let original = medians;
+        assert!(matches!(
+            medians.select_range(1),
+            Err(MusicError::Limit("WavPack entropy median update overflows"))
+        ));
+        assert_eq!(medians, original);
     }
 
     #[test]

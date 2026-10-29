@@ -4,6 +4,27 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-29 — RM-014 median-zone and residual primitives
+
+Added `MedianChannel`, which selects the recursive Golomb interval from an
+already-resolved unary partition count and adapts all three Q4 median
+breakpoints with checked arithmetic. Added an atomic signed-residual decoder
+using the adjusted-binary reader; on truncation it restores both bit and
+median state. Deterministic tests cover all first four recursive zones,
+positive zero/negative-one sign mapping, truncation rollback and update
+overflow. This is entropy primitive evidence only; unary pair translation,
+zero runs, full real-stream decode, decorrelation, block CRC and PCM parity
+remain open. The behavior follows the published WavPack entropy description
+already indexed as LIT-020; no reference implementation code was copied.
+
+**Observed checks:** `cargo test --locked --offline -p rust-music-wavpack`
+passed 22/22. `sh scripts/offline-gate.sh` exited 0 across 16 local crates and
+29 path-only edges, including formatting, warnings-denied Clippy, workspace
+tests, release build and macOS feature check. Both roadmap and literature
+validators and `git diff --check` passed. A read-only safety review found no
+actionable issue in the reviewed primitives and explicitly did not treat them
+as full word-stream or PCM-parity evidence.
+
 ## 2026-10-29 — RM-014 adjusted-binary entropy primitive
 
 Implemented a bounded WavPack adjusted-binary reader on top of the existing
