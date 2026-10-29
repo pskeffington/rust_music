@@ -11,7 +11,29 @@ pub struct PlaybackSnapshot {
     pub state: PlaybackState,
     pub generation: u64,
     pub frames_delivered: u64,
+    /// Declared sample frames; an untrusted header until EOF checks complete.
+    pub total_frames: Option<u64>,
     pub format: Option<AudioFormat>,
+}
+
+impl PlaybackSnapshot {
+    pub fn elapsed_seconds(self) -> Option<u64> {
+        let rate = u64::from(self.format?.sample_rate);
+        Some(self.frames_delivered / rate)
+    }
+    pub fn duration_seconds(self) -> Option<u64> {
+        let rate = u64::from(self.format?.sample_rate);
+        Some(self.total_frames? / rate)
+    }
+    /// Integer ratio avoids overflow at u64::MAX and never guesses duration.
+    pub fn progress_per_mille(self) -> Option<u16> {
+        let total = self.total_frames?;
+        if total == 0 { return None; }
+        let frames = self.frames_delivered.min(total);
+        let whole = frames / total;
+        let remainder = frames % total;
+        Some((whole * 1000 + ((u128::from(remainder) * 1000) / u128::from(total)) as u64) as u16)
+    }
 }
 
 /// Exactly one decoder and sink; the host must arbitrate device focus with RADIO/TV.
@@ -24,7 +46,7 @@ pub struct Player<S: PcmSink> {
 impl<S: PcmSink> Player<S> {
     pub fn new(sink: S) -> Self {
         Self { decoder: None, sink, snapshot: PlaybackSnapshot {
-            state: PlaybackState::Empty, generation: 0, frames_delivered: 0, format: None,
+            state: PlaybackState::Empty, generation: 0, frames_delivered: 0, total_frames: None, format: None,
         } }
     }
     pub fn status(&self) -> PlaybackSnapshot { self.snapshot }
@@ -35,6 +57,7 @@ impl<S: PcmSink> Player<S> {
         self.decoder = Some(decoder);
         self.snapshot.generation = self.snapshot.generation.wrapping_add(1);
         self.snapshot.format = self.decoder.as_ref().map(|x| x.format());
+        self.snapshot.total_frames = self.decoder.as_ref().and_then(|x| x.total_frames());
         self.snapshot.frames_delivered = 0;
         self.snapshot.state = PlaybackState::Ready;
         Ok(())
@@ -80,6 +103,11 @@ impl<S: PcmSink> Player<S> {
                         return Err(err);
                     }
                 };
+                if self.snapshot.total_frames.is_some_and(|total| frames > total) {
+                    self.snapshot.state = PlaybackState::Failed;
+                    let _ = self.sink.finish();
+                    return Err(MusicError::Invalid("decoded audio exceeds declared total frames"));
+                }
                 if let Err(err) = self.sink.write(&block) {
                     self.snapshot.state = PlaybackState::Failed;
                     let _ = self.sink.finish();
@@ -88,6 +116,11 @@ impl<S: PcmSink> Player<S> {
                 self.snapshot.frames_delivered = frames;
             }
             Ok(None) => {
+                if self.snapshot.total_frames.is_some_and(|total| self.snapshot.frames_delivered != total) {
+                    self.snapshot.state = PlaybackState::Failed;
+                    let _ = self.sink.finish();
+                    return Err(MusicError::Invalid("decoded audio is shorter than declared total frames"));
+                }
                 if let Err(err) = self.sink.finish() {
                     self.snapshot.state = PlaybackState::Failed;
                     return Err(err);
@@ -112,6 +145,7 @@ impl<S: PcmSink> Player<S> {
         self.decoder = None;
         self.snapshot.state = PlaybackState::Stopped;
         self.snapshot.format = None;
+        self.snapshot.total_frames = None;
         result
     }
 }
@@ -139,6 +173,24 @@ mod tests {
         fn next_block(&mut self) -> Result<Option<PcmBlock>> {
             Ok(Some(PcmBlock::new(self.actual, vec![1, 2])?))
         }
+    }
+    #[test]
+    fn progress_is_bounded_and_unknown_is_not_estimated() {
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let mut snap = PlaybackSnapshot {
+            state: PlaybackState::Playing, generation: 1, frames_delivered: 22_050,
+            total_frames: Some(44_100), format: Some(format),
+        };
+        assert_eq!(snap.progress_per_mille(), Some(500));
+        assert_eq!(snap.elapsed_seconds(), Some(0));
+        assert_eq!(snap.duration_seconds(), Some(1));
+        snap.frames_delivered = u64::MAX;
+        assert_eq!(snap.progress_per_mille(), Some(1000));
+        snap.total_frames = None;
+        assert_eq!(snap.progress_per_mille(), None);
+        assert_eq!(snap.duration_seconds(), None);
+        snap.total_frames = Some(0);
+        assert_eq!(snap.progress_per_mille(), None);
     }
     #[test]
     fn changing_format_fails_before_output() {
