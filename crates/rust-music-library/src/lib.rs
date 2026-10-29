@@ -194,11 +194,11 @@ mod tests {
         fs::write(t.0.join("ignore.mp3"), b"fLaCxxxx").unwrap();
         let lib = scan(&t.0, ScanLimits::default()).unwrap();
         assert_eq!(lib.len(), 3);
-        assert_eq!(lib.track(0).unwrap().title, "a");
-        assert_eq!(lib.track(1).unwrap().title, "B");
+        assert_eq!(lib.track(0).unwrap().title, "B");
+        assert_eq!(lib.track(1).unwrap().title, "a");
         assert_eq!(lib.track(2).unwrap().title, "z");
-        assert_eq!(lib.track(0).unwrap().container, AudioContainer::Wave);
-        assert_eq!(lib.track(1).unwrap().container, AudioContainer::Aiff);
+        assert_eq!(lib.track(0).unwrap().container, AudioContainer::Aiff);
+        assert_eq!(lib.track(1).unwrap().container, AudioContainer::Wave);
         assert_eq!(lib.examined_entries, 5);
         assert!(lib.checked_path(0).unwrap().ends_with("album/a.wav"));
         assert!(lib.checked_path(10).is_err());
