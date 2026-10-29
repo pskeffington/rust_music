@@ -14,3 +14,5 @@ alsa-output = ["rust-music/native-alsa"]
 [dependencies]
 rust-music = { path = "../rust-music" }
 rust-music-library = { path = "../rust-music-library" }
+rust-music-host = { path = "../rust-music-host" }
+rust-music-panel = { path = "../rust-music-panel" }

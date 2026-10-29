@@ -4,6 +4,22 @@
 
 All runtime codecs are ours. All Cargo dependencies are local workspace paths. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
 
+## G6 micro display
+
+The new `rust-music-panel` crate renders a 128x64 monochrome MUSIC view into a
+fixed **1024-byte** buffer, without a GUI toolkit, network, OS display library,
+or audio I/O. Rust_Boy can tint that bitmap phosphor-green. It uses the
+existing host audio focus and command contract; `Settings` is routed to the
+host's actual settings screen, not a decorative control. Standalone preview:
+
+```sh
+cargo run --locked --offline -p rust-music-cli -- preview /path/to/music /tmp/music.pbm
+```
+
+See [G6 micro panel](docs/G6_MICRO_PANEL.md). Compilation and physical screen
+integration remain unverified until a Rust toolchain and target hardware run
+those checks.
+
 ## Implemented foundation
 
 - **FLAC decoder**: native FLAC streams, 4-32-bit PCM, 1-8 channels, frame CRC8/CRC16, constant/verbatim/fixed/LPC subframes, Rice residuals, stereo decorrelation, frame-number continuity, full-file decoded PCM MD5 when provided. Corpus parity is **not yet certified**.
@@ -13,7 +29,7 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths. N
 - **Local music library**: bounded, explicit directory scan; FLAC/WAV signature detection, stable filename ordering, symlink rejection and no background scanner.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
-- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, and optional native output.
+- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, 1-bit PBM screen preview, and optional native output.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
@@ -34,7 +50,7 @@ cargo run --locked --offline -p rust-music-cli --features macos-output -- play ~
 cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/Music/track.flac hw:0,0
 ```
 
-All **10 workspace crates** are locally authored and have zero third-party Cargo dependencies. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host provides an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Source is implemented; Rust compilation and physical playback are not yet verified here.
+All **11 workspace crates** are locally authored and have zero third-party Cargo dependencies. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host provides an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Source is implemented; Rust compilation and physical playback are not yet verified here.
 
 ## Module and research guide
 
@@ -44,6 +60,7 @@ All **10 workspace crates** are locally authored and have zero third-party Cargo
 - [Zero third-party dependency policy and offline gate](docs/DEPENDENCY_POLICY.md)
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
+- [G6 independent micro panel, controls, and validation](docs/G6_MICRO_PANEL.md)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)

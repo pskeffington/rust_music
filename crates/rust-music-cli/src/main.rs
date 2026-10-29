@@ -1,5 +1,5 @@
 //! Offline decoder acceptance harness. Native device output is a separate gate.
-use rust_music::{open_file, AudioFormat, Decoder, MusicError, Result};
+use rust_music::{open_file, AudioFormat, Decoder, MusicError, NullSink, Result};
 use std::{env, fs::File, io::{Seek, SeekFrom, Write}};
 
 fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -> Result<()> {
@@ -93,7 +93,7 @@ fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
     let path = args.next().ok_or(MusicError::Invalid("missing input filename"))?;
     match action.as_str() {
         "scan" => {
@@ -108,6 +108,23 @@ fn run() -> Result<()> {
                 library.len(), library.examined_entries, library.skipped_entries);
             Ok(())
         }
+        "preview" => {
+            use rust_music_host::MusicSlot;
+            use rust_music_library::{scan, ScanLimits};
+            use rust_music_panel::{render, PanelView};
+            let output = args.next().ok_or(MusicError::Invalid("preview requires OUTPUT.pbm"))?;
+            if args.next().is_some() {
+                return Err(MusicError::Invalid("unexpected preview arguments"));
+            }
+            let library = scan(&path, ScanLimits::default())?;
+            let slot = MusicSlot::new(NullSink::default(), library);
+            let frame = render(PanelView::from_slot(&slot));
+            let mut dest = File::create(&output)?;
+            dest.write_all(b"P4\n128 64\n")?;
+            dest.write_all(frame.pixels())?;
+            println!("128x64 monochrome MUSIC preview: {output}; playback not started");
+            Ok(())
+        }
         "inspect" if args.next().is_none() => inspect(open_file(path)?),
         "play" => {
             let device = args.next();
@@ -119,7 +136,7 @@ fn run() -> Result<()> {
             if args.next().is_some() { return Err(MusicError::Invalid("unexpected extra command arguments")); }
             export_wav(open_file(path)?, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]")),
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]")),
     }
 }
 fn main() {

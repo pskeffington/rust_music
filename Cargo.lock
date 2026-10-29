@@ -22,7 +22,9 @@ name = "rust-music-cli"
 version = "0.1.0"
 dependencies = [
  "rust-music",
+ "rust-music-host",
  "rust-music-library",
+ "rust-music-panel",
 ]
 
 [[package]]
@@ -63,6 +65,15 @@ name = "rust-music-native"
 version = "0.1.0"
 dependencies = [
  "rust-music-core",
+]
+
+[[package]]
+name = "rust-music-panel"
+version = "0.1.0"
+dependencies = [
+ "rust-music",
+ "rust-music-host",
+ "rust-music-library",
 ]
 
 [[package]]

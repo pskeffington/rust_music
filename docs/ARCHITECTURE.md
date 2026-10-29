@@ -14,11 +14,12 @@ rust-music-flac        native RFC 9639 decoder: STREAMINFO, CRC, fixed/LPC, Rice
 rust-music-wave        native PCM RIFF/WAVE parser and bounded frame decoder
 rust-music-engine      explicit Load -> Ready -> Play -> Step -> Finish/Stop state machine
 rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shims
-rust-music             public facade: content sniffing and decoder integration
-rust-music-library     explicit bounded offline directory scanner, no symlink traversal
-rust-music-host        host-facing MUSIC slot, commands, snapshots, RAII audio lease
-rust-music-audit       local-only dependency/FFI/network source gate
-rust-music-cli         inspect / convert back to PCM WAVE / optional native output
+rust-music             public façade: content sniffing + host integration exports
+rust-music-cli         scan / inspect / PCM WAVE export / PBM preview / optional output
+rust-music-audit       offline dependency and native-link policy checks
+rust-music-library     explicit bounded local directory scan
+rust-music-host        exclusive host audio lease and pop-in control API
+rust-music-panel       128x64 1-bit local glyph renderer and button mapping
 ```
 
 **State:** `load()` never auto-opens an output device. `play()` must only occur after Rust_Boy grants audio focus; `step()` must execute off the UI thread. Music and Radio/TV must not claim devices simultaneously. The shell has one slot for a Music module; there are no menu sidebars, background scanners, or network requirements.
@@ -53,9 +54,19 @@ Mac AudioQueue and the Linux ALSA **kernel ioctl UAPI** are optional app-owned d
 
 ## Micro-interface contract
 
-For Rust_Boy, `rust-music-host` exposes an explicit `MusicSlot`, `Command` and `SlotSnapshot`. The host supplies a single-owner `AudioFocus` that returns an RAII `AudioLease` only if neither Radio nor TV owns output. Music releases the lease at Stop, error, EOF, selection change or drop. See [host contract](HOST_CONTRACT.md).
+`rust-music-host` exposes a typed `MusicSlot` with explicit
+`Select/Previous/Next/Play/Stop/Poll`, read-only playback snapshots and a host
+`AudioFocus` lease. The host alone arbitrates with Rust_Radio and Rust_TV.
 
-The thin panel can show `MUSIC / TRACK / 00:00 / PREV-PLAY-STOP-NEXT / SETTINGS` without changing host navigation. Artist tags and pause/resume are **not implemented**; do not display placeholder metadata or fake controls. The host retains screen, focus, filesystem permissions and task scheduling. The music crates never launch a window, browser, socket, server, or mixer.
+`rust-music-panel` creates an exact **128x64 / 1024-byte / 1-bit** frame with a
+locally authored 5x7 font. It reads the existing slot snapshot, filename-title,
+codec type, real PCM format and playback state. `PanelAction::OpenSettings`
+requests navigation to the host's existing Settings screen. Rust_Music never
+creates a window, input loop, new mixer, or network client. See
+[G6 micro panel](G6_MICRO_PANEL.md).
+
+Artist metadata, elapsed duration, seek, progress percentage and pause/resume
+are **not** represented until supported by actual parsers and tests.
 
 ## Non-goals in G0-G2
 

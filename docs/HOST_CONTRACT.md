@@ -38,6 +38,15 @@ while slot.status().playback.state == PlaybackState::Playing {
 
 The host owns the phosphor-green, low-refresh CRT-like panel. It can display `MUSIC`, `track.title`, `track.container`, `playback.state`, and `frames_delivered/sample_rate` as integer-derived elapsed time. The primary controls are `PREV`, `PLAY`, `STOP`, `NEXT`, with a single slim settings affordance. Track titles are **filenames only**, not album/artist tags: those are later parser modules and must not be invented.
 
+## G6 native micro panel
+
+[`rust-music-panel`](G6_MICRO_PANEL.md) supplies a 128 x 64, 1-bit snapshot
+renderer, a locally authored fixed glyph rasterizer, and a small button map.
+Rendering has no ownership or side effects. The host must tint pixels, route
+settings, debounce input, and send `Command::Poll` on an audio worker.
+The standalone CLI `preview DIRECTORY OUTPUT.pbm` creates a PBM snapshot
+without starting audio or opening a device. This is **not** a hardware UI test.
+
 ## Explicit limitations and acceptance
 
 - No pause/resume, sample-accurate seek, playlist persistence, embedded album art, artist/tag parser or asynchronous library watcher yet. Do not expose fake controls.
