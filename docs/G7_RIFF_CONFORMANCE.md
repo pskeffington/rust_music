@@ -12,7 +12,8 @@ The decoder and exporter remain locally authored; all Cargo packages use local w
 - Nonzero padding bits are **rejected**; silently right-shifting such data would violate the precision-preservation goal. Supported output precision is 8, 16, 24, or 32 bits.
 - The CLI WAV export now includes required odd-byte padding and uses a 40-byte `fmt` chunk with PCM subtype for 3+ channels. It uses a **zero speaker mask** because the current `AudioFormat` does not know the original speakers. It does not invent a speaker configuration.
 - The CLI size limit now reserves RIFF header and optional odd-data padding space before writing PCM. Both `decode` and `preview` use exclusive file creation to prevent overwriting existing music, output files or symlinks.
-- Unit tests exercise signed 24-bit, unsigned 8-bit, 24 valid bits stored in 32, multichannel PCM, bad GUID, impossible sample precision, wrong RIFF size, missing trailing pad, odd metadata chunks, export headers and zero low padding bits.
+- RF64 requires the 64-bit `ds64` chunk first, validates its 64-bit container/data/sample counts and bounded 1024-entry size table, resolves sentinel chunk lengths, and streams large data without whole-file allocation. Unknown metadata remains capped at 32 MiB.
+- Unit tests exercise signed 24-bit, unsigned 8-bit, 24 valid bits stored in 32, multichannel PCM, bad GUID, impossible sample precision, wrong RIFF size, missing trailing pad, odd metadata chunks, export headers and zero low padding bits. RF64 tests verify malformed `ds64` rejection, exact PCM on a small file, and streaming/sample-block parity for a synthetic 4 GiB payload without allocating it.
 
 ## Offline tests
 
@@ -37,7 +38,7 @@ Passing `--fixtures-only` **does not run the Rust decoder**. The full native har
 
 ## Documented exclusions
 
-- RF64, RIFX, float WAVE, compressed WAV, ADPCM, 20-bit precision, and wave seeking are not yet supported. Malformed metadata fails explicitly.
+- RIFX, float WAVE, compressed WAV, ADPCM, 20-bit precision, and wave seeking are not yet supported. Malformed metadata fails explicitly.
 - The decoder represents PCM audio precision, **not a speaker-routing map**. An application requiring exact channel mapping must add a channel-mask-aware API before a certified multichannel playback release.
 - This reader does not promise hostile filesystem TOCTOU safety or physical DAC bit-perfect output.
 

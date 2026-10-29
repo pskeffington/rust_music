@@ -20,7 +20,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .m4a / .mp4 | MP4 containing ALAC | Bounded profile passes generated parity and four Internet Archive CC0 M4A files (three 16-bit/44.1 kHz and one 24-bit/48 kHz) with exact PCM parity against FFmpeg; scanner indexes `.m4a`/`.mp4` by `ftyp`, while codec admission stays in the decoder. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broader ALAC/CAF corpus remains open | AAC in identical container prohibited |
 | .caf | ALAC or signed integer LPCM | Bounded profile passes generated FFmpeg-encoded CAF parity: ALAC 16/24-bit and LPCM 16/24/32-bit; strict cookie, packet-table, chunk-bound and codec checks; no OS decoder fallback. Broad real-world CAF corpus and host/output validation remain open | Mono/stereo only; reject AAC, ADPCM, float PCM and unsupported channel layouts |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
-| RF64/BWF .wav | Extended large-file PCM | Planned | ds64 and exact bounds required |
+| RF64/BWF .wav | Extended large-file PCM | Native source implemented | Bounded ds64 parser and synthetic >4 GiB streaming/sample parity; real large-file corpus and hardware remain unverified |
 | .oga / .ogg | Ogg FLAC mapping | Later | Reject Vorbis and Opus |
 | .dsf, .dff | DSD | Optional native-device path | Never claim DSD-bit-perfect after PCM conversion |
 | .ape | Monkey's Audio | Optional research | Local decoder and parity required |
@@ -69,7 +69,7 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 1. Expand ALAC parity over independently generated depths and a real-world M4A/CAF corpus; retain strict AAC/DRM denial.
 3. Bounded metadata, safe cover art exclusion from the tiny framebuffer, exact seek.
 4. Hardware output negotiation, anti-resampling checks, bit-perfect DAC loopback and shared Radio/TV focus.
-5. Add WavPack lossless, RF64, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests.
+5. Add WavPack lossless, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests. RF64/ds64 source support exists, with broad real-file and hardware acceptance still open.
 
 ## Standards used for the format policy (research only)
 

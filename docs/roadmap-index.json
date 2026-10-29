@@ -196,7 +196,7 @@
       "title": "Strict RIFF/WAVE PCM and extensible WAV",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified",
+      "next_evidence": "Six native RIFF PCM cases and synthetic RF64 greater-than-4-GiB streaming/sample parity pass; real large-file corpus and hardware output remain unverified",
       "evidence_doc": "docs/G7_RIFF_CONFORMANCE.md"
     },
     {
@@ -235,8 +235,8 @@
       "id": "G12",
       "title": "RF64 and WavPack lossless extensions",
       "owner_agent": "codec_engineer",
-      "status": "planned",
-      "next_evidence": "Per-format independent parity and malicious-input rejection needed",
+      "status": "partial_evidence",
+      "next_evidence": "Bounded RF64/ds64 and synthetic large-size streaming pass; independent WavPack implementation and parity remain",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -496,7 +496,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "planned",
+      "status": "done",
       "depends_on": [
         "RM-003"
       ],
@@ -505,7 +505,7 @@
       ],
       "create_paths": [],
       "acceptance": "RF64 large-size fields and metadata limits verified; legacy RIFF remains byte-correct",
-      "blocker": "None; RM-003 passed. RF64 remains unsupported until ds64 bounds and large-file PCM parity pass"
+      "blocker": "Bounded ds64 parsing, metadata limits, malformed-field rejection, small RF64 exact PCM parity, and streaming/sample-block parity with a synthetic 4 GiB payload pass. Actual large-file corpus and hardware output remain unverified; legacy RIFF parity remains 6/6."
     },
     {
       "id": "RM-014",

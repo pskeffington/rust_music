@@ -335,3 +335,23 @@ is intentionally unavailable after a partial seek.
 - Synthetic fixed- and variable-block FLAC tests cover exact frame boundaries,
   mid-frame trimming, EOF, invalid targets, and invalid seektable offsets.
   Real-world encoder seektable compatibility and host input routing remain open.
+
+## 2026-10-29 — RM-013 bounded RF64/ds64 support
+
+`rust-music-wave` now accepts RF64 integer PCM with a required first `ds64`
+chunk, bounded 1024-entry size table, checked 64-bit container/data/sample
+counts, and sentinel chunk-size resolution. Metadata remains capped at 32 MiB;
+PCM data is streamed in existing bounded blocks. Legacy RIFF behavior remains
+unchanged. A sparse synthetic stream verifies correct frame accounting and
+PCM block output for a 4 GiB data size without allocating that file.
+
+- `cargo test --locked --offline -p rust-music-wave`: **exit 0**, 10/10 tests.
+- `python3 scripts/test_wave_reference.py`: **exit 0**, 6/6 exact native RIFF
+  PCM vectors and malformed-input rejection.
+- `sh scripts/offline-gate.sh`: **exit 0**; 15 crates, 28 local edges,
+  fmt, warnings-denied Clippy, workspace tests, release build, macOS feature
+  check.
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**, 4/4 exact PCM cases.
+- Read-only `safety_reviewer`: no blocking RF64 bounds or RIFF regression
+  findings. Roadmap/literature validators and `git diff --check` pass.
+- Real large-file corpus and physical playback remain unverified.

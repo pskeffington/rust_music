@@ -144,9 +144,9 @@
       "accepted_codecs": [
         "integer PCM"
       ],
-      "stage": "planned",
-      "verification": "not-implemented",
-      "gate": "G12"
+      "stage": "native-source-implemented",
+      "verification": "synthetic-rf64-4g-streaming-sample-parity-pass; small-rf64-exact-pcm-pass; ds64-bounds-pass",
+      "gate": "G7"
     },
     {
       "id": "ogg-flac",

@@ -26,8 +26,9 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 ## Latest verified checkpoint (2026-10-29)
 
 Branch `build/native-codecs-g0`; the latest verified checkpoint includes
-RM-017 M4A ingestion/corpus work, RM-011 bounded local tags, and RM-012
-synthetic fixed/variable-block FLAC seek. Rust/Cargo
+RM-017 M4A ingestion/corpus work, RM-011 bounded local tags, RM-012
+synthetic fixed/variable-block FLAC seek, and RM-013 bounded RF64/ds64 parsing
+with synthetic >4 GiB streaming coverage. Rust/Cargo
 1.99.1/macOS:
 `sh scripts/offline-gate.sh` exited 0 on 15 local crates and 28 path-only
 edges, with zero registry/Git crates and zero third-party system links. Fmt,

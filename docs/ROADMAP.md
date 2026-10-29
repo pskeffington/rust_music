@@ -21,12 +21,12 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | **G4** | Expanded lossless umbrella | `codec_engineer` | partial evidence | AIFF, generated M4A/ALAC, and bounded CAF profiles are implemented; broader ALAC admission remains |
 | **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | partial evidence | Rust Music has stable `org.rustboy.music` identity and an explicit suspend/pop-out API preserving the mounted slot and selection; Pip-Boy registration/protocol bridge, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain open |
 | **G6** | 128x64 monochrome 1KiB panel | `host_integrator` | source implemented | Renderer exists; hardware screen/controls pending |
-| **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified |
+| **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six native RIFF PCM cases and synthetic RF64 >4 GiB streaming/sample parity pass; actual large-file corpus and hardware output remain unverified |
 | **G8** | Six-file private FLAC differential corpus | `gate_verifier` | partial evidence | Reference FLAC/FFmpeg and native Rust PCM hashes match on all six private files; artwork and hardware stress remain separate |
 | **G9** | Exact declared-frame timing and display progress | `host_integrator` | source implemented | Workspace tests pass; physical display and Rust_Boy button behavior remain unverified |
 | **G10** | Audiophile-only admission and AIFF/AIFF-C | `codec_engineer` | partial evidence | Local offline gate passes on Rust 1.99.1/macOS and seven AIFF/AIFF-C native PCM vectors pass; physical DAC and host integration remain open |
 | **G11** | ALAC decoder and M4A/CAF demultiplexers | `codec_engineer` | partial evidence | Raw packet parity, four Internet Archive M4A ALAC parity cases, AAC denial, and five generated CAF ALAC/LPCM vectors pass; broader encoders, real-world CAF, and host/output acceptance remain |
-| **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | planned | Per-format independent parity and malicious-input rejection needed |
+| **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | partial evidence | Bounded RF64/ds64 and large-size synthetic streaming pass; independent WavPack implementation and parity remain |
 | **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | partial evidence | Bounded FLAC/AIFF tags and synthetic fixed/variable-block FLAC seek tests pass; real-world seektable and host/hardware evidence remain |
 | **G14** | Windows WASAPI and Android AAudio ports | `audio_backend` | planned | Platform-local compile, focus and physical output acceptance needed |
 
@@ -46,7 +46,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | `RM-010` — Implement CAF ALAC and integer LPCM demux | P2 | G11 | `codec_engineer` | done | RM-008 |
 | `RM-011` — Add bounded local metadata without cover-art memory spikes | P2 | G13 | `codec_engineer` | done | RM-001 |
 | `RM-012` — Implement validated sample-accurate FLAC seek | P2 | G13 | `codec_engineer` | done | RM-002 |
-| `RM-013` — Implement RF64 large PCM files with ds64 limits | P2 | G12 | `codec_engineer` | planned | RM-003 |
+| `RM-013` — Implement RF64 large PCM files with ds64 limits | P2 | G12 | `codec_engineer` | done | RM-003 |
 | `RM-014` — Implement WavPack only in verified lossless modes | P2 | G12 | `codec_engineer` | planned | RM-001 |
 | `RM-015` — Port native output to Windows and Android without codec dependencies | P2 | G14 | `audio_backend` | blocked | RM-005, RM-006 |
 | `RM-016` — Keep code, literature, agent roles and format registry indexed | P1 | G0 | `index_curator` | done | None |
@@ -77,7 +77,7 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 ## Next expansion
 
 **G11:** Locally authored ALAC, bounded M4A/MP4 and CAF demultiplexers, AAC/DRM denial, and M4A catalog ingestion are implemented. Four licensed M4A ALAC files and generated cases pass exact PCM parity; broader independent encoder/source and real-world CAF coverage are still required before broad ALAC admission.
-**G12:** WavPack pure-lossless/hybrid-with-correction, RF64/ds64 and verified large PCM.  
+**G12:** RF64/ds64 is implemented with bounded synthetic large-file evidence; WavPack pure-lossless/hybrid-with-correction remains planned.
 **G13:** Safe bounded metadata and accurate frame seek, without embedded artwork exhausting the micro UI.  
 **G14:** Independent WASAPI and AAudio device adapters with real target qualification.
 
