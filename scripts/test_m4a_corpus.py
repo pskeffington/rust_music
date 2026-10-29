@@ -77,13 +77,16 @@ def run():
         # admission is a later decoder boundary and must still reject AAC.
         scan_root = work / "scan"
         scan_root.mkdir()
+        mp4a_alias = scan_root / "archive-alias.mp4a"
+        shutil.copyfile(UPSTREAM / next(iter(CASES)), mp4a_alias)
         for path in [*(UPSTREAM / name for name in CASES), FIXTURES / "generated_aac.m4a"]:
             shutil.copyfile(path, scan_root / path.name)
         scan = rust_cli("scan", scan_root).stdout
         if (
-            f"{len(CASES) + 1} tracks" not in scan
+            f"{len(CASES) + 2} tracks" not in scan
             or "Mp4" not in scan
             or any(name not in scan for name in CASES)
+            or "archive-alias.mp4a" not in scan
         ):
             raise AssertionError(f"M4A signature ingestion failed: {scan}")
         aac_details = dict(line.split("=", 1) for line in codec(FIXTURES / "generated_aac.m4a").splitlines())

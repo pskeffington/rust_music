@@ -290,6 +290,28 @@ encoder compatibility.
 - `python3 scripts/check_roadmap_index.py`,
   `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
 
+## 2026-10-29 — RM-017 `.mp4a` ingestion coverage
+
+The six-file CC0 Archive.org ALAC corpus was already present, so no duplicate
+audio blobs were added. Expanded the bounded scanner's MP4-family extension
+allowlist to include `.mp4a` and added a real-corpus rename/copy case to the
+corpus harness. The test checks that `.mp4a` is cataloged from its `ftyp`
+signature; AAC remains catalogable but rejected by the lossless decoder.
+
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**; all six existing Archive.org
+  files passed exact PCM parity, and the harness catalogued the `.mp4a` alias
+  together with all `.m4a` samples and the AAC negative fixture before
+  confirming AAC decode rejection.
+- `cargo test --locked --offline -p rust-music-library`: **exit 0**, 6/6 unit
+  tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 path-only
+  edges, format checks, warnings-denied Clippy, workspace tests, release build,
+  and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
+- Additional Archive.org downloads were not possible in this environment:
+  `curl https://archive.org/metadata/musopen-chopin` failed DNS resolution.
+
 ## 2026-10-29 — RM-011 bounded local metadata
 
 The explicit library scan now extracts only bounded, valid UTF-8 display tags:

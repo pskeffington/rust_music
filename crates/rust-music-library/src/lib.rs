@@ -148,9 +148,11 @@ impl Library {
 
 fn supported_extension(path: &Path) -> bool {
     path.extension().and_then(|x| x.to_str()).is_some_and(|x| {
-        ["flac", "wav", "aif", "aiff", "aifc", "caf", "m4a", "mp4"]
-            .iter()
-            .any(|allowed| x.eq_ignore_ascii_case(allowed))
+        [
+            "flac", "wav", "aif", "aiff", "aifc", "caf", "m4a", "mp4", "mp4a",
+        ]
+        .iter()
+        .any(|allowed| x.eq_ignore_ascii_case(allowed))
     })
 }
 fn probe_container(input: &mut File) -> Result<Option<AudioContainer>> {
@@ -526,22 +528,29 @@ mod tests {
             b"\x00\x00\x00\x18ftypisom\x00\x00\x00\x00",
         )
         .unwrap();
+        fs::write(
+            t.0.join("F.mp4a"),
+            b"\x00\x00\x00\x18ftypM4A \x00\x00\x00\x00",
+        )
+        .unwrap();
         fs::write(t.0.join("fake.flac"), b"NOTFLAC").unwrap();
         fs::write(t.0.join("ignore.mp3"), b"fLaCxxxx").unwrap();
         let lib = scan(&t.0, ScanLimits::default()).unwrap();
-        assert_eq!(lib.len(), 6);
+        assert_eq!(lib.len(), 7);
         assert_eq!(lib.track(0).unwrap().title, "B");
         assert_eq!(lib.track(1).unwrap().title, "C");
         assert_eq!(lib.track(2).unwrap().title, "D");
         assert_eq!(lib.track(3).unwrap().title, "E");
-        assert_eq!(lib.track(4).unwrap().title, "a");
-        assert_eq!(lib.track(5).unwrap().title, "z");
+        assert_eq!(lib.track(4).unwrap().title, "F");
+        assert_eq!(lib.track(5).unwrap().title, "a");
+        assert_eq!(lib.track(6).unwrap().title, "z");
         assert_eq!(lib.track(0).unwrap().container, AudioContainer::Aiff);
         assert_eq!(lib.track(1).unwrap().container, AudioContainer::Caf);
         assert_eq!(lib.track(2).unwrap().container, AudioContainer::Mp4);
-        assert_eq!(lib.track(4).unwrap().container, AudioContainer::Wave);
-        assert_eq!(lib.examined_entries, 9);
-        assert!(lib.checked_path(4).unwrap().ends_with("album/a.wav"));
+        assert_eq!(lib.track(4).unwrap().container, AudioContainer::Mp4);
+        assert_eq!(lib.track(5).unwrap().container, AudioContainer::Wave);
+        assert_eq!(lib.examined_entries, 10);
+        assert!(lib.checked_path(5).unwrap().ends_with("album/a.wav"));
         assert!(lib.checked_path(10).is_err());
     }
 

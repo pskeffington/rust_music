@@ -28,7 +28,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | WavPack block/metadata parser foundation (not yet a decoder) | `crates/rust-music-wavpack/` | `codec_engineer` | G12 / RM-014 |
 | AIFF/AIFF-C signed PCM | `crates/rust-music-aiff/` | `codec_engineer` | G10 |
 | ALAC raw-packet decoder and synthetic vectors | `crates/rust-music-alac/`, `crates/rust-music-alac/tests/fixtures/` | `codec_engineer` | G11 (16/24/32-bit plus stereo-matrix parity; not admitted; malformed coverage and demux remain) |
-| M4A/MP4 ALAC-only demux and corpus | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/`, `scripts/test_m4a_corpus.py` | `codec_engineer` | G11 / RM-009, RM-017 (bounded demux; generated and CC0 corpus parity; AAC/DRM denial) |
+| M4A/MP4 ALAC-only demux and corpus | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/`, `scripts/test_m4a_corpus.py` | `codec_engineer` | G11 / RM-009, RM-017 (bounded `.m4a`/`.mp4`/`.mp4a` ingestion; generated and CC0 corpus parity; AAC/DRM denial) |
 | CAF ALAC and LPCM demux | `crates/rust-music-caf/`, `scripts/test_caf_reference.py` | `codec_engineer` | G11 / RM-010 (bounded mono/stereo profile; generated ALAC 16/24 and LPCM 16/24/32 exact PCM parity; custom layouts/codecs denied) |
 | Playback state/progress | `crates/rust-music-engine/` | `codec_engineer` | G1 / G9 |
 | OS DAC adapters | `crates/rust-music-native/` | `audio_backend` | G3 |
