@@ -1,0 +1,571 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-29",
+  "repository": "pskeffington/rust_music",
+  "active_development_branch": "build/native-codecs-g0",
+  "draft_pr": 1,
+  "canonical_human_roadmap": "docs/ROADMAP.md",
+  "codex_routing": "docs/CODEX_AGENT_MAP.md",
+  "navigation": "docs/REPOSITORY_INDEX.md",
+  "related_registries": [
+    "docs/literature-index.json",
+    "docs/lossless-formats.json"
+  ],
+  "policy": {
+    "runtime_cargo_dependencies": "local-workspace-only",
+    "runtime_network": false,
+    "decoder_ownership": "locally-authored-only",
+    "playback_lossless_only": true,
+    "minimum_playback_pcm_bits": 16,
+    "minimum_playback_sample_rate_hz": 44100,
+    "bit_perfect_hardware_verified": false,
+    "unsupported_lossy_codecs": [
+      "MP3",
+      "AAC",
+      "Opus",
+      "Vorbis",
+      "lossy WMA",
+      "lossy WavPack hybrid"
+    ]
+  },
+  "evidence_classification": [
+    "source_only",
+    "operator_reported",
+    "locally_executed",
+    "independent_pcm_parity",
+    "hardware_measured"
+  ],
+  "shared_write_paths": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/rust-music/src/lib.rs",
+    "crates/rust-music-core/src/lib.rs",
+    "crates/rust-music-engine/src/lib.rs",
+    "docs/lossless-formats.json",
+    "docs/ROADMAP.md",
+    "docs/roadmap-index.json"
+  ],
+  "agent_definitions": [
+    {
+      "id": "gate_verifier",
+      "config": ".codex/agents/gate-verifier.toml",
+      "mode": "read_only",
+      "purpose": "Offline gate and sample-parity evidence; no edits",
+      "owns": [],
+      "reads": [
+        "scripts/offline-gate.sh",
+        "tests/",
+        "docs/G2_VALIDATION.md",
+        "docs/G8_REALWORLD_FLAC_CORPUS.md",
+        "docs/G10_AUDIOPHILE_FORMATS.md"
+      ]
+    },
+    {
+      "id": "codec_engineer",
+      "config": ".codex/agents/codec-engineer.toml",
+      "mode": "write_scoped",
+      "purpose": "Own independent codec/container decoding and rigorous PCM tests",
+      "owns": [
+        "crates/rust-music-flac/",
+        "crates/rust-music-wave/",
+        "crates/rust-music-aiff/"
+      ],
+      "reads": [
+        "docs/G10_AUDIOPHILE_FORMATS.md",
+        "docs/LITERATURE_MATRIX.md"
+      ]
+    },
+    {
+      "id": "audio_backend",
+      "config": ".codex/agents/audio-backend.toml",
+      "mode": "write_scoped",
+      "purpose": "OS PCM adapters and hardware-format acceptance",
+      "owns": [
+        "crates/rust-music-native/"
+      ],
+      "reads": [
+        "docs/ARCHITECTURE.md",
+        "docs/DEPENDENCY_POLICY.md"
+      ]
+    },
+    {
+      "id": "host_integrator",
+      "config": ".codex/agents/host-integrator.toml",
+      "mode": "write_scoped",
+      "purpose": "Rust_Boy audio lease, bounded library and 1KiB interface",
+      "owns": [
+        "crates/rust-music-host/",
+        "crates/rust-music-library/",
+        "crates/rust-music-panel/"
+      ],
+      "reads": [
+        "docs/HOST_CONTRACT.md",
+        "docs/G6_MICRO_PANEL.md"
+      ]
+    },
+    {
+      "id": "index_curator",
+      "config": ".codex/agents/index-curator.toml",
+      "mode": "write_scoped",
+      "purpose": "Stable roadmap IDs, evidence routing, docs and JSON index",
+      "owns": [
+        "docs/ROADMAP.md",
+        "docs/CODEX_AGENT_MAP.md",
+        "docs/REPOSITORY_INDEX.md",
+        "docs/roadmap-index.json",
+        "scripts/check_roadmap_index.py"
+      ],
+      "reads": [
+        "AGENTS.md",
+        "docs/literature-index.json",
+        "docs/lossless-formats.json"
+      ]
+    },
+    {
+      "id": "safety_reviewer",
+      "config": ".codex/agents/safety-reviewer.toml",
+      "mode": "read_only",
+      "purpose": "Lossless policy and adversarial code/security review; no edits",
+      "owns": [],
+      "reads": [
+        "crates/",
+        "docs/DEPENDENCY_POLICY.md",
+        "docs/HOST_CONTRACT.md"
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "G0",
+      "title": "Ownership, standards and offline audit",
+      "owner_agent": "index_curator",
+      "status": "partial_evidence",
+      "next_evidence": "Dependency audit 12 local crates/21 edges passed; full Rust gate recheck pending",
+      "evidence_doc": "docs/DEPENDENCY_POLICY.md"
+    },
+    {
+      "id": "G1",
+      "title": "Integer PCM core and explicit playback state",
+      "owner_agent": "codec_engineer",
+      "status": "source_implemented",
+      "next_evidence": "Unit tests and output behavior require full offline gate",
+      "evidence_doc": "docs/ARCHITECTURE.md"
+    },
+    {
+      "id": "G2",
+      "title": "Native FLAC with CRC, Rice/LPC, PCM MD5",
+      "owner_agent": "codec_engineer",
+      "status": "partial_evidence",
+      "next_evidence": "Source present; own-decoder real-corpus parity not reported",
+      "evidence_doc": "docs/G2_VALIDATION.md"
+    },
+    {
+      "id": "G3",
+      "title": "Mac AudioQueue / Linux kernel PCM output",
+      "owner_agent": "audio_backend",
+      "status": "source_implemented",
+      "next_evidence": "Source present; DAC format, drain and underrun measurement pending",
+      "evidence_doc": "docs/ARCHITECTURE.md"
+    },
+    {
+      "id": "G4",
+      "title": "Expanded lossless umbrella",
+      "owner_agent": "codec_engineer",
+      "status": "planned",
+      "next_evidence": "Implemented AIFF is G10; ALAC and later formats are G11/G12 work",
+      "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
+    },
+    {
+      "id": "G5",
+      "title": "Rust_Boy socket and shared audio-focus",
+      "owner_agent": "host_integrator",
+      "status": "source_implemented",
+      "next_evidence": "Unit slot exists; real Radio/TV integration and field gate pending",
+      "evidence_doc": "docs/HOST_CONTRACT.md"
+    },
+    {
+      "id": "G6",
+      "title": "128x64 monochrome 1KiB panel",
+      "owner_agent": "host_integrator",
+      "status": "source_implemented",
+      "next_evidence": "Renderer exists; hardware screen/controls pending",
+      "evidence_doc": "docs/G6_VALIDATION.md"
+    },
+    {
+      "id": "G7",
+      "title": "Strict RIFF/WAVE PCM and extensible WAV",
+      "owner_agent": "codec_engineer",
+      "status": "partial_evidence",
+      "next_evidence": "Six reference fixtures; native full workspace gate/parity pending",
+      "evidence_doc": "docs/G7_RIFF_CONFORMANCE.md"
+    },
+    {
+      "id": "G8",
+      "title": "Six-file private FLAC differential corpus",
+      "owner_agent": "gate_verifier",
+      "status": "partial_evidence",
+      "next_evidence": "Reference decoder 6/6; Rust decoder parity on those six files pending",
+      "evidence_doc": "docs/G8_REALWORLD_FLAC_CORPUS.md"
+    },
+    {
+      "id": "G9",
+      "title": "Exact declared-frame timing and display progress",
+      "owner_agent": "host_integrator",
+      "status": "source_implemented",
+      "next_evidence": "Source present; full gate and physical display behavior pending",
+      "evidence_doc": "docs/G9_TIMING_PROGRESS.md"
+    },
+    {
+      "id": "G10",
+      "title": "Audiophile-only admission and AIFF/AIFF-C",
+      "owner_agent": "codec_engineer",
+      "status": "partial_evidence",
+      "next_evidence": "Operator-reported 7/7 native CLI cases PASS; full gate stopped at rustfmt; repair needs retest",
+      "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
+    },
+    {
+      "id": "G11",
+      "title": "ALAC decoder and M4A/CAF demultiplexers",
+      "owner_agent": "codec_engineer",
+      "status": "planned",
+      "next_evidence": "Independent ALAC decode golden PCM and strict AAC rejection needed",
+      "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
+    },
+    {
+      "id": "G12",
+      "title": "RF64 and WavPack lossless extensions",
+      "owner_agent": "codec_engineer",
+      "status": "planned",
+      "next_evidence": "Per-format independent parity and malicious-input rejection needed",
+      "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
+    },
+    {
+      "id": "G13",
+      "title": "Bounded metadata and sample-accurate seek",
+      "owner_agent": "codec_engineer",
+      "status": "planned",
+      "next_evidence": "Never claim seek or album tags without indexed code and tests",
+      "evidence_doc": "docs/G9_TIMING_PROGRESS.md"
+    },
+    {
+      "id": "G14",
+      "title": "Windows WASAPI and Android AAudio ports",
+      "owner_agent": "audio_backend",
+      "status": "planned",
+      "next_evidence": "Platform-local compile, focus and physical output acceptance needed",
+      "evidence_doc": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "RM-001",
+      "gate": "G10",
+      "title": "Rerun full offline Rust quality gate after formatter repair",
+      "owner_agent": "gate_verifier",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "needs_operator",
+      "depends_on": [],
+      "focus_paths": [
+        "scripts/offline-gate.sh",
+        "crates/rust-music-audit/src/main.rs"
+      ],
+      "create_paths": [],
+      "acceptance": "sh scripts/offline-gate.sh returns exit 0; record rustfmt, Clippy, all tests, release build and native macOS check",
+      "blocker": "Last reported gate halted at rustfmt; four formatting commits made; fresh operator exit status absent"
+    },
+    {
+      "id": "RM-002",
+      "gate": "G8",
+      "title": "Replay six private FLACs through native Rust decoder",
+      "owner_agent": "gate_verifier",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "scripts/test_flac_user_corpus.py",
+        "tests/corpus/guiezio-flac-sha256.json"
+      ],
+      "create_paths": [],
+      "acceptance": "python3 scripts/test_flac_user_corpus.py --mode rust --require-complete \"$PRIVATE_FLAC_DIRECTORY\" passes 6/6 with independent PCM parity",
+      "blocker": "Needs complete offline gate and operator-owned private corpus"
+    },
+    {
+      "id": "RM-003",
+      "gate": "G7",
+      "title": "Prove native RIFF/WAVE decoded PCM roundtrip",
+      "owner_agent": "gate_verifier",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "scripts/test_wave_reference.py",
+        "crates/rust-music-wave/src/lib.rs"
+      ],
+      "create_paths": [],
+      "acceptance": "python3 scripts/test_wave_reference.py passes source-to-export PCM comparisons and malformed RIFF rejection",
+      "blocker": "Full offline gate must pass before native acceptance claim"
+    },
+    {
+      "id": "RM-004",
+      "gate": "G10",
+      "title": "Verify lossless-only floor and focus denial through Rust_Boy",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "crates/rust-music-engine/src/lib.rs",
+        "crates/rust-music-host/src/lib.rs",
+        "docs/HOST_CONTRACT.md"
+      ],
+      "create_paths": [],
+      "acceptance": "cargo test --locked --offline --workspace proves below-16-bit/44.1k source cannot open sink or acquire lease; lossy containers rejected",
+      "blocker": "Full Rust workspace test completion not yet reported"
+    },
+    {
+      "id": "RM-005",
+      "gate": "G3",
+      "title": "Qualify macOS AudioQueue output with physical DAC",
+      "owner_agent": "audio_backend",
+      "review_agent": "gate_verifier",
+      "priority": "P1",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "crates/rust-music-native/src/macos.rs",
+        "docs/ARCHITECTURE.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Operator captures negotiated PCM format, rate/channel accuracy, drain/stop, device changes and loopback evidence; does not infer bit-perfect from CLI",
+      "blocker": "Requires a complete offline toolchain gate and physical audio hardware"
+    },
+    {
+      "id": "RM-006",
+      "gate": "G5",
+      "title": "Integrate independent MUSIC socket with Radio and TV ownership",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "blocked",
+      "depends_on": [
+        "RM-004"
+      ],
+      "focus_paths": [
+        "crates/rust-music-host/src/lib.rs",
+        "docs/HOST_CONTRACT.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
+      "blocker": "Sibling repositories must not be edited without separate authorization"
+    },
+    {
+      "id": "RM-007",
+      "gate": "G6",
+      "title": "Validate fixed 1KiB panel on actual Rust_Boy display",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "priority": "P1",
+      "status": "blocked",
+      "depends_on": [
+        "RM-006"
+      ],
+      "focus_paths": [
+        "crates/rust-music-panel/src/lib.rs",
+        "docs/G6_VALIDATION.md"
+      ],
+      "create_paths": [],
+      "acceptance": "128x64 output renders correctly with physical controls, Settings and track/time clipping",
+      "blocker": "Real host display acceptance required"
+    },
+    {
+      "id": "RM-008",
+      "gate": "G11",
+      "title": "Develop independent ALAC bitstream and PCM decoder",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "crates/rust-music-core/src/lib.rs",
+        "docs/lossless-formats.json"
+      ],
+      "create_paths": [
+        "crates/rust-music-alac/"
+      ],
+      "acceptance": "New local ALAC crate handles predictor/entropy, bounded cookies, malformed input, exact 16/24/32-bit PCM parity; no third-party codec",
+      "blocker": "Do not begin dependent format admission until base offline gate is green"
+    },
+    {
+      "id": "RM-009",
+      "gate": "G11",
+      "title": "Implement M4A/MP4 ALAC-only demux and AAC denial",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "blocked",
+      "depends_on": [
+        "RM-008"
+      ],
+      "focus_paths": [
+        "crates/rust-music/src/lib.rs",
+        "docs/lossless-formats.json"
+      ],
+      "create_paths": [
+        "crates/rust-music-mp4/"
+      ],
+      "acceptance": "Strict ISO BMFF box bounds and ALAC stsd identification; reject AAC/DRM and wrong codec regardless of .m4a suffix",
+      "blocker": "Requires ALAC decoder and independent parity vectors"
+    },
+    {
+      "id": "RM-010",
+      "gate": "G11",
+      "title": "Implement CAF ALAC and integer LPCM demux",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-008"
+      ],
+      "focus_paths": [
+        "docs/lossless-formats.json",
+        "crates/rust-music/src/lib.rs"
+      ],
+      "create_paths": [
+        "crates/rust-music-caf/"
+      ],
+      "acceptance": "CAF descriptor, magic cookie, sample and chunk bounds verified with ALAC/PCM golden tests; no AudioToolbox decoder fallback",
+      "blocker": "Requires native ALAC packet decoding"
+    },
+    {
+      "id": "RM-011",
+      "gate": "G13",
+      "title": "Add bounded local metadata without cover-art memory spikes",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "crates/rust-music-flac/src/lib.rs",
+        "crates/rust-music-library/src/lib.rs"
+      ],
+      "create_paths": [],
+      "acceptance": "FLAC Vorbis comments and optional AIFF tags have deterministic size/UTF-8 tests; artwork never decoded into 1KiB UI",
+      "blocker": "Must preserve strict memory/resource bounds"
+    },
+    {
+      "id": "RM-012",
+      "gate": "G13",
+      "title": "Implement validated sample-accurate FLAC seek",
+      "owner_agent": "codec_engineer",
+      "review_agent": "gate_verifier",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-002"
+      ],
+      "focus_paths": [
+        "crates/rust-music-flac/src/lib.rs",
+        "crates/rust-music-engine/src/lib.rs"
+      ],
+      "create_paths": [],
+      "acceptance": "Seektable and frame-boundary tests compare exact expected PCM frames; invalid seeks fail closed",
+      "blocker": "Requires real FLAC native corpus parity before seek claims"
+    },
+    {
+      "id": "RM-013",
+      "gate": "G12",
+      "title": "Implement RF64 large PCM files with ds64 limits",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-003"
+      ],
+      "focus_paths": [
+        "crates/rust-music-wave/src/lib.rs"
+      ],
+      "create_paths": [],
+      "acceptance": "RF64 large-size fields and metadata limits verified; legacy RIFF remains byte-correct",
+      "blocker": "Native WAVE parity is prerequisite"
+    },
+    {
+      "id": "RM-014",
+      "gate": "G12",
+      "title": "Implement WavPack only in verified lossless modes",
+      "owner_agent": "codec_engineer",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "docs/lossless-formats.json"
+      ],
+      "create_paths": [
+        "crates/rust-music-wavpack/"
+      ],
+      "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
+      "blocker": "No lossy-only playback and no external codec"
+    },
+    {
+      "id": "RM-015",
+      "gate": "G14",
+      "title": "Port native output to Windows and Android without codec dependencies",
+      "owner_agent": "audio_backend",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "blocked",
+      "depends_on": [
+        "RM-005",
+        "RM-006"
+      ],
+      "focus_paths": [
+        "crates/rust-music-native/src/lib.rs",
+        "docs/ARCHITECTURE.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Independent WASAPI/AAudio adapters pass target builds, local focus policy and device format/stop tests",
+      "blocker": "Real Windows/Android devices required; macOS/host baselines first"
+    },
+    {
+      "id": "RM-016",
+      "gate": "G0",
+      "title": "Keep code, literature, agent roles and format registry indexed",
+      "owner_agent": "index_curator",
+      "review_agent": "gate_verifier",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [],
+      "focus_paths": [
+        "docs/roadmap-index.json",
+        "docs/literature-index.json",
+        "docs/lossless-formats.json",
+        "docs/ROADMAP.md"
+      ],
+      "create_paths": [],
+      "acceptance": "python3 scripts/check_roadmap_index.py and python3 scripts/check_literature.py pass offline without extra Python packages",
+      "blocker": "Any new gate, codec or ownership handoff requires index update and observed evidence"
+    }
+  ]
+}

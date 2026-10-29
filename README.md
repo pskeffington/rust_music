@@ -64,7 +64,11 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 
 - [Architecture and micro-interface](docs/ARCHITECTURE.md)
 - [Rust_Boy host and audio-focus contract](docs/HOST_CONTRACT.md)
+- [Repository and machine navigation](docs/REPOSITORY_INDEX.md)
 - [Phased roadmap and evidence gates](docs/ROADMAP.md)
+- [Machine-readable gate/task/owner index](docs/roadmap-index.json)
+- [Codex agent routing and handoff instructions](docs/CODEX_AGENT_MAP.md)
+- [Codex root instructions](AGENTS.md)
 - [Zero third-party dependency policy and offline gate](docs/DEPENDENCY_POLICY.md)
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
