@@ -398,6 +398,25 @@ and validated `.wvc` pairing are still missing. RM-014 remains planned.
   feature check passed. `check_roadmap_index.py`, `check_literature.py`, and
   `git diff --check` pass.
 
+## 2026-10-29 — RM-014 version-aware WavPack framing
+
+Corrected the bounded WavPack header parser to treat reserved upper bytes as
+unused before stream version `0x407`, use 40-bit fields from `0x407` onward,
+and expose `total_samples` only on a block whose sample index is zero. This
+matches the official v4/v5 format description. Added regression cases for
+version `0x406`, the `0x407` transition, upper-byte values, and later blocks.
+This is parser correctness evidence only; WavPack remains unregistered because
+entropy decoding, reconstruction, CRC parity, and hybrid correction pairing
+remain absent.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 7/7 unit
+  tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 local
+  dependency edges, warnings-denied Clippy, workspace tests, release build, and
+  macOS feature check passed.
+- `git diff --check`: **pass**.
+- Official format reference: [WavPack 4 & 5 Binary File / Block Format](https://www.wavpack.com/WavPack5FileFormat.pdf).
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:

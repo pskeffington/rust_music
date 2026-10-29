@@ -50,13 +50,28 @@ impl BlockHeader {
             return Err(MusicError::Unsupported("unsupported WavPack version"));
         }
         let total_low = u32::from_le_bytes(bytes[12..16].try_into().unwrap());
-        let total_samples = if total_low == u32::MAX {
-            None
+        let block_index_low = u32::from_le_bytes(bytes[16..20].try_into().unwrap());
+        // The upper index and length bytes are defined for the WavPack 5
+        // stream format (0x407 and later). Earlier versions reserved them.
+        let (total_samples, block_index) = if version >= 0x407 {
+            (
+                if block_index_low == 0 && total_low != u32::MAX {
+                    Some((u64::from(bytes[11]) << 32) | u64::from(total_low))
+                } else {
+                    None
+                },
+                (u64::from(bytes[10]) << 32) | u64::from(block_index_low),
+            )
         } else {
-            Some((u64::from(bytes[11]) << 32) | u64::from(total_low))
+            (
+                if block_index_low == 0 && total_low != u32::MAX {
+                    Some(u64::from(total_low))
+                } else {
+                    None
+                },
+                u64::from(block_index_low),
+            )
         };
-        let block_index = (u64::from(bytes[10]) << 32)
-            | u64::from(u32::from_le_bytes(bytes[16..20].try_into().unwrap()));
         let block_samples = u32::from_le_bytes(bytes[20..24].try_into().unwrap());
         let flags = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
         let crc = u32::from_le_bytes(bytes[28..32].try_into().unwrap());
@@ -217,6 +232,40 @@ mod tests {
         assert_eq!(header.block_samples, 128);
         assert_eq!(header.channels(), 1);
         header.validate_integer_mono_stereo().unwrap();
+    }
+
+    #[test]
+    fn v4_uses_32_bit_lengths_and_indices_only() {
+        let mut bytes = block(128, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
+        bytes[8..10].copy_from_slice(&0x406u16.to_le_bytes());
+        bytes[10] = 7;
+        bytes[11] = 9;
+        bytes[12..16].copy_from_slice(&10_000u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, Some(10_000));
+        assert_eq!(header.block_index, 0);
+
+        bytes[16..20].copy_from_slice(&25u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, None);
+        assert_eq!(header.block_index, 25);
+    }
+
+    #[test]
+    fn v5_uses_40_bit_fields_and_only_first_block_has_total_length() {
+        let mut bytes = block(128, FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK);
+        bytes[8..10].copy_from_slice(&0x407u16.to_le_bytes());
+        bytes[10] = 2;
+        bytes[11] = 3;
+        bytes[12..16].copy_from_slice(&10_000u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, Some((3u64 << 32) | 10_000));
+        assert_eq!(header.block_index, 2u64 << 32);
+
+        bytes[16..20].copy_from_slice(&25u32.to_le_bytes());
+        let header = BlockHeader::parse(&bytes).unwrap();
+        assert_eq!(header.total_samples, None);
+        assert_eq!(header.block_index, (2u64 << 32) | 25);
     }
 
     #[test]
