@@ -329,6 +329,40 @@ impl<'a> BitReader<'a> {
         Ok(value)
     }
 
+    /// Read one adjusted-binary value in `0..range` from the next stream bits.
+    /// The WavPack codewords use a truncated binary prefix followed by one
+    /// extra bit for values above the short-code cutoff.
+    pub fn read_adjusted_binary(&mut self, range: u32) -> Result<u32> {
+        if range == 0 {
+            return Err(MusicError::Invalid(
+                "WavPack adjusted-binary range must be nonzero",
+            ));
+        }
+        if range == 1 {
+            return Ok(0);
+        }
+
+        let checkpoint = self.bit_offset;
+        let decoded = (|| {
+            let width = (u32::BITS - 1 - range.leading_zeros()) as u8;
+            let short_count = ((1u64 << (width + 1)) - u64::from(range)) as u32;
+            let mut prefix = 0u32;
+            for _ in 0..width {
+                prefix = (prefix << 1) | u32::from(self.read_bit()?);
+            }
+            if prefix < short_count {
+                Ok(prefix)
+            } else {
+                let suffix = u32::from(self.read_bit()?);
+                Ok((prefix - short_count) * 2 + short_count + suffix)
+            }
+        })();
+        if decoded.is_err() {
+            self.bit_offset = checkpoint;
+        }
+        decoded
+    }
+
     /// Read a unary run of one bits terminated by zero, bounded by both the
     /// caller's cap and the remaining block payload.
     pub fn read_unary_ones(&mut self, max_ones: u32) -> Result<u32> {
@@ -464,6 +498,17 @@ mod tests {
         bytes.extend_from_slice(&block_samples.to_le_bytes());
         bytes.extend_from_slice(&flags.to_le_bytes());
         bytes.extend_from_slice(&0x1234_5678u32.to_le_bytes());
+        bytes
+    }
+
+    fn stream_bits(bits: &str) -> Vec<u8> {
+        let mut bytes = vec![0; bits.len().div_ceil(8)];
+        for (index, bit) in bits.bytes().enumerate() {
+            assert!(matches!(bit, b'0' | b'1'));
+            if bit == b'1' {
+                bytes[index / 8] |= 1 << (index % 8);
+            }
+        }
         bytes
     }
 
@@ -745,6 +790,62 @@ mod tests {
         assert!(bits.read_bits(9).is_err());
         assert_eq!(bits.remaining_bits(), 8);
         assert_eq!(bits.read_bits(8).unwrap(), 0b1010_0101);
+    }
+
+    #[test]
+    fn adjusted_binary_matches_official_golomb_code_vectors() {
+        // Table 7.32 in the WavPack compression-algorithm description.
+        let tables: &[(u32, &[&str])] = &[
+            (6, &["00", "01", "100", "101", "110", "111"]),
+            (7, &["00", "010", "011", "100", "101", "110", "111"]),
+            (8, &["000", "001", "010", "011", "100", "101", "110", "111"]),
+            (
+                9,
+                &[
+                    "000", "001", "010", "011", "100", "101", "110", "1110", "1111",
+                ],
+            ),
+            (
+                10,
+                &[
+                    "000", "001", "010", "011", "100", "101", "1100", "1101", "1110", "1111",
+                ],
+            ),
+            (
+                11,
+                &[
+                    "000", "001", "010", "011", "100", "1010", "1011", "1100", "1101", "1110",
+                    "1111",
+                ],
+            ),
+        ];
+
+        for &(range, codes) in tables {
+            for (expected, code) in codes.iter().enumerate() {
+                let bytes = stream_bits(code);
+                let mut reader = BitReader::new(&bytes);
+                assert_eq!(
+                    reader.read_adjusted_binary(range).unwrap(),
+                    expected as u32,
+                    "range {range}, code {code}"
+                );
+                assert_eq!(reader.remaining_bits(), bytes.len() * 8 - code.len());
+            }
+        }
+        assert_eq!(BitReader::new(&[]).read_adjusted_binary(1).unwrap(), 0);
+        assert!(BitReader::new(&[]).read_adjusted_binary(0).is_err());
+
+        let mut widest = BitReader::new(&[0xff; 4]);
+        assert_eq!(widest.read_adjusted_binary(u32::MAX).unwrap(), u32::MAX - 1);
+    }
+
+    #[test]
+    fn adjusted_binary_truncation_does_not_consume_prefix_bits() {
+        let bytes = stream_bits("00000011");
+        let mut reader = BitReader::new(&bytes);
+        reader.read_bits(6).unwrap();
+        assert!(reader.read_adjusted_binary(6).is_err());
+        assert_eq!(reader.remaining_bits(), 2);
     }
 
     #[test]

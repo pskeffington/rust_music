@@ -529,7 +529,7 @@
       ],
       "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "Only a bounded block-header/metadata parser foundation exists; its version fields and one FFmpeg-generated stream's framing are verified, but it is not exposed by the facade. Entropy decoding, sample reconstruction/CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
+      "blocker": "Bounded block framing, entropy-variable parsing, and an adjusted-binary bitreader primitive with official table vectors now exist, but the crate is not exposed by the facade. Median-zone decoding and updates, sample reconstruction/CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
     },
     {
       "id": "RM-015",

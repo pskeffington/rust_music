@@ -4,6 +4,27 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-29 — RM-014 adjusted-binary entropy primitive
+
+Implemented a bounded WavPack adjusted-binary reader on top of the existing
+LSB-first bit reader. It reads the truncated-binary prefix and optional suffix,
+rejects an empty range, handles the full `u32` range without shift overflow,
+and restores the cursor if a codeword is truncated. Test vectors cover every
+codeword in the official WavPack Golomb table for ranges 6–11, plus the
+`u32::MAX` boundary and atomic truncated-read behavior. The decoder remains
+unregistered and unsupported for playback: median-zone selection/adaptation,
+residual word sequencing, sample reconstruction, CRC, and independent PCM
+parity are still missing.
+
+**Observed checks:** the full `sh scripts/offline-gate.sh` exited 0 on the
+final change across 16 local crates and 29 path-only edges, including
+formatting, warnings-denied Clippy, workspace tests, release build and macOS
+feature check. The WavPack suite passed 19/19, including the explicit
+`u32::MAX` assertion. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, and `git diff --check` passed. A
+read-only safety review found no actionable correctness issue in the
+primitive; it does not validate WavPack word decoding or PCM parity.
+
 ## 2026-10-29 — Archive.org AAC ingestion-denial sample
 
 Added `ia-stificash-starstedede-aac.m4a` from Archive.org item
