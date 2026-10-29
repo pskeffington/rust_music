@@ -14,7 +14,10 @@ rust-music-flac        native RFC 9639 decoder: STREAMINFO, CRC, fixed/LPC, Rice
 rust-music-wave        native PCM RIFF/WAVE parser and bounded frame decoder
 rust-music-engine      explicit Load -> Ready -> Play -> Step -> Finish/Stop state machine
 rust-music-native      optional own AudioQueue macOS and ALSA Linux PCM API shims
-rust-music             public façade: content sniffing + host integration exports
+rust-music             public facade: content sniffing and decoder integration
+rust-music-library     explicit bounded offline directory scanner, no symlink traversal
+rust-music-host        host-facing MUSIC slot, commands, snapshots, RAII audio lease
+rust-music-audit       local-only dependency/FFI/network source gate
 rust-music-cli         inspect / convert back to PCM WAVE / optional native output
 ```
 
@@ -50,7 +53,9 @@ Mac AudioQueue and the Linux ALSA **kernel ioctl UAPI** are optional app-owned d
 
 ## Micro-interface contract
 
-The host asks for `File -> AudioFormat` and calls `Player::load`, `play`, `step`, `stop`, `status`. For Rust_Boy, provide a minimal panel showing `TRACK / ARTIST / 00:00 / PLAY-PAUSE / PREV-NEXT / AUDIO`, with one narrow settings affordance. A host retains screen and audio-focus ownership, local playlist storage, and platform file permissions. The `rust_music` crate never launches a new window, browser, socket, server, or independent mixer.
+For Rust_Boy, `rust-music-host` exposes an explicit `MusicSlot`, `Command` and `SlotSnapshot`. The host supplies a single-owner `AudioFocus` that returns an RAII `AudioLease` only if neither Radio nor TV owns output. Music releases the lease at Stop, error, EOF, selection change or drop. See [host contract](HOST_CONTRACT.md).
+
+The thin panel can show `MUSIC / TRACK / 00:00 / PREV-PLAY-STOP-NEXT / SETTINGS` without changing host navigation. Artist tags and pause/resume are **not implemented**; do not display placeholder metadata or fake controls. The host retains screen, focus, filesystem permissions and task scheduling. The music crates never launch a window, browser, socket, server, or mixer.
 
 ## Non-goals in G0-G2
 

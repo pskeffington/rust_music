@@ -9,6 +9,8 @@ members = [
   "crates/rust-music",
   "crates/rust-music-cli",
   "crates/rust-music-audit",
+  "crates/rust-music-library",
+  "crates/rust-music-host",
 ]
 
 [workspace.package]

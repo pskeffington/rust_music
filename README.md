@@ -2,7 +2,7 @@
 
 **A lightweight, native, locally authored lossless music engine for Rust_Boy.** Designed to stay alive on minimal handheld/desktop systems, run offline, and ship independently of the host shell.
 
-All runtime codecs are ours. All Cargo dependencies are local workspace paths; `.cargo/config.toml` enforces offline mode by default. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
+All runtime codecs are ours. All Cargo dependencies are local workspace paths. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
 
 ## Implemented foundation
 
@@ -10,7 +10,10 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths; `
 - **WAVE PCM decoder**: 8/16/24/32-bit RIFF PCM with bounded streaming.
 - **Headless player**: explicit `load()` then `play()`, single active decoder/sink, no automatic sound or network activity.
 - **Audio outputs (experimental)**: own macOS AudioQueue (`macos-output`) and *direct Linux ALSA kernel ioctl* (`alsa-output`) adapters. No libasound, mixer plugin, or audio server. Neither is yet hardware validated as bit-perfect.
-- **Development CLI**: inspect full-file decode, FLAC/WAV to WAV, and optional native output.
+- **Local music library**: bounded, explicit directory scan; FLAC/WAV signature detection, stable filename ordering, symlink rejection and no background scanner.
+- **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
+- **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
+- **Development CLI**: bounded library scan, inspect full-file decode, FLAC/WAV to WAV, and optional native output.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
@@ -22,6 +25,7 @@ cargo test --locked --offline --workspace
 python3 scripts/check_literature.py  # optional research maintenance
 python3 scripts/test_flac_reference.py --fixtures-only  # OPTIONAL external reference validation
 python3 scripts/test_flac_reference.py                  # OPTIONAL differential oracle, needs flac + cargo
+cargo run --locked --offline -p rust-music-cli -- scan ~/Music
 cargo run --locked --offline -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run --locked --offline -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
 # macOS native output (experimental):
@@ -30,14 +34,16 @@ cargo run --locked --offline -p rust-music-cli --features macos-output -- play ~
 cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/Music/track.flac hw:0,0
 ```
 
-Every workspace configuration has **zero third-party Rust dependencies** and builds as a pure headless codec/module. Start from `rust_music::open_file(path)` and `Player::new(host_owned_sink)` to embed in Rust_Boy. Playback `step()` must run on a decoder worker, not the GUI or native audio callback.
+All **10 workspace crates** are locally authored and have zero third-party Cargo dependencies. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host provides an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Source is implemented; Rust compilation and physical playback are not yet verified here.
 
 ## Module and research guide
 
 - [Architecture and micro-interface](docs/ARCHITECTURE.md)
+- [Rust_Boy host and audio-focus contract](docs/HOST_CONTRACT.md)
 - [Phased roadmap and evidence gates](docs/ROADMAP.md)
 - [Zero third-party dependency policy and offline gate](docs/DEPENDENCY_POLICY.md)
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
+- [G5 host/source validation ledger](docs/G5_VALIDATION.md)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)
 - [Navigation index](docs/LITERATURE_INDEX.md)
 - [Machine registry](docs/literature-index.json)

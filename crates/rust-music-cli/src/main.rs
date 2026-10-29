@@ -93,22 +93,33 @@ fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
     let path = args.next().ok_or(MusicError::Invalid("missing input filename"))?;
-    let input = open_file(path)?;
     match action.as_str() {
-        "inspect" if args.next().is_none() => inspect(input),
+        "scan" => {
+            use rust_music_library::{scan, ScanLimits};
+            if args.next().is_some() { return Err(MusicError::Invalid("unexpected scan arguments")); }
+            let library = scan(&path, ScanLimits::default())?;
+            for (index, track) in library.tracks().iter().enumerate() {
+                println!("{index}: {:?} | {:?} | {} bytes", track.relative_path,
+                    track.container, track.size_bytes);
+            }
+            println!("{} tracks | {} entries checked | {} skipped",
+                library.len(), library.examined_entries, library.skipped_entries);
+            Ok(())
+        }
+        "inspect" if args.next().is_none() => inspect(open_file(path)?),
         "play" => {
             let device = args.next();
             if args.next().is_some() { return Err(MusicError::Invalid("too many playback arguments")); }
-            play(input, device.as_deref())
+            play(open_file(path)?, device.as_deref())
         }
         "decode" => {
             let output = args.next().ok_or(MusicError::Invalid("missing output .wav filename"))?;
             if args.next().is_some() { return Err(MusicError::Invalid("unexpected extra command arguments")); }
-            export_wav(input, &output)
+            export_wav(open_file(path)?, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]")),
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]")),
     }
 }
 fn main() {

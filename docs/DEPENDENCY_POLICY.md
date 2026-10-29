@@ -37,7 +37,7 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play /p
 ## Safeguards
 
 - The self-authored `rust-music-audit` executable examines all workspace manifests, exact path edges, Cargo.lock package set, build scripts, `.rs` files, forbidden network APIs and native `#[link]` directives. It allows a single, exact macOS system framework link. This check is defensive/static, not a substitute for compilation or code review.
-- Repository `.cargo/config.toml` defaults Cargo to offline mode, including direct `cargo build`; the offline+locked gate blocks registry access or lockfile mutation. Generated code or future features must also pass the same audit and tests.
+- Cargo offline+locked mode blocks hidden registry access or lockfile mutation. Generated code or future features must also pass the same audit and tests.
 - The GitHub Actions workflow is optional `workflow_dispatch` on a pre-provisioned **operator-owned offline runner** with the exact commit already checked out. It uses no third-party action or package installer. No CI runner is claimed available until a job actually runs.
 - The public runtime does not require Python, FLAC reference tools, GitHub, a Rust build daemon, or internet access.
 
@@ -53,3 +53,7 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play /p
 | Optional reference FLAC comparison | Outside offline gate | Pending differential corpus | N/A |
 
 All-gates-green or bit-perfect claims are prohibited until measured.
+
+## G5 local-only modules
+
+`rust-music-library` and `rust-music-host` are additional locally authored workspace packages. The library scan never creates a network client, database, daemon, or background thread; it examines explicitly selected regular files under strict limits. The host slot requires the Rust_Boy host to furnish a single-owner RAII lease shared with Radio/TV. Both crates have only local path Cargo edges. The workspace now contains **10** crates. Refer to [HOST_CONTRACT.md](HOST_CONTRACT.md) for focus and filesystem boundaries. Offline Cargo builds still require a preinstalled Rust toolchain and remain unverified in this environment.
