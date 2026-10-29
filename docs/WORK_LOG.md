@@ -156,3 +156,35 @@ check. Roadmap and literature validators and `git diff --check` passed. ALAC
 remains unadmitted pending compressed 32-bit parity, broader malformed-input
 coverage, and container demux; no hardware or final production acceptance is
 claimed.
+
+## 2026-10-29 — RM-009 bounded M4A/MP4 demux
+
+Added the independent `rust-music-mp4` crate and wired content-sniffed `ftyp`
+input through the public Rust Music facade. The parser uses checked ISO BMFF
+box and sample-table bounds, recognizes the ALAC sample description and cookie,
+and reads packet extents from the local `mdat`. Unsupported layouts, AAC,
+encrypted entries/DRM indicators, external data references, invalid offsets,
+truncated input, and every file-prefix truncation fail closed. The feature is
+limited to a generated 24-bit M4A parity vector; raw ALAC packet parity remains
+separately verified at 16/24/32-bit and stereo-matrix settings. No runtime
+third-party dependency was added. M4A/ALAC is not broadly production-admitted;
+CAF demux and wider real-world M4A coverage remain open.
+
+Validation on the local Rust/Cargo 1.99.1 macOS environment:
+
+- `sh scripts/offline-gate.sh`: **exit 0**; 14 local crates, 25 path-only
+  edges, dependency audit, fmt, warnings-denied Clippy, workspace tests,
+  optimized build, and macOS output-feature check passed.
+- The MP4 crate's five tests passed, including exact generated PCM parity,
+  AAC/wrong-codec/encrypted/external-reference denial, bad sample bounds, and
+  every truncated file prefix. The facade's three tests passed, including
+  content-based M4A ALAC admission and AAC rejection despite a `.flac` path.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **pass**.
+
+The first gate attempt exposed a Clippy `let_unit_value` warning and a
+concurrent facade test temp-directory collision. Both were fixed; the temp
+directories now use process-local atomic IDs and retry if already present.
+RM-009 is complete for its bounded acceptance. RM-010 CAF parsing, production
+format corpus checks, host integration, distinct-module registration/input,
+and physical audio acceptance are still outstanding.

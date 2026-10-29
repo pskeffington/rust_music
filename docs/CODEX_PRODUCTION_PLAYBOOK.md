@@ -64,7 +64,7 @@ For all codec/container additions (ALAC/MP4/CAF, RF64, WavPack), keep them disab
 
 ## Current checkpoint
 
-As of 2026-10-29, branch `build/native-codecs-g0`: the local offline gate passes on Rust/Cargo 1.99.1/macOS; generated FLAC/WAVE/AIFF parity passes; and all six supplied private FLAC tracks passed combined reference FLAC, FFmpeg and native Rust PCM validation. Private audio remains outside Git. Host-owned Music/Radio/TV focus, Pip-Boy package/input integration, physical panel/output and device acceptance remain unverified. `RM-008` is the next planned P1 task with satisfied prerequisites; do not repeat RM-001/RM-002 or claim production readiness without new evidence.
+As of 2026-10-29, branch `build/native-codecs-g0`: the local offline gate passes on Rust/Cargo 1.99.1/macOS; generated FLAC/WAVE/AIFF parity and ALAC raw packet parity pass; all six supplied private FLAC tracks passed combined reference FLAC, FFmpeg and native Rust PCM validation; and generated 24-bit M4A parity plus AAC/DRM denial pass. Private audio remains outside Git. Pip-Boy keeps each module as a distinct package identity/lifecycle in its shared universal container; host-owned Music/Radio/TV focus, final module input routing, physical panel/output and device acceptance remain unverified. `RM-010` CAF demux is the next G11 codec task. Keep the module-boundary and production evidence gates separate; do not claim release readiness without new evidence.
 
 ## Codex completion report template
 

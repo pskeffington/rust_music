@@ -18,14 +18,14 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | **G1** | Integer PCM core and explicit playback state | `codec_engineer` | source implemented | Workspace tests pass, including lossless playback floor and fail-closed output state; actual device behavior remains unverified |
 | **G2** | Native FLAC with CRC, Rice/LPC, PCM MD5 | `codec_engineer` | partial evidence | Seven generated vectors and six private real-world tracks pass native PCM parity; wider codec/hardware claims remain separate |
 | **G3** | Mac AudioQueue / Linux kernel PCM output | `audio_backend` | source implemented | Source present; DAC format, drain and underrun measurement pending |
-| **G4** | Expanded lossless umbrella | `codec_engineer` | planned | Implemented AIFF is G10; ALAC and later formats are G11/G12 work |
+| **G4** | Expanded lossless umbrella | `codec_engineer` | partial evidence | AIFF is implemented; narrow generated M4A/ALAC path is implemented; CAF and broader ALAC admission remain |
 | **G5** | Rust_Boy socket and shared audio-focus | `host_integrator` | source implemented | Unit slot and Pip-Boy bridge contract exist; host-side adapter, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain open |
 | **G6** | 128x64 monochrome 1KiB panel | `host_integrator` | source implemented | Renderer exists; hardware screen/controls pending |
 | **G7** | Strict RIFF/WAVE PCM and extensible WAV | `codec_engineer` | partial evidence | Six local native CLI PCM roundtrips and malformed RIFF rejection pass; hardware output remains unverified |
 | **G8** | Six-file private FLAC differential corpus | `gate_verifier` | partial evidence | Reference FLAC/FFmpeg and native Rust PCM hashes match on all six private files; artwork and hardware stress remain separate |
 | **G9** | Exact declared-frame timing and display progress | `host_integrator` | source implemented | Workspace tests pass; physical display and Rust_Boy button behavior remain unverified |
 | **G10** | Audiophile-only admission and AIFF/AIFF-C | `codec_engineer` | partial evidence | Local offline gate passes on Rust 1.99.1/macOS and seven AIFF/AIFF-C native PCM vectors pass; physical DAC and host integration remain open |
-| **G11** | ALAC decoder and M4A/CAF demultiplexers | `codec_engineer` | planned | Independent ALAC decode golden PCM and strict AAC rejection needed |
+| **G11** | ALAC decoder and M4A/CAF demultiplexers | `codec_engineer` | partial evidence | Raw packet parity and strict generated 24-bit M4A parity/AAC denial pass; CAF and broader M4A corpus remain |
 | **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | planned | Per-format independent parity and malicious-input rejection needed |
 | **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | planned | Never claim seek or album tags without indexed code and tests |
 | **G14** | Windows WASAPI and Android AAudio ports | `audio_backend` | planned | Platform-local compile, focus and physical output acceptance needed |
@@ -41,9 +41,9 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | `RM-005` — Qualify macOS AudioQueue output with physical DAC | P1 | G3 | `audio_backend` | blocked | RM-001 (done); physical DAC required |
 | `RM-006` — Integrate independent MUSIC socket with Radio and TV ownership | P1 | G5 | `host_integrator` | blocked | RM-004 |
 | `RM-007` — Validate fixed 1KiB panel on actual Rust_Boy display | P1 | G6 | `host_integrator` | blocked | RM-006 |
-| `RM-008` — Develop independent ALAC bitstream and PCM decoder | P1 | G11 | `codec_engineer` | planned | RM-001 |
-| `RM-009` — Implement M4A/MP4 ALAC-only demux and AAC denial | P1 | G11 | `codec_engineer` | blocked | RM-008 |
-| `RM-010` — Implement CAF ALAC and integer LPCM demux | P2 | G11 | `codec_engineer` | blocked | RM-008 |
+| `RM-008` — Develop independent ALAC bitstream and PCM decoder | P1 | G11 | `codec_engineer` | done | RM-001 |
+| `RM-009` — Implement M4A/MP4 ALAC-only demux and AAC denial | P1 | G11 | `codec_engineer` | done | RM-008 |
+| `RM-010` — Implement CAF ALAC and integer LPCM demux | P2 | G11 | `codec_engineer` | planned | RM-008 |
 | `RM-011` — Add bounded local metadata without cover-art memory spikes | P2 | G13 | `codec_engineer` | planned | RM-001 |
 | `RM-012` — Implement validated sample-accurate FLAC seek | P2 | G13 | `codec_engineer` | planned | RM-002 |
 | `RM-013` — Implement RF64 large PCM files with ds64 limits | P2 | G12 | `codec_engineer` | planned | RM-003 |
@@ -51,7 +51,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | `RM-015` — Port native output to Windows and Android without codec dependencies | P2 | G14 | `audio_backend` | blocked | RM-005, RM-006 |
 | `RM-016` — Keep code, literature, agent roles and format registry indexed | P1 | G0 | `index_curator` | done | None |
 
-**Priority order:** The local G10 offline gate (`RM-001`), native WAVE parity (`RM-003`), lossless admission/focus-denial unit evidence (`RM-004`) and six-file native FLAC parity (`RM-002`) now pass. RM-008 is the next planned P1 implementation task. Physical output and actual Rust_Boy shared-focus/display acceptance remain separate production gates; do not infer those from host mocks or source review.
+**Priority order:** RM-008 (raw ALAC packet parity) and RM-009 (bounded M4A/MP4 ALAC demux/AAC denial) now pass their source-level acceptance. RM-010 CAF demux is next for G11. Physical output, Rust_Boy shared audio focus, and display acceptance remain separate production gates; do not infer those from host mocks or source review. Each Pip-Boy module retains its own module identity, package/registration record, and lifecycle while using the shared container.
 
 ## Acceptance ladder (no skipped proofs)
 
@@ -73,7 +73,7 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 
 ## Next expansion
 
-**G11:** Locally authored ALAC, strict ALAC-only M4A/MP4 codec inspection, and CAF ALAC/lpcm. Reject AAC in a .m4a shell.  
+**G11:** Locally authored ALAC with a bounded M4A/MP4 ALAC profile and AAC/DRM denial is implemented and has generated 24-bit parity; CAF and broader M4A evidence are still required before broad ALAC admission.
 **G12:** WavPack pure-lossless/hybrid-with-correction, RF64/ds64 and verified large PCM.  
 **G13:** Safe bounded metadata and accurate frame seek, without embedded artwork exhausting the micro UI.  
 **G14:** Independent WASAPI and AAudio device adapters with real target qualification.

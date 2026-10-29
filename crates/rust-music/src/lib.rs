@@ -11,6 +11,7 @@ pub use rust_music_aiff::AiffDecoder;
 pub use rust_music_core::{AudioFormat, Decoder, MusicError, NullSink, PcmBlock, PcmSink, Result};
 pub use rust_music_engine::{PlaybackSnapshot, PlaybackState, Player};
 pub use rust_music_flac::{FlacDecoder, StreamInfo};
+pub use rust_music_mp4::Mp4AlacDecoder;
 pub use rust_music_wave::WaveDecoder;
 
 /// Sniff content, not filename. No audio starts during file opening.
@@ -27,10 +28,10 @@ pub fn open_file(path: impl AsRef<Path>) -> Result<Box<dyn Decoder>> {
     {
         Ok(Box::new(AiffDecoder::new(input)?))
     } else if head.len() >= 8 && &head[4..8] == b"ftyp" {
-        Err(MusicError::Unsupported("M4A/MP4 may contain lossy AAC; native ALAC verification and decoding is not implemented"))
+        Ok(Box::new(Mp4AlacDecoder::new(input)?))
     } else {
         Err(MusicError::Unsupported(
-            "audiophile-only input: native FLAC, integer PCM WAV or uncompressed AIFF/AIFF-C",
+            "audiophile-only input: native FLAC, integer PCM WAV, uncompressed AIFF/AIFF-C or supported ALAC M4A",
         ))
     }
 }
@@ -46,23 +47,27 @@ mod tests {
     use std::{
         fs,
         path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
+        sync::atomic::{AtomicU64, Ordering},
     };
+
+    static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
     struct Temp(PathBuf);
 
     impl Temp {
         fn new() -> Self {
-            let stamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
-            let path = std::env::temp_dir().join(format!(
-                "rust-music-admission-{}-{stamp}",
-                std::process::id()
-            ));
-            fs::create_dir(&path).unwrap();
-            Self(path)
+            loop {
+                let sequence = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+                let path = std::env::temp_dir().join(format!(
+                    "rust-music-admission-{}-{sequence}",
+                    std::process::id()
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Self(path),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => panic!("failed to create admission test directory: {error}"),
+                }
+            }
         }
 
         fn write_named(&self, bytes: &[u8]) -> PathBuf {
@@ -89,7 +94,35 @@ mod tests {
             b"\xff\xf1\x50\x80\x00\x1f\xfc".as_slice(),
         ] {
             let path = temp.write_named(bytes);
-            assert!(matches!(open_file(path), Err(MusicError::Unsupported(_))));
+            assert!(open_file(path).is_err());
         }
+    }
+
+    #[test]
+    fn admits_alac_m4a_by_content_even_with_flac_suffix() {
+        let temp = Temp::new();
+        let path = temp.write_named(include_bytes!(
+            "../../rust-music-mp4/tests/fixtures/generated_alac24.m4a"
+        ));
+        let mut decoder = open_file(path).unwrap();
+        assert_eq!(decoder.format(), AudioFormat::new(44_100, 2, 24).unwrap());
+        assert_eq!(decoder.total_frames(), Some(64));
+        let mut actual = Vec::new();
+        while let Some(block) = decoder.next_block().unwrap() {
+            actual.extend(block.samples);
+        }
+        let expected: Vec<i32> = (0..64)
+            .flat_map(|frame| [-7_000_000 + frame * 17_111, 4_000_000 - frame * 9_999])
+            .collect();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn rejects_aac_m4a_by_content_even_with_flac_suffix() {
+        let temp = Temp::new();
+        let path = temp.write_named(include_bytes!(
+            "../../rust-music-mp4/tests/fixtures/generated_aac.m4a"
+        ));
+        assert!(matches!(open_file(path), Err(MusicError::Unsupported(_))));
     }
 }

@@ -89,8 +89,8 @@
       "accepted_codecs": [
         "ALAC"
       ],
-      "stage": "planned",
-      "verification": "not-implemented",
+      "stage": "native-source-implemented",
+      "verification": "generated-m4a-alac-24bit-exact-pcm-parity; aac-drm-wrong-codec-external-reference-and-malformed-bounds-rejected; broad-corpus-and-caf-pending",
       "gate": "G11",
       "refuse_codecs": [
         "AAC",

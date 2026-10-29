@@ -11,6 +11,7 @@ dependencies = [
  "rust-music-core",
  "rust-music-engine",
  "rust-music-flac",
+ "rust-music-mp4",
  "rust-music-native",
  "rust-music-wave",
 ]
@@ -73,6 +74,14 @@ dependencies = [
 name = "rust-music-library"
 version = "0.1.0"
 dependencies = [
+ "rust-music-core",
+]
+
+[[package]]
+name = "rust-music-mp4"
+version = "0.1.0"
+dependencies = [
+ "rust-music-alac",
  "rust-music-core",
 ]
 

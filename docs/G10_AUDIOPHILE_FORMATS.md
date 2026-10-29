@@ -17,7 +17,7 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Six generated native CLI vectors pass PCM parity; physical output pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
 | .aif, .aiff | AIFF signed integer PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
 | .aifc | AIFF-C signed PCM | Native CLI PCM parity: PASS (7-case mixed corpus); offline workspace gate passes; hardware pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
-| .m4a | ALAC | Bounded raw-packet decoder passes generated 16/24/32-bit and nonzero stereo-matrix PCM vectors; malformed-input breadth and container demux remain incomplete, so ALAC is not admitted | AAC in identical container prohibited |
+| .m4a | ALAC | Bounded M4A/MP4 profile passes generated 24-bit exact PCM parity; raw packets separately pass generated 16/24/32-bit and stereo-matrix parity. AAC, DRM, external data, unsupported layouts and malformed bounds fail closed. Broad real-world M4A corpus and CAF remain open; do not claim general ALAC production admission | AAC in identical container prohibited |
 | .caf | ALAC or verified integer PCM | Planned | Reject other CAF codecs |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
 | RF64/BWF .wav | Extended large-file PCM | Planned | ds64 and exact bounds required |
@@ -64,8 +64,8 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 
 ## Next priorities
 
-1. Own ALAC packet decoder and strict M4A/MP4 demux, including correct ALAC sample-description/magic-cookie recognition and mandatory AAC rejection.
-2. Own CAF ALAC/lpcm demux, no OS codec fallback.
+1. Own CAF ALAC/lpcm demux, no OS codec fallback.
+2. Expand ALAC/M4A parity over independently generated depths and a real-world corpus; retain strict AAC/DRM denial.
 3. Bounded metadata, safe cover art exclusion from the tiny framebuffer, exact seek.
 4. Hardware output negotiation, anti-resampling checks, bit-perfect DAC loopback and shared Radio/TV focus.
 5. Add WavPack lossless, RF64, optional Ogg FLAC and direct DSD only with reference PCM/bitstream conformance tests.

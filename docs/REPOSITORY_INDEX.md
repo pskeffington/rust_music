@@ -27,6 +27,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | WAVE integer PCM and RIFF | `crates/rust-music-wave/` | `codec_engineer` | G7 |
 | AIFF/AIFF-C signed PCM | `crates/rust-music-aiff/` | `codec_engineer` | G10 |
 | ALAC raw-packet decoder and synthetic vectors | `crates/rust-music-alac/`, `crates/rust-music-alac/tests/fixtures/` | `codec_engineer` | G11 (16/24/32-bit plus stereo-matrix parity; not admitted; malformed coverage and demux remain) |
+| M4A/MP4 ALAC-only demux and synthetic files | `crates/rust-music-mp4/`, `crates/rust-music-mp4/tests/fixtures/` | `codec_engineer` | G11 / RM-009 (bounded profile; generated 24-bit parity; AAC/DRM denial; broader corpus and CAF remain) |
 | Playback state/progress | `crates/rust-music-engine/` | `codec_engineer` | G1 / G9 |
 | OS DAC adapters | `crates/rust-music-native/` | `audio_backend` | G3 |
 | Public facade, sniffing | `crates/rust-music/` | serial handoff | G1 / G10 |
