@@ -78,3 +78,19 @@ Note for interactive Zsh: pasted comment lines may cause `zsh: command not found
 - Apple CAF specification: https://developer.apple.com/library/archive/documentation/MusicAudio/Reference/CAFSpec/CAF_spec/CAF_spec.html
 - Apple Audio File Types: https://developer.apple.com/documentation/audiotoolbox/1576497-audio-file-types
 - WavPack lossless/hybrid rules: https://www.wavpack.com/wavpack_doc.html
+
+## G10 offline quality-gate repair (2026-10-29)
+
+An operator's macOS gate log reports that the local-only dependency audit passed:
+**12 local crates; 21 path-only edges; zero registry/Git crates; zero third-party system links; one approved Apple framework link**. The subsequent `cargo fmt --all -- --check` failed and printed rustfmt diffs across 14 Rust source files. The gate exits at that check; Clippy, complete workspace tests, release builds, and physical audio are not established by this log.
+
+The exact 252 rustfmt hunks supplied by the operator were matched against GitHub source and applied without intentionally changing decoder algorithms. Three compiler warnings for unnecessary Boolean-expression parentheses in `crates/rust-music-audit/src/main.rs` were also removed. The changes are published in four commits ending at `13f8e85975f7b4cae921593df2ab0e7f310b8d30`. A GitHub commit comparison confirms only the expected 14 Rust files changed.
+
+**This is a source-level formatting repair, not a claim that the full gate has passed.** Rerun on the operator's Mac after pulling the branch:
+
+    cd /Users/null/GitHub/rust_music
+    git pull --ff-only origin build/native-codecs-g0
+    sh scripts/offline-gate.sh
+
+If format passes and Clippy finds new warnings/errors, record the first diagnostic and repair those separately. Keep PR #1 draft until full offline, FLAC corpus, audio focus and device gates pass.
+
