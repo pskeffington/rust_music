@@ -15,8 +15,8 @@ Date: 2026-10-29. Applies to the standalone engine and the Rust_Boy MUSIC module
 | --- | --- | --- | --- |
 | .flac | Native FLAC | Source implemented; cargo and native PCM parity pending | Stream CRC + decoded-PCM MD5 at EOF, 16-bit/44.1k+ for playback |
 | .wav | RIFF/WAVE signed integer PCM or 8-bit unsigned PCM | Source implemented; cargo parity pending | PCM WAVE_FORMAT_EXTENSIBLE supported; 8-bit only in decoder tests |
-| .aif, .aiff | AIFF signed integer PCM | New G10 implementation; cargo parity pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
-| .aifc | AIFF-C signed PCM | New G10 implementation; cargo parity pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
+| .aif, .aiff | AIFF signed integer PCM | G10 operator-run CLI PCM parity: PASS (7-case mixed corpus); full workspace gate pending | 8/16/24/32-bit big-endian, exact extended-rate parsing |
+| .aifc | AIFF-C signed PCM | G10 operator-run CLI PCM parity: PASS (7-case mixed corpus); full workspace gate pending | Valid FVER and NONE, twos or sowt only; no ADPCM/ulaw/alaw |
 | .m4a | ALAC | Planned; no native decoder yet | AAC in identical container prohibited |
 | .caf | ALAC or verified integer PCM | Planned | Reject other CAF codecs |
 | .wv | WavPack pure lossless or hybrid with verified correction | Planned | Reject lossy-only hybrid files |
@@ -36,7 +36,7 @@ Parser rules: checked FORM length, bounded IFF chunks, odd-byte padding, max 512
 
 The AIFF 80-bit extended rate is decoded with integer math and must represent an exact whole number of Hz, never rounded. The renderer labels AIFF and remains exactly 128×64 pixels / 1,024 bytes.
 
-Known limits: chunks following the audio SSND are not exhaustively parsed; source implementation is not yet compiled here. The quick scanner may include a provisional file that the full decoder later rejects.
+Known limits: chunks following the audio SSND are not exhaustively parsed; the operator-run AIFF CLI parity tests passed, but a full workspace test/Clippy/release build is not established. The quick scanner may include a provisional file that the full decoder later rejects.
 
 ## Reproduction and evidence
 
@@ -48,6 +48,19 @@ Python-stdlib-only generated reference vectors cover uncompressed AIFF and AIFF-
     python3 scripts/test_flac_user_corpus.py --mode rust --require-complete /private/music
 
 The second and subsequent commands require a locally installed Rust toolchain; the last requires the original private six-track FLAC files. No recordings or encoded artwork are committed. Do not mark Rust compile, full PCM parity or physical DAC acceptance as PASS until they have run. Keep PR #1 draft.
+
+## Operator-reported native AIFF validation (2026-10-29)
+
+The operator ran the checked-in Python-stdlib fixture harness on a macOS machine with a working Rust toolchain and shared the following terminal results:
+
+- `python3 scripts/test_aiff_reference.py --fixtures-only`: **PASS: 7 AIFF/AIFF-C vectors; fixtures-only=True**.
+- `python3 scripts/test_aiff_reference.py`: **PASS: 7 AIFF/AIFF-C vectors; fixtures-only=False**. Each case invokes the native Rust CLI through `cargo run --locked --offline`, performs `inspect` and `decode`, then compares exported WAV integer PCM with an independent fixture expectation.
+- Passed cases: `mono-16`, `stereo-24-192k`, `stereo-32`, `aifc-none`, `aifc-sowt-24`, `offset-16`, and `parser-only-8`. The 8-bit example tests the decoder, not permitted playback.
+- The native-harness output also reports rejection of corrupt FORM boundaries, contradictory COMM frame counts, truncated data and lossy AIFF-C.
+
+**Evidence basis:** user-supplied terminal transcript, not a CI artifact. This resolves the G10 fixture/decoder PCM parity checkpoint for the enumerated synthetic cases, but does **not** prove the full `sh scripts/offline-gate.sh` completed, that native host tests passed, that the six real FLACs passed native Rust parity, or that audio reaches a physical DAC bit-perfect. Continue to keep PR #1 draft.
+
+Note for interactive Zsh: pasted comment lines may cause `zsh: command not found: #` unless `setopt interactivecomments` is enabled. These shell-comment messages are unrelated to the Rust decoder test outcomes.
 
 ## Next priorities
 
