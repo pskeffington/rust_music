@@ -247,6 +247,89 @@ pub fn read_block<R: Read>(input: &mut R) -> Result<Option<(BlockHeader, Vec<u8>
     Ok(Some((header, block)))
 }
 
+/// Validate ordering and stream-wide invariants for a simple mono/stereo file.
+/// This does not decode samples or validate the block's audio CRC.
+#[derive(Debug, Default)]
+pub struct BlockSequence {
+    next_sample: u64,
+    declared_total: Option<u64>,
+    format_flags: Option<u32>,
+    saw_audio: bool,
+}
+
+impl BlockSequence {
+    /// Accept one header in physical file order. Non-audio metadata blocks are
+    /// ignored; audio blocks must be contiguous and keep a stable PCM profile.
+    pub fn accept(&mut self, header: &BlockHeader) -> Result<()> {
+        if header.block_samples == 0 {
+            return Ok(());
+        }
+        header.validate_integer_mono_stereo()?;
+        if header.block_index != self.next_sample {
+            return Err(MusicError::Invalid(
+                "WavPack audio blocks are not contiguous",
+            ));
+        }
+        let format_flags = header.flags
+            & (0x3 | FLAG_MONO | FLAG_HYBRID | FLAG_FLOAT | (1 << 8) | (0xf << 23) | FLAG_DSD);
+        if self
+            .format_flags
+            .is_some_and(|previous| previous != format_flags)
+        {
+            return Err(MusicError::Invalid(
+                "WavPack PCM format changes between audio blocks",
+            ));
+        }
+        if let Some(total) = header.total_samples {
+            if self.declared_total.is_some() {
+                return Err(MusicError::Invalid(
+                    "WavPack total sample count is declared more than once",
+                ));
+            }
+            let end = header
+                .block_index
+                .checked_add(u64::from(header.block_samples))
+                .ok_or(MusicError::Limit("WavPack sample range overflows"))?;
+            if total < end {
+                return Err(MusicError::Invalid(
+                    "WavPack total is shorter than its first audio block",
+                ));
+            }
+            self.declared_total = Some(total);
+        }
+        self.next_sample = header
+            .block_index
+            .checked_add(u64::from(header.block_samples))
+            .ok_or(MusicError::Limit("WavPack sample range overflows"))?;
+        self.format_flags = Some(format_flags);
+        self.saw_audio = true;
+        Ok(())
+    }
+
+    /// Finish the file and compare its observed audio frames with the optional
+    /// total advertised by its first audio block.
+    pub fn finish(&self) -> Result<()> {
+        if !self.saw_audio {
+            return Err(MusicError::Invalid(
+                "WavPack stream contains no audio blocks",
+            ));
+        }
+        if self
+            .declared_total
+            .is_some_and(|total| total != self.next_sample)
+        {
+            return Err(MusicError::Invalid(
+                "WavPack block samples do not match declared total",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn decoded_frames(&self) -> u64 {
+        self.next_sample
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,6 +382,71 @@ mod tests {
             [2, 3, 4, 5, 10]
         );
         assert!(metadata.iter().all(|entry| !entry.optional));
+    }
+
+    fn sequence_header(index: u32, samples: u32, total: u32, flags: u32) -> BlockHeader {
+        let mut bytes = block(samples, flags);
+        bytes[12..16].copy_from_slice(&total.to_le_bytes());
+        bytes[16..20].copy_from_slice(&index.to_le_bytes());
+        BlockHeader::parse(&bytes).unwrap()
+    }
+
+    #[test]
+    fn block_sequence_accepts_contiguous_audio_and_skips_metadata_blocks() {
+        let flags = FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK | FLAG_MONO;
+        let mut sequence = BlockSequence::default();
+        sequence.accept(&sequence_header(0, 2, 4, flags)).unwrap();
+        sequence
+            .accept(&sequence_header(2, 0, u32::MAX, flags))
+            .unwrap(); // Metadata-only block does not advance PCM position.
+        sequence
+            .accept(&sequence_header(2, 2, u32::MAX, flags))
+            .unwrap();
+        assert_eq!(sequence.decoded_frames(), 4);
+        sequence.finish().unwrap();
+    }
+
+    #[test]
+    fn block_sequence_rejects_gaps_overlaps_and_format_changes() {
+        let flags = FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK | FLAG_MONO;
+        let first = sequence_header(0, 2, 4, flags);
+        for bad_index in [1, 3] {
+            let mut sequence = BlockSequence::default();
+            sequence.accept(&first).unwrap();
+            assert!(matches!(
+                sequence.accept(&sequence_header(bad_index, 2, u32::MAX, flags)),
+                Err(MusicError::Invalid(
+                    "WavPack audio blocks are not contiguous"
+                ))
+            ));
+        }
+        let mut sequence = BlockSequence::default();
+        sequence.accept(&first).unwrap();
+        assert!(matches!(
+            sequence.accept(&sequence_header(2, 2, u32::MAX, flags ^ 1)),
+            Err(MusicError::Invalid(
+                "WavPack PCM format changes between audio blocks"
+            ))
+        ));
+    }
+
+    #[test]
+    fn block_sequence_checks_declared_total_and_audio_presence() {
+        let flags = FLAG_INITIAL_BLOCK | FLAG_FINAL_BLOCK | FLAG_MONO;
+        assert!(matches!(
+            BlockSequence::default().finish(),
+            Err(MusicError::Invalid(
+                "WavPack stream contains no audio blocks"
+            ))
+        ));
+        let mut sequence = BlockSequence::default();
+        sequence.accept(&sequence_header(0, 2, 4, flags)).unwrap();
+        assert!(matches!(
+            sequence.finish(),
+            Err(MusicError::Invalid(
+                "WavPack block samples do not match declared total"
+            ))
+        ));
     }
 
     #[test]

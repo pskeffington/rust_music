@@ -493,6 +493,25 @@ FFmpeg stream test now asserts the observed core metadata sequence.
   release build, and macOS feature check passed.
 - `git diff --check`: **pass**.
 
+## 2026-10-29 — RM-014 contiguous stream validation
+
+Added a stateful validator for the simple mono/stereo WavPack profile. It
+skips metadata-only blocks, requires contiguous audio frame indexes, rejects
+stream-wide PCM profile changes, and verifies the first block's optional
+declared total at EOF. Adversarial tests cover gaps, overlaps, format changes,
+empty streams, and incomplete declared totals. This is still framing and
+sequence validation only: there is no entropy decode, sample reconstruction,
+block CRC check, facade registration, or WavPack playback admission.
+
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 12/12
+  unit tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 workspace crates, 29 local
+  dependency edges, formatter, warnings-denied Clippy, workspace tests,
+  release build, and macOS feature check passed.
+- `python3 scripts/check_roadmap_index.py`: **exit 0**.
+- `python3 scripts/check_literature.py`: **exit 0**.
+- `git diff --check`: **pass**.
+
 The Archive.org CC0 ALAC search surfaced two additional items reporting
 “Apple Lossless Audio.” Actual `ffprobe` inspection of one file from each item
 found AAC, so neither is retained as an ALAC corpus fixture:
