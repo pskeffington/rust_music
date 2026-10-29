@@ -16,7 +16,7 @@ Check each gate with an actual assertion, report or hardware test. A repository 
 
 | **G9** Exact sample-derived timing | Declared PCM frame count, playback progress, compact micro-screen clock | Offline compilation/tests + corpus parity + display review | Source implemented; compilation and physical screen unverified |
 
-| **G10** Audiophile-only format gate and AIFF | Native AIFF/PCM AIFF-C, strict lossless codec checks, minimum 16-bit/44.1k playback | Python fixture evidence, offline Rust test/Clippy, complete decoder parity, hardware audio | Source implemented; Rust compilation and real hardware unverified |
+| **G10** Audiophile-only format gate and AIFF | Native AIFF/PCM AIFF-C, strict lossless codec checks, minimum 16-bit/44.1k playback | Python fixture evidence, offline Rust test/Clippy, complete decoder parity, hardware audio | Source implemented; operator-run 7/7 native AIFF PCM vectors PASS; full workspace gate and hardware unverified |
 
 ## Immediate priorities
 
