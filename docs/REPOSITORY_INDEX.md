@@ -33,7 +33,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | Playback state/progress | `crates/rust-music-engine/` | `codec_engineer` | G1 / G9 |
 | OS DAC adapters | `crates/rust-music-native/` | `audio_backend` | G3 |
 | Public facade, sniffing | `crates/rust-music/` | serial handoff | G1 / G10 / G11 |
-| CLI / acceptance harness | `crates/rust-music-cli/`, `scripts/test_caf_reference.py`, `scripts/test_m4a_corpus.py` | serial handoff | G7 / G8 / G10 / G11 |
+| CLI / acceptance harness | `crates/rust-music-cli/`, `scripts/test_caf_reference.py`, `scripts/test_m4a_corpus.py`, `scripts/test_flac_user_corpus.py` | serial handoff | G7 / G8 / G10 / G11 / G13 (bounded seek-range export and private-corpus parity) |
 | Workspace dependency auditor | `crates/rust-music-audit/` | `gate_verifier` reviews | G0 |
 | Directory scanner | `crates/rust-music-library/` | `host_integrator` | G5 / G11 |
 | Music socket and audio lease | `crates/rust-music-host/` | `host_integrator` | G5 |

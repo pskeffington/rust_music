@@ -399,3 +399,25 @@ encoder/source coverage.
   removes decoded temporary WAV files on exit.
 - The M4A/MP4 ingestion implementation was already present; this change extends
   its corpus regression coverage rather than changing container recognition.
+
+## 2026-10-29 — RM-012 real-world FLAC seek parity
+
+Added a bounded `decode-range` CLI action for seek-capable inputs. It requires a
+declared frame count, rejects zero/out-of-range requests and WAV-size overflow,
+and exports only the requested frames without resampling. Extended the private
+FLAC corpus harness to compare each populated SEEKTABLE sample and its next
+sample against independent FFmpeg PCM. The six user recordings stayed in their
+provided directory; reference PCM, range WAVs, and seek reports stayed in
+temporary storage.
+
+- `cargo test --locked --offline -p rust-music-cli`: **exit 0**, 6/6 tests,
+  including exact range bytes and rejection before output creation on bounds
+  failure.
+- `CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all
+  --verify-seek --require-complete <six supplied FLAC paths>`: **exit 0**;
+  all six complete streams passed FLAC integrity, FLAC/FFmpeg/Rust whole-PCM
+  parity, and exact PCM parity on all 132 ranges at every populated SEEKTABLE
+  point plus the following sample.
+- This closes the six-file real-world seektable evidence gap only. Other FLAC
+  encoders and host seek-input routing remain unverified; partial seeks do not
+  validate full-stream PCM MD5.

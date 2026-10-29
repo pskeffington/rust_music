@@ -27,7 +27,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | **G10** | Audiophile-only admission and AIFF/AIFF-C | `codec_engineer` | partial evidence | Local offline gate passes on Rust 1.99.1/macOS and seven AIFF/AIFF-C native PCM vectors pass; physical DAC and host integration remain open |
 | **G11** | ALAC decoder and M4A/CAF demultiplexers | `codec_engineer` | partial evidence | Raw packet parity, six Internet Archive M4A ALAC parity cases, AAC denial, and five generated CAF ALAC/LPCM vectors pass; broader encoders, real-world CAF, and host/output acceptance remain |
 | **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | partial evidence | Bounded RF64/ds64 and large-size synthetic streaming pass; WavPack framing parser exists, but entropy decode/parity/correction remain |
-| **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | partial evidence | Bounded FLAC/AIFF tags and synthetic fixed/variable-block FLAC seek tests pass; real-world seektable and host/hardware evidence remain |
+| **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | partial evidence | Bounded FLAC/AIFF tags, synthetic seek tests, and PCM-exact seeks at every populated SEEKTABLE point in six private FLAC streams pass; other encoders and host/hardware evidence remain |
 | **G14** | Windows WASAPI and Android AAudio ports | `audio_backend` | planned | Platform-local compile, focus and physical output acceptance needed |
 
 ## Codex task queue
@@ -52,7 +52,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | `RM-016` — Keep code, literature, agent roles and format registry indexed | P1 | G0 | `index_curator` | done | None |
 | `RM-017` — Index M4A/MP4 in library and validate Archive.org ALAC corpus | P1 | G11 | `codec_engineer` | done | RM-009 |
 
-**Priority order:** RM-008 raw ALAC parity, RM-009 bounded M4A demux/AAC denial, RM-010 CAF ALAC/LPCM demux, RM-017 M4A catalog ingestion plus six licensed upstream ALAC files, RM-011 bounded text tags, and RM-012 synthetic FLAC seek acceptance pass their recorded criteria. The next decoder evidence is broader ALAC coverage across more independent sources/encoders and real-world FLAC seektable compatibility. Physical output, Rust_Boy shared audio focus, and display acceptance remain separate production gates; do not infer those from host mocks or source review. Each Pip-Boy module retains its own module identity, package/registration record, and lifecycle while using the shared container.
+**Priority order:** RM-008 raw ALAC parity, RM-009 bounded M4A demux/AAC denial, RM-010 CAF ALAC/LPCM demux, RM-017 M4A catalog ingestion plus six licensed upstream ALAC files, RM-011 bounded text tags, and RM-012 FLAC seek acceptance pass their recorded criteria. Six supplied real-world streams now pass exact range parity at every populated SEEKTABLE point and the following sample; broader encoder coverage remains open. Next decoder evidence is ALAC parity across independent sources/encoders and real-world CAF coverage. Physical output, Rust_Boy shared audio focus, and display acceptance remain separate production gates; do not infer those from host mocks or source review. Each Pip-Boy module retains its own module identity, package/registration record, and lifecycle while using the shared container.
 
 ## Acceptance ladder (no skipped proofs)
 

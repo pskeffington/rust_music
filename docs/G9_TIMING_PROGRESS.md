@@ -25,4 +25,4 @@ The second command requires the six original private FLACs; do not commit, redis
 ## Follow-up
 1. Replay the private FLAC corpus and further malformed/truncated streams to confirm frame bounds and sample counts fail closed on real-world inputs.
 2. Feed a real Rust_Boy host display and verify 128x64 layout, focus arbitration and hardware stop/drain.
-3. Expand real-world FLAC seektable compatibility evidence and validate host seek input under G13.
+3. Expand FLAC seektable evidence across other encoders and validate host seek input under G13.

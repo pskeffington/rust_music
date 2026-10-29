@@ -126,8 +126,99 @@ def reference_check(path: pathlib.Path, case: dict) -> dict:
             'ffmpeg_pcm_sha256': pcm_ffmpeg[0], 'reference_pcm_equal': True}
 
 
+def reference_pcm_file(path: pathlib.Path, destination: pathlib.Path) -> None:
+    result = subprocess.run(['ffmpeg', '-nostdin', '-hide_banner', '-loglevel',
+                             'error', '-i', str(path), '-map', '0:a:0',
+                             '-f', 's16le', '-c:a', 'pcm_s16le', str(destination)],
+                            cwd=REPO, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f'FFmpeg seek oracle failed: {result.stderr[-600:]}')
+
+
+def flac_seekpoints(path: pathlib.Path) -> list[int]:
+    points = []
+    size = path.stat().st_size
+    with path.open('rb') as source:
+        if source.read(4) != b'fLaC':
+            raise ValueError('not a native FLAC stream')
+        for _ in range(MAX_METADATA_BLOCKS):
+            header = source.read(4)
+            if len(header) != 4:
+                raise ValueError('truncated metadata header while reading SEEKTABLE')
+            final = bool(header[0] & 128)
+            kind = header[0] & 127
+            length = int.from_bytes(header[1:], 'big')
+            if length > MAX_METADATA_SIZE or source.tell() + length > size:
+                raise ValueError('invalid metadata size while reading SEEKTABLE')
+            if kind == 3:
+                if length % 18:
+                    raise ValueError('SEEKTABLE length is not a multiple of 18 bytes')
+                for _ in range(length // 18):
+                    point = source.read(18)
+                    if len(point) != 18:
+                        raise ValueError('truncated SEEKTABLE point')
+                    sample = int.from_bytes(point[:8], 'big')
+                    if sample != (1 << 64) - 1:
+                        points.append(sample)
+            else:
+                source.seek(length, os.SEEK_CUR)
+            if final:
+                break
+        else:
+            raise ValueError('too many metadata blocks while reading SEEKTABLE')
+    if not points or points != sorted(set(points)):
+        raise ValueError('corpus file has no strictly increasing SEEKTABLE points')
+    return points
+
+
+def verify_seek_ranges(binary: pathlib.Path, path: pathlib.Path, case: dict,
+                       temp_dir: pathlib.Path) -> int:
+    reference = temp_dir / f'{case["id"]}-seek-reference.pcm'
+    reference_pcm_file(path, reference)
+    if reference.stat().st_size != case['pcm_bytes']:
+        raise AssertionError(f'FFmpeg seek oracle length differs for {case["id"]}')
+
+    total_frames = case['total_samples_per_channel']
+    bytes_per_frame = case['channels'] * (case['bits_per_sample'] // 8)
+    if bytes_per_frame != 4:
+        raise AssertionError('the private seek corpus oracle currently expects stereo s16le')
+    targets = set()
+    for point in flac_seekpoints(path):
+        if point < total_frames:
+            targets.add(point)
+        if point + 1 < total_frames:
+            targets.add(point + 1)
+
+    with reference.open('rb') as expected_pcm:
+        for index, target in enumerate(sorted(targets)):
+            count = min(257, total_frames - target)
+            output = temp_dir / f'{case["id"]}-seek-{index}.wav'
+            result = subprocess.run(
+                [str(binary), 'decode-range', str(path), str(target), str(count), str(output)],
+                cwd=REPO, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                raise AssertionError(
+                    f'Rust seek failed for {case["id"]} at frame {target}: {result.stderr[-600:]}')
+            with wave.open(str(output), 'rb') as decoded:
+                attributes = (decoded.getframerate(), decoded.getnchannels(),
+                              decoded.getsampwidth() * 8, decoded.getnframes())
+                expected_attributes = (case['sample_rate_hz'], case['channels'],
+                                       case['bits_per_sample'], count)
+                if attributes != expected_attributes:
+                    raise AssertionError(
+                        f'seek WAV format differs for {case["id"]}: {attributes} != {expected_attributes}')
+                actual = decoded.readframes(count)
+            expected_pcm.seek(target * bytes_per_frame)
+            expected = expected_pcm.read(count * bytes_per_frame)
+            if actual != expected:
+                raise AssertionError(
+                    f'sought PCM differs for {case["id"]} at frame {target}')
+            output.unlink()
+    return len(targets)
+
+
 def cli_check(binary: pathlib.Path, path: pathlib.Path, case: dict,
-              temp_dir: pathlib.Path) -> dict:
+              temp_dir: pathlib.Path, verify_seek: bool = False) -> dict:
     inspection = subprocess.run([str(binary), 'inspect', str(path)], cwd=REPO,
                                 capture_output=True, text=True, check=False)
     if inspection.returncode != 0:
@@ -155,8 +246,12 @@ def cli_check(binary: pathlib.Path, path: pathlib.Path, case: dict,
     wav_file.unlink()
     if h.hexdigest() != case['pcm_s16le_sha256'] or total != case['pcm_bytes']:
         raise AssertionError(f'Rust PCM SHA-256 or byte count differs for {case["id"]}')
-    return {'rust_inspect': 'pass', 'rust_pcm_sha256': h.hexdigest(),
-            'rust_pcm_equal': True}
+    result = {'rust_inspect': 'pass', 'rust_pcm_sha256': h.hexdigest(),
+              'rust_pcm_equal': True}
+    if verify_seek:
+        result['real_seek_positions_pcm_equal'] = verify_seek_ranges(
+            binary, path, case, temp_dir)
+    return result
 
 
 def files_from_args(inputs: list[str]) -> list[pathlib.Path]:
@@ -183,9 +278,13 @@ def run() -> int:
     parser.add_argument('--mode', choices=('oracle', 'rust', 'all'), default='all')
     parser.add_argument('--require-complete', action='store_true',
                         help='require all six known track SHA-256 digests')
+    parser.add_argument('--verify-seek', action='store_true',
+                        help='compare Rust seek output at every real SEEKTABLE point and adjacent sample against FFmpeg; requires --mode all')
     parser.add_argument('--report', type=pathlib.Path,
                         help='write a hash-only machine-readable report; never writes audio')
     args = parser.parse_args()
+    if args.verify_seek and args.mode != 'all':
+        parser.error('--verify-seek requires --mode all for independent PCM reference')
     manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
     assert manifest['schema_version'] == 1
     cases = {entry['flac_sha256']: entry for entry in manifest['cases']}
@@ -236,11 +335,17 @@ def run() -> int:
                 result.update(reference_check(path, case))
             if args.mode in {'rust', 'all'}:
                 assert binary is not None
-                result.update(cli_check(binary, path, case, temp_dir))
+                result.update(cli_check(binary, path, case, temp_dir,
+                                        verify_seek=args.verify_seek))
             results.append(result)
+            seek_summary = ''
+            if 'real_seek_positions_pcm_equal' in result:
+                seek_summary = (
+                    f', {result["real_seek_positions_pcm_equal"]} real seek ranges')
             print(f'PASS {case["id"]}: metadata, SHA-256'
                   f'{", reference FLAC/FFmpeg" if "flac_integrity" in result else ""}'
-                  f'{", Rust PCM" if "rust_inspect" in result else ""}', flush=True)
+                  f'{", Rust PCM" if "rust_inspect" in result else ""}'
+                  f'{seek_summary}', flush=True)
     missing = sorted({case['id'] for case in manifest['cases']} - checked)
     if args.require_complete and missing:
         raise AssertionError(f'missing corpus tracks: {missing}')

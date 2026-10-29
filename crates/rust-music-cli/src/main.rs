@@ -61,6 +61,25 @@ fn write_header<W: Write>(output: &mut W, format: AudioFormat, data_size: u32) -
     output.write_all(&data_size.to_le_bytes())?;
     Ok(())
 }
+
+fn encode_samples(samples: &[i32], sample_bytes: usize) -> Result<Vec<u8>> {
+    let capacity = samples
+        .len()
+        .checked_mul(sample_bytes)
+        .ok_or(MusicError::Limit("PCM export buffer size overflows"))?;
+    let mut bytes = Vec::with_capacity(capacity);
+    for &value in samples {
+        match sample_bytes {
+            1 => bytes.push((value + 128) as u8),
+            2 => bytes.extend_from_slice(&(value as i16).to_le_bytes()),
+            3 => bytes.extend_from_slice(&value.to_le_bytes()[..3]),
+            4 => bytes.extend_from_slice(&value.to_le_bytes()),
+            _ => return Err(MusicError::Unsupported("unsupported integer PCM width")),
+        }
+    }
+    Ok(bytes)
+}
+
 fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
     let format = decoder.format();
     let mut file = OpenOptions::new().write(true).create_new(true).open(dest)?;
@@ -71,16 +90,7 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
         if block.format != format {
             return Err(MusicError::Invalid("format changed during decode"));
         }
-        let mut bytes = Vec::with_capacity(block.samples.len() * sample_bytes);
-        for value in block.samples {
-            match sample_bytes {
-                1 => bytes.push((value + 128) as u8),
-                2 => bytes.extend_from_slice(&(value as i16).to_le_bytes()),
-                3 => bytes.extend_from_slice(&value.to_le_bytes()[..3]),
-                4 => bytes.extend_from_slice(&value.to_le_bytes()),
-                _ => return Err(MusicError::Unsupported("unsupported integer PCM width")),
-            }
-        }
+        let bytes = encode_samples(&block.samples, sample_bytes)?;
         let total = bytes_written
             .checked_add(bytes.len() as u64)
             .ok_or(MusicError::Limit("WAV size counter overflow"))?;
@@ -99,6 +109,75 @@ fn export_wav(mut decoder: Box<dyn Decoder>, dest: &str) -> Result<()> {
     file.seek(SeekFrom::Start(0))?;
     write_header(&mut file, format, bytes_written as u32)?;
     println!("decoded {bytes_written} bytes of original integer PCM into {dest}");
+    Ok(())
+}
+
+fn export_wav_range(
+    mut decoder: Box<dyn Decoder>,
+    start_frame: u64,
+    frame_count: u64,
+    dest: &str,
+) -> Result<()> {
+    if !decoder.supports_seek() {
+        return Err(MusicError::Unsupported(
+            "sample-accurate seek is unsupported",
+        ));
+    }
+    if frame_count == 0 {
+        return Err(MusicError::Invalid(
+            "seek range must contain at least one frame",
+        ));
+    }
+    let total_frames = decoder.total_frames().ok_or(MusicError::Unsupported(
+        "seek range needs a declared frame count",
+    ))?;
+    let end_frame = start_frame
+        .checked_add(frame_count)
+        .ok_or(MusicError::Limit("seek range frame count overflows"))?;
+    if end_frame > total_frames {
+        return Err(MusicError::Invalid("seek range exceeds end of track"));
+    }
+
+    let format = decoder.format();
+    let sample_bytes = usize::from(format.bits_per_sample / 8);
+    let data_size = frame_count
+        .checked_mul(u64::from(format.channels))
+        .and_then(|bytes| bytes.checked_mul(sample_bytes as u64))
+        .ok_or(MusicError::Limit("seek range PCM byte count overflows"))?;
+    let max_data_size = u64::from(u32::MAX - riff_overhead(format) - 1);
+    if data_size > max_data_size {
+        return Err(MusicError::Limit("seek range exceeds WAV RIFF size limit"));
+    }
+    let mut header = Vec::new();
+    write_header(&mut header, format, data_size as u32)?;
+    decoder.seek_frame(start_frame)?;
+
+    let mut file = OpenOptions::new().write(true).create_new(true).open(dest)?;
+    file.write_all(&header)?;
+    let mut frames_remaining = frame_count;
+    while frames_remaining > 0 {
+        let block = decoder.next_block()?.ok_or(MusicError::Invalid(
+            "decoder ended before seek range completed",
+        ))?;
+        if block.format != format {
+            return Err(MusicError::Invalid("format changed during seek range"));
+        }
+        let block_frames = block.frames();
+        if block_frames == 0 {
+            return Err(MusicError::Invalid("decoder returned an empty seek block"));
+        }
+        let write_frames = frames_remaining.min(block_frames as u64) as usize;
+        let sample_count = write_frames
+            .checked_mul(usize::from(format.channels))
+            .ok_or(MusicError::Limit("seek range sample count overflows"))?;
+        let bytes = encode_samples(&block.samples[..sample_count], sample_bytes)?;
+        file.write_all(&bytes)?;
+        frames_remaining -= write_frames as u64;
+    }
+    if data_size & 1 != 0 {
+        file.write_all(&[0])?;
+    }
+    println!("decoded {frame_count} frames from sample {start_frame} into {dest}");
     Ok(())
 }
 fn inspect(mut decoder: Box<dyn Decoder>) -> Result<()> {
@@ -149,7 +228,7 @@ fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
     let path = args
         .next()
         .ok_or(MusicError::Invalid("missing input filename"))?;
@@ -194,7 +273,26 @@ fn run() -> Result<()> {
             if args.next().is_some() { return Err(MusicError::Invalid("unexpected extra command arguments")); }
             export_wav(open_file(path)?, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | play FILE [ALSA_DEVICE]")),
+        "decode-range" => {
+            let start = args
+                .next()
+                .ok_or(MusicError::Invalid("decode-range requires START_FRAME"))?
+                .parse::<u64>()
+                .map_err(|_| MusicError::Invalid("START_FRAME must be an unsigned integer"))?;
+            let count = args
+                .next()
+                .ok_or(MusicError::Invalid("decode-range requires FRAME_COUNT"))?
+                .parse::<u64>()
+                .map_err(|_| MusicError::Invalid("FRAME_COUNT must be an unsigned integer"))?;
+            let output = args
+                .next()
+                .ok_or(MusicError::Invalid("decode-range requires OUTPUT.wav"))?;
+            if args.next().is_some() {
+                return Err(MusicError::Invalid("unexpected decode-range arguments"));
+            }
+            export_wav_range(open_file(path)?, start, count, &output)
+        }
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE]")),
     }
 }
 fn main() {
@@ -252,6 +350,115 @@ mod tests {
         assert!(export_wav(Box::new(EmptyDecoder(format)), path.to_str().unwrap()).is_err());
         assert_eq!(fs::read(&path).unwrap(), b"KEEP_EXISTING_MUSIC");
         fs::remove_file(path).unwrap();
+    }
+
+    struct SeekableDecoder {
+        format: AudioFormat,
+        samples: Vec<i32>,
+        cursor: usize,
+    }
+
+    impl Decoder for SeekableDecoder {
+        fn format(&self) -> AudioFormat {
+            self.format
+        }
+        fn total_frames(&self) -> Option<u64> {
+            Some((self.samples.len() / usize::from(self.format.channels)) as u64)
+        }
+        fn supports_seek(&self) -> bool {
+            true
+        }
+        fn seek_frame(&mut self, frame: u64) -> Result<()> {
+            let sample = usize::try_from(frame)
+                .ok()
+                .and_then(|frame| frame.checked_mul(usize::from(self.format.channels)))
+                .ok_or(MusicError::Limit("test seek offset overflows"))?;
+            if sample > self.samples.len() {
+                return Err(MusicError::Invalid("test seek beyond end"));
+            }
+            self.cursor = sample;
+            Ok(())
+        }
+        fn next_block(&mut self) -> Result<Option<rust_music::PcmBlock>> {
+            if self.cursor == self.samples.len() {
+                return Ok(None);
+            }
+            let samples = self.samples[self.cursor..].to_vec();
+            self.cursor = self.samples.len();
+            Ok(Some(rust_music::PcmBlock::new(self.format, samples)?))
+        }
+    }
+
+    #[test]
+    fn decode_range_seeks_and_writes_exact_requested_frames() {
+        use std::{
+            fs,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "rust-music-seek-range-{}-{stamp}.wav",
+            std::process::id()
+        ));
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let decoder = SeekableDecoder {
+            format,
+            samples: vec![10, 11, 20, 21, 30, 31, 40, 41],
+            cursor: 0,
+        };
+        export_wav_range(Box::new(decoder), 1, 2, path.to_str().unwrap()).unwrap();
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(u32::from_le_bytes(bytes[40..44].try_into().unwrap()), 8);
+        assert_eq!(&bytes[44..], &[20, 0, 21, 0, 30, 0, 31, 0]);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn decode_range_rejects_out_of_bounds_before_creating_output() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "rust-music-seek-range-invalid-{}-{stamp}.wav",
+            std::process::id()
+        ));
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let decoder = SeekableDecoder {
+            format,
+            samples: vec![10, 11, 20, 21],
+            cursor: 0,
+        };
+        assert!(export_wav_range(Box::new(decoder), 1, 2, path.to_str().unwrap()).is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn decode_range_rejects_unexportable_format_before_creating_output() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "rust-music-seek-range-format-{}-{stamp}.wav",
+            std::process::id()
+        ));
+        let format = AudioFormat::new(44_100, 2, 12).unwrap();
+        let decoder = SeekableDecoder {
+            format,
+            samples: vec![10, 11, 20, 21],
+            cursor: 0,
+        };
+        assert!(export_wav_range(Box::new(decoder), 0, 1, path.to_str().unwrap()).is_err());
+        assert!(!path.exists());
     }
 
     #[test]

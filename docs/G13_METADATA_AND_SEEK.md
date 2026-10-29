@@ -41,7 +41,26 @@ boundaries and within frames, end-of-stream, invalid targets, and malformed
 offset rejection. The host `Command::SeekFrame` drains active output, releases
 the audio lease and returns to `Ready`; it never resumes automatically.
 
-Current evidence is synthetic. Real-world encoder/seektable compatibility and
-host input routing remain open. A partial seek cannot verify the whole-stream
-PCM MD5, so successful seek does not claim that checksum validation. The panel
-does not expose a seek control until the host provides a reviewed input path.
+Synthetic coverage is supplemented by real-world tests across the six supplied
+streams. Compatibility with other encoders and host input routing remain open.
+A partial seek cannot verify the whole-stream PCM MD5, so successful seek does
+not claim that checksum validation. The panel does not expose a seek control
+until the host provides a reviewed input path.
+
+On 2026-10-29, extended the private-corpus harness with `--verify-seek`. The
+offline CLI now has `decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav`,
+which requires a seek-capable decoder, declared total, in-range sample bounds,
+and a WAV-size-safe requested range. With the six supplied FLACs, the harness
+compares up to 257-frame Rust output at every real SEEKTABLE sample and the
+following sample against FFmpeg PCM. All 132 ranges across six streams passed
+at every populated seekpoint. The source FLACs and all temporary reference/range PCM remained
+outside Git and were removed from temporary storage. This validates these six
+encodes only; whole-file decoding/FLAC integrity is still checked separately,
+and a partial seek does not validate the complete stream MD5.
+
+Observed command:
+
+```sh
+CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all --verify-seek --require-complete \
+  '/path/to/private-flac-directory'
+```

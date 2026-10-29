@@ -27,7 +27,7 @@ At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft P
 
 Branch `build/native-codecs-g0`; the latest verified checkpoint includes
 RM-017 M4A ingestion/corpus work, RM-011 bounded local tags, RM-012
-synthetic fixed/variable-block FLAC seek, RM-013 bounded RF64/ds64 parsing
+synthetic fixed/variable-block FLAC seek plus 132 real-world seek ranges, RM-013 bounded RF64/ds64 parsing
 with synthetic >4 GiB streaming coverage, and the RM-014 WavPack framing
 foundation (not a decoder). Rust/Cargo
 1.99.1/macOS:
@@ -47,5 +47,5 @@ outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual
 Rust_Boy/Pip-Boy shared focus and input routing, physical panel/output and
 device acceptance remain unverified. Keep PR #1 draft and do not modify sibling
 repositories under the current goal. RM-012 host seek routing, real-world
-seektable compatibility, Rust_Boy shared focus and physical panel/output remain
-unverified pending external acceptance evidence.
+seektable compatibility across other encoders, Rust_Boy shared focus and
+physical panel/output remain unverified pending external acceptance evidence.

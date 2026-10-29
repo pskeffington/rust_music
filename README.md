@@ -31,7 +31,7 @@ unverified.
 - **Local music library**: bounded, explicit directory scan; FLAC/WAV/AIFF/CAF/M4A/MP4 signature detection, stable filename ordering, symlink rejection and no background scanner. MP4-family container detection does not imply codec admission; AAC remains rejected by the decoder.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
-- **Development CLI**: bounded library scan, inspect full-file decode, lossless source to WAV, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
+- **Development CLI**: bounded library scan, inspect/full decode, lossless source to WAV, sample-bounded seek-range export for seek-capable decoders, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
@@ -56,13 +56,14 @@ python3 scripts/test_m4a_corpus.py                      # OPTIONAL, CC0 ALAC M4A
 cargo run --locked --offline -p rust-music-cli -- scan ~/Music
 cargo run --locked --offline -p rust-music-cli -- inspect ~/Music/track.flac
 cargo run --locked --offline -p rust-music-cli -- decode ~/Music/track.flac /tmp/track.wav
+cargo run --locked --offline -p rust-music-cli -- decode-range ~/Music/track.flac 44100 4096 /tmp/track-range.wav
 # macOS native output (experimental):
 cargo run --locked --offline -p rust-music-cli --features macos-output -- play ~/Music/track.flac
 # Linux ALSA direct device (experimental):
 cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/Music/track.flac hw:0,0
 ```
 
-All **15 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF and CAF vectors and six private real-world FLAC tracks pass native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
+All **16 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF and CAF vectors and six private real-world FLAC tracks pass native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
 
 ## Module and research guide
 

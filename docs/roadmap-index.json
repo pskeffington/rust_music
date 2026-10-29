@@ -244,7 +244,7 @@
       "title": "Bounded metadata and sample-accurate seek",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Bounded FLAC/AIFF tags and synthetic fixed/variable-block FLAC seek exact-frame tests pass; real-world seektable compatibility, host input routing and hardware acceptance remain",
+      "next_evidence": "Bounded FLAC/AIFF tags, synthetic fixed/variable-block seek tests, and PCM-exact 132 ranges at every populated SEEKTABLE point plus the following sample in six private FLAC streams pass; other-encoder compatibility, host input routing and hardware acceptance remain",
       "evidence_doc": "docs/G13_METADATA_AND_SEEK.md"
     },
     {
@@ -483,11 +483,13 @@
       ],
       "focus_paths": [
         "crates/rust-music-flac/src/lib.rs",
-        "crates/rust-music-engine/src/lib.rs"
+        "crates/rust-music-engine/src/lib.rs",
+        "crates/rust-music-cli/src/main.rs",
+        "scripts/test_flac_user_corpus.py"
       ],
       "create_paths": [],
-      "acceptance": "Seektable and frame-boundary tests compare exact expected PCM frames; invalid seeks fail closed",
-      "blocker": "Synthetic fixed/variable-block exact-frame, invalid target, malformed offset, and host lease lifecycle tests pass. Real-world encoder seektable compatibility and host seek input remain open; successful partial seeks cannot verify whole-stream PCM MD5."
+      "acceptance": "Synthetic fixed/variable-block seektable and frame-boundary tests compare exact expected PCM; all 132 bounded ranges at every populated SEEKTABLE sample and following sample across six private FLAC streams match independent FFmpeg PCM; invalid seeks fail closed",
+      "blocker": "Synthetic and six-stream real-world seek parity pass. Compatibility with other encoders and host seek input remain open; successful partial seeks cannot verify whole-stream PCM MD5."
     },
     {
       "id": "RM-013",
