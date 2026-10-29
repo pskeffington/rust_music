@@ -15,8 +15,12 @@ const PCM_SUBFORMAT_GUID: [u8; 16] = [
     1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71,
 ];
 
-fn u16le(bytes: &[u8]) -> u16 { u16::from_le_bytes([bytes[0], bytes[1]]) }
-fn u32le(bytes: &[u8]) -> u32 { u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) }
+fn u16le(bytes: &[u8]) -> u16 {
+    u16::from_le_bytes([bytes[0], bytes[1]])
+}
+fn u32le(bytes: &[u8]) -> u32 {
+    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+}
 
 fn skip<R: Read>(reader: &mut R, mut len: u64) -> Result<()> {
     let mut scratch = [0u8; 4096];
@@ -36,7 +40,9 @@ struct WaveFormat {
 }
 
 fn parse_format(data: &[u8]) -> Result<WaveFormat> {
-    if data.len() < 16 { return Err(MusicError::Invalid("WAVE fmt chunk too short")); }
+    if data.len() < 16 {
+        return Err(MusicError::Invalid("WAVE fmt chunk too short"));
+    }
     let code = u16le(&data[0..2]);
     let channels = u16le(&data[2..4]);
     let rate = u32le(&data[4..8]);
@@ -44,7 +50,9 @@ fn parse_format(data: &[u8]) -> Result<WaveFormat> {
     let block_align = u16le(&data[12..14]);
     let container_bits = u16le(&data[14..16]);
     if !matches!(container_bits, 8 | 16 | 24 | 32) {
-        return Err(MusicError::Unsupported("only packed 8/16/24/32-bit WAVE containers are supported"));
+        return Err(MusicError::Unsupported(
+            "only packed 8/16/24/32-bit WAVE containers are supported",
+        ));
     }
     if !(1..=8).contains(&channels) {
         return Err(MusicError::Unsupported("WAVE supports 1..8 channels"));
@@ -53,34 +61,51 @@ fn parse_format(data: &[u8]) -> Result<WaveFormat> {
         1 => {
             if data.len() != 16 {
                 if data.len() < 18 || usize::from(u16le(&data[16..18])) > data.len() - 18 {
-                    return Err(MusicError::Invalid("WAVE PCM extra format bytes are inconsistent"));
+                    return Err(MusicError::Invalid(
+                        "WAVE PCM extra format bytes are inconsistent",
+                    ));
                 }
             }
             container_bits
         }
         0xfffe => {
-            if data.len() < 40 || u16le(&data[16..18]) < 22
-                || usize::from(u16le(&data[16..18])) > data.len() - 18 {
-                return Err(MusicError::Invalid("WAVE_FORMAT_EXTENSIBLE format size is invalid"));
+            if data.len() < 40
+                || u16le(&data[16..18]) < 22
+                || usize::from(u16le(&data[16..18])) > data.len() - 18
+            {
+                return Err(MusicError::Invalid(
+                    "WAVE_FORMAT_EXTENSIBLE format size is invalid",
+                ));
             }
             if &data[24..40] != PCM_SUBFORMAT_GUID.as_slice() {
-                return Err(MusicError::Unsupported("WAVE_FORMAT_EXTENSIBLE subtype is not integer PCM"));
+                return Err(MusicError::Unsupported(
+                    "WAVE_FORMAT_EXTENSIBLE subtype is not integer PCM",
+                ));
             }
             let mask = u32le(&data[20..24]);
             if mask != 0 && mask.count_ones() != u32::from(channels) {
-                return Err(MusicError::Invalid("WAVE speaker mask disagrees with channel count"));
+                return Err(MusicError::Invalid(
+                    "WAVE speaker mask disagrees with channel count",
+                ));
             }
             u16le(&data[18..20])
         }
-        _ => return Err(MusicError::Unsupported("only integer PCM WAVE is supported")),
+        _ => {
+            return Err(MusicError::Unsupported(
+                "only integer PCM WAVE is supported",
+            ))
+        }
     };
     if !matches!(valid_bits, 8 | 16 | 24 | 32) || valid_bits > container_bits {
-        return Err(MusicError::Unsupported("valid PCM bits must be 8/16/24/32 and fit their container"));
+        return Err(MusicError::Unsupported(
+            "valid PCM bits must be 8/16/24/32 and fit their container",
+        ));
     }
     let actual_align = u32::from(channels) * u32::from(container_bits / 8);
-    if u32::from(block_align) != actual_align
-        || rate.checked_mul(actual_align) != Some(byte_rate) {
-        return Err(MusicError::Invalid("WAVE frame alignment or byte rate mismatch"));
+    if u32::from(block_align) != actual_align || rate.checked_mul(actual_align) != Some(byte_rate) {
+        return Err(MusicError::Invalid(
+            "WAVE frame alignment or byte rate mismatch",
+        ));
     }
     Ok(WaveFormat {
         pcm: AudioFormat::new(rate, channels as u8, valid_bits as u8)?,
@@ -108,48 +133,67 @@ impl<R: Read + Send> WaveDecoder<R> {
             return Err(MusicError::Invalid("expected RIFF WAVE file"));
         }
         let riff_size = u64::from(u32le(&riff[4..8]));
-        if riff_size < 4 { return Err(MusicError::Invalid("RIFF container smaller than WAVE marker")); }
+        if riff_size < 4 {
+            return Err(MusicError::Invalid(
+                "RIFF container smaller than WAVE marker",
+            ));
+        }
         // RIFF size includes WAVE marker, all chunk headers, data and padding.
         let mut budget = riff_size - 4;
         let mut fmt = None;
         for _ in 0..MAX_CHUNKS {
-            if budget == 0 { break; }
-            if budget < 8 { return Err(MusicError::Invalid("trailing partial WAVE chunk header")); }
+            if budget == 0 {
+                break;
+            }
+            if budget < 8 {
+                return Err(MusicError::Invalid("trailing partial WAVE chunk header"));
+            }
             let mut header = [0u8; 8];
             input.read_exact(&mut header)?;
             budget -= 8;
             let length = u64::from(u32le(&header[4..8]));
             let padded = length + (length & 1);
-            if padded > budget { return Err(MusicError::Invalid("WAVE chunk extends past RIFF boundary")); }
+            if padded > budget {
+                return Err(MusicError::Invalid("WAVE chunk extends past RIFF boundary"));
+            }
             if &header[..4] == b"fmt " {
-                    if fmt.is_some() { return Err(MusicError::Invalid("duplicate WAVE fmt chunk")); }
-                    if !(16..=1024).contains(&length) {
-                        return Err(MusicError::Invalid("unsupported WAVE fmt length"));
-                    }
-                    let mut bytes = vec![0u8; length as usize];
-                    input.read_exact(&mut bytes)?;
-                    fmt = Some(parse_format(&bytes)?);
+                if fmt.is_some() {
+                    return Err(MusicError::Invalid("duplicate WAVE fmt chunk"));
+                }
+                if !(16..=1024).contains(&length) {
+                    return Err(MusicError::Invalid("unsupported WAVE fmt length"));
+                }
+                let mut bytes = vec![0u8; length as usize];
+                input.read_exact(&mut bytes)?;
+                fmt = Some(parse_format(&bytes)?);
             } else if &header[..4] == b"data" {
-                    let format = fmt.ok_or(MusicError::Invalid("WAVE data before fmt is unsupported"))?;
-                    let frame_bytes = format.bytes_per_sample * usize::from(format.pcm.channels);
-                    if length % frame_bytes as u64 != 0 {
-                        return Err(MusicError::Invalid("WAVE data size is not frame aligned"));
-                    }
-                    return Ok(Self {
-                        input,
-                        format,
-                        remaining: length,
-                        total_frames: length / frame_bytes as u64,
-                        pad_after_data: length & 1 != 0,
-                    });
+                let format =
+                    fmt.ok_or(MusicError::Invalid("WAVE data before fmt is unsupported"))?;
+                let frame_bytes = format.bytes_per_sample * usize::from(format.pcm.channels);
+                if length % frame_bytes as u64 != 0 {
+                    return Err(MusicError::Invalid("WAVE data size is not frame aligned"));
+                }
+                return Ok(Self {
+                    input,
+                    format,
+                    remaining: length,
+                    total_frames: length / frame_bytes as u64,
+                    pad_after_data: length & 1 != 0,
+                });
             } else {
-                if length > MAX_SKIP { return Err(MusicError::Limit("WAVE metadata chunk exceeds skip budget")); }
+                if length > MAX_SKIP {
+                    return Err(MusicError::Limit("WAVE metadata chunk exceeds skip budget"));
+                }
                 skip(&mut input, length)?;
             }
-            if length & 1 != 0 { skip(&mut input, 1)?; }
+            if length & 1 != 0 {
+                skip(&mut input, 1)?;
+            }
             budget -= padded;
         }
-        Err(MusicError::Invalid("WAVE fmt or data chunk missing within bounded RIFF"))
+        Err(MusicError::Invalid(
+            "WAVE fmt or data chunk missing within bounded RIFF",
+        ))
     }
 
     pub fn next_pcm_block(&mut self) -> Result<Option<PcmBlock>> {
@@ -186,7 +230,9 @@ impl<R: Read + Send> WaveDecoder<R> {
             if self.format.right_shift > 0 {
                 let mask = (1i32 << self.format.right_shift) - 1;
                 if value & mask != 0 {
-                    return Err(MusicError::Invalid("nonzero WAVE low padding bits would lose PCM precision"));
+                    return Err(MusicError::Invalid(
+                        "nonzero WAVE low padding bits would lose PCM precision",
+                    ));
                 }
             }
             samples.push(value >> self.format.right_shift);
@@ -196,9 +242,15 @@ impl<R: Read + Send> WaveDecoder<R> {
 }
 
 impl<R: Read + Send> Decoder for WaveDecoder<R> {
-    fn format(&self) -> AudioFormat { self.format.pcm }
-    fn total_frames(&self) -> Option<u64> { Some(self.total_frames) }
-    fn next_block(&mut self) -> Result<Option<PcmBlock>> { self.next_pcm_block() }
+    fn format(&self) -> AudioFormat {
+        self.format.pcm
+    }
+    fn total_frames(&self) -> Option<u64> {
+        Some(self.total_frames)
+    }
+    fn next_block(&mut self) -> Result<Option<PcmBlock>> {
+        self.next_pcm_block()
+    }
 }
 
 #[cfg(test)]
@@ -206,7 +258,13 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    fn wave(bits: u16, channels: u16, samples: &[u8], extensible: bool, valid_bits: u16) -> Vec<u8> {
+    fn wave(
+        bits: u16,
+        channels: u16,
+        samples: &[u8],
+        extensible: bool,
+        valid_bits: u16,
+    ) -> Vec<u8> {
         let frame_bytes = channels * (bits / 8);
         let mut fmt = Vec::new();
         fmt.extend_from_slice(&(if extensible { 0xfffeu16 } else { 1u16 }).to_le_bytes());
@@ -227,7 +285,9 @@ mod tests {
         body.extend_from_slice(b"data");
         body.extend_from_slice(&(samples.len() as u32).to_le_bytes());
         body.extend_from_slice(samples);
-        if samples.len() & 1 != 0 { body.push(0); }
+        if samples.len() & 1 != 0 {
+            body.push(0);
+        }
         let mut wav = b"RIFF".to_vec();
         wav.extend_from_slice(&(body.len() as u32).to_le_bytes());
         wav.extend_from_slice(&body);
@@ -239,12 +299,18 @@ mod tests {
         let source = wave(24, 2, &[0xff, 0xff, 0x7f, 0, 0, 0x80], false, 24);
         let mut decoder = WaveDecoder::new(Cursor::new(source)).unwrap();
         assert_eq!(decoder.total_frames(), Some(1));
-        assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![8_388_607, -8_388_608]);
+        assert_eq!(
+            decoder.next_pcm_block().unwrap().unwrap().samples,
+            vec![8_388_607, -8_388_608]
+        );
         assert_eq!(decoder.next_pcm_block().unwrap(), None);
         let source = wave(8, 1, &[0, 128, 255], false, 8);
         let mut decoder = WaveDecoder::new(Cursor::new(source)).unwrap();
         assert_eq!(decoder.total_frames(), Some(3));
-        assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![-128, 0, 127]);
+        assert_eq!(
+            decoder.next_pcm_block().unwrap().unwrap().samples,
+            vec![-128, 0, 127]
+        );
         assert_eq!(decoder.next_pcm_block().unwrap(), None);
     }
 
@@ -254,7 +320,10 @@ mod tests {
         let wav = wave(32, 2, &raw, true, 24);
         let mut decoder = WaveDecoder::new(Cursor::new(wav)).unwrap();
         assert_eq!(decoder.format(), AudioFormat::new(44_100, 2, 24).unwrap());
-        assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![8_388_607, -8_388_608]);
+        assert_eq!(
+            decoder.next_pcm_block().unwrap().unwrap().samples,
+            vec![8_388_607, -8_388_608]
+        );
         assert_eq!(decoder.next_pcm_block().unwrap(), None);
     }
 
@@ -271,16 +340,20 @@ mod tests {
         let mut wav = wave(16, 6, &[1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0], true, 16);
         wav[40..44].copy_from_slice(&0x3fu32.to_le_bytes());
         let mut decoder = WaveDecoder::new(Cursor::new(wav)).unwrap();
-        assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![1, 2, 3, 4, 5, 6]);
+        assert_eq!(
+            decoder.next_pcm_block().unwrap().unwrap().samples,
+            vec![1, 2, 3, 4, 5, 6]
+        );
     }
 
     #[test]
     fn rejects_data_past_declared_riff_boundary() {
         let mut wav = wave(16, 2, &[0, 0, 0, 0], false, 16);
         wav[4..8].copy_from_slice(&37u32.to_le_bytes());
-        assert!(matches!(WaveDecoder::new(Cursor::new(wav)), Err(MusicError::Invalid(
-            "WAVE chunk extends past RIFF boundary"
-        ))));
+        assert!(matches!(
+            WaveDecoder::new(Cursor::new(wav)),
+            Err(MusicError::Invalid("WAVE chunk extends past RIFF boundary"))
+        ));
     }
 
     #[test]
@@ -312,6 +385,9 @@ mod tests {
         let len = (wav.len() - 8) as u32;
         wav[4..8].copy_from_slice(&len.to_le_bytes());
         let mut decoder = WaveDecoder::new(Cursor::new(wav)).unwrap();
-        assert_eq!(decoder.next_pcm_block().unwrap().unwrap().samples, vec![513]);
+        assert_eq!(
+            decoder.next_pcm_block().unwrap().unwrap().samples,
+            vec![513]
+        );
     }
 }
