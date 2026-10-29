@@ -6,7 +6,7 @@ Date: 2026-10-29. Six user-supplied real-world FLAC files were tested **locally*
 - 6/6 files passed the reference FLAC integrity check (frame CRC and STREAMINFO PCM MD5 verified by the reference decoder).
 - All 6: native FLAC, 44,100 Hz, 16-bit, stereo.
 - All 6 contain embedded image metadata. Parsing must skip large metadata blocks while respecting allocation limits.
-- Total: 45,465,421 bytes of FLAC data; 26,311,317 PCM sample frames across the corpus.
+- Total: 45,465,421 bytes of FLAC data; 27,311,317 PCM sample frames across the corpus.
 - No claim of custom Rust decoder parity: `cargo` and `rustc` were unavailable in the testing environment.
 
 ## Reproducible test without shipping music
