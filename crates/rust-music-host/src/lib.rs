@@ -197,9 +197,40 @@ mod tests {
             bytes.extend_from_slice(&123i16.to_le_bytes());
             fs::write(self.0.join(name), bytes).unwrap();
         }
+        fn low_quality_wav(&self, name: &str) {
+            // Valid 8-bit mono 44.1k PCM: decodable for tests, not playable.
+            let mut bytes = b"RIFF".to_vec();
+            bytes.extend_from_slice(&38u32.to_le_bytes());
+            bytes.extend_from_slice(b"WAVEfmt ");
+            bytes.extend_from_slice(&16u32.to_le_bytes());
+            bytes.extend_from_slice(&1u16.to_le_bytes());
+            bytes.extend_from_slice(&1u16.to_le_bytes());
+            bytes.extend_from_slice(&44_100u32.to_le_bytes());
+            bytes.extend_from_slice(&44_100u32.to_le_bytes());
+            bytes.extend_from_slice(&1u16.to_le_bytes());
+            bytes.extend_from_slice(&8u16.to_le_bytes());
+            bytes.extend_from_slice(b"data");
+            bytes.extend_from_slice(&1u32.to_le_bytes());
+            bytes.extend_from_slice(&[128, 0]);
+            fs::write(self.0.join(name), bytes).unwrap();
+        }
         fn scan(&self) -> Library { scan(&self.0, ScanLimits::default()).unwrap() }
     }
     impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+
+    #[test]
+    fn below_cd_quality_source_never_claims_radio_focus_or_opens_sink() {
+        let temp = Temp::new();
+        temp.low_quality_wav("low.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        assert_eq!(slot.status().tracks, 1);
+        assert!(matches!(slot.handle(Command::Play, &focus), Err(MusicError::Unsupported(_))));
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert!(!slot.status().has_audio_focus);
+        assert_eq!(slot.status().playback.state, PlaybackState::Empty);
+        assert!(slot.sink().opened.is_none());
+    }
 
     #[test]
     fn no_autoplay_and_focus_released_at_end_of_file() {
