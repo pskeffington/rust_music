@@ -73,10 +73,13 @@ fn parse_common(bytes: &[u8], aifc: bool) -> Result<Common> {
     }
     let rate = integer_rate(&bytes[8..18])?;
     let order = if aifc {
-        match &bytes[18..22] {
-            b"NONE" | b"twos" => ByteOrder::Big,
-            b"sowt" => ByteOrder::Little,
-            _ => return Err(MusicError::Unsupported("lossy or non-integer AIFF-C codec is prohibited")),
+        let code = &bytes[18..22];
+        if code == b"NONE" || code == b"twos" {
+            ByteOrder::Big
+        } else if code == b"sowt" {
+            ByteOrder::Little
+        } else {
+            return Err(MusicError::Unsupported("lossy or non-integer AIFF-C codec is prohibited"));
         }
     } else {
         ByteOrder::Big
@@ -101,7 +104,7 @@ impl<R: Read + Send> AiffDecoder<R> {
     pub fn new(mut input: R) -> Result<Self> {
         let mut form = [0u8; 12];
         input.read_exact(&mut form)?;
-        if &form[..4] != b"FORM" || !matches!(&form[8..12], b"AIFF" | b"AIFC") {
+        if &form[..4] != b"FORM" || (&form[8..12] != b"AIFF" && &form[8..12] != b"AIFC") {
             return Err(MusicError::Invalid("expected AIFF or AIFF-C FORM"));
         }
         let aifc = &form[8..12] == b"AIFC";
@@ -123,7 +126,8 @@ impl<R: Read + Send> AiffDecoder<R> {
             if padded > budget {
                 return Err(MusicError::Invalid("AIFF chunk exceeds declared FORM boundary"));
             }
-            match &header[..4] {
+            let id: [u8; 4] = header[..4].try_into().unwrap();
+            match &id {
                 b"FVER" => {
                     if !aifc || saw_fver || length != 4 {
                         return Err(MusicError::Invalid("invalid or duplicate AIFF-C FVER"));
