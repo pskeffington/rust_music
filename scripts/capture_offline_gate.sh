@@ -2,15 +2,25 @@
 # Capture the authoritative offline gate with evidence outside the repository.
 # No downloads, third-party packages, or automatic roadmap status changes.
 set -u
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd) || exit 2
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P) || exit 2
 cd "$ROOT" || exit 2
 if ! command -v git >/dev/null 2>&1; then
   echo "BLOCKED: git required for evidence SHA" >&2
   exit 3
 fi
 HEAD=$(git rev-parse HEAD 2>/dev/null) || exit 2
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
+TOP=$(CDPATH= cd -- "$TOP" && pwd -P) || exit 2
+if [ "$TOP" != "$ROOT" ]; then
+  echo "BLOCKED: source script is not running in the expected repository root" >&2
+  exit 3
+fi
 BRANCH=$(git branch --show-current 2>/dev/null) || BRANCH=unknown
-if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+DIRTY=$(git status --porcelain 2>/dev/null) || {
+  echo "BLOCKED: git could not verify the working tree" >&2
+  exit 3
+}
+if [ -n "$DIRTY" ]; then
   echo "BLOCKED: working tree not clean; preserve edits and commit/review first" >&2
   exit 3
 fi
