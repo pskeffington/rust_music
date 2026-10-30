@@ -885,3 +885,20 @@ without claiming shared RADIO/TV arbitration.
   warnings`: **exit 0**.
 - `sh scripts/offline-gate.sh`: **exit 0**; all 16 workspace crates audited,
   formatted, linted, tested, release-built, and the macOS feature check passed.
+
+## 2026-10-30 — Host and panel crate portability checks
+
+Cross-checked the framework-free `rust-music-host` and `rust-music-panel`
+dependency closures against the locally installed AArch64 Linux and Windows
+GNU targets. This verifies source and test-target compilation for those targets;
+it does not establish native output support or runtime behavior there.
+
+- `cargo check --locked --offline -p rust-music-host -p rust-music-panel
+  --all-targets --target aarch64-unknown-linux-gnu`: **exit 0**.
+- `cargo clippy --locked --offline -p rust-music-host -p rust-music-panel
+  --all-targets --target aarch64-unknown-linux-gnu -- -D warnings`: **exit 0**.
+- The matching `cargo check` and warnings-denied Clippy commands with
+  `--target x86_64-pc-windows-gnu`: **exit 0**.
+- Test binaries were type-checked but not linked or executed for either
+  cross-target. Native OS audio adapters, host integration and physical output
+  remain separate acceptance gates.
