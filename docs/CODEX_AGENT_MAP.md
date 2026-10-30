@@ -33,6 +33,10 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 - `index_curator` reconciles evidence and routing, but **must not** promote gate outcomes just because a source commit landed.
 - Current starting task is `RM-001` (fresh complete offline gate after rustfmt fixes); after its exit 0, native six-track FLAC parity is `RM-002`. G11 ALAC remains planned, not implemented.
 
+## Current handoff
+
+Use [engineering handoff — 2026-10-30](ENGINEERING_HANDOFF_2026-10-30.md) to verify branch selection, evidence provenance, and exact next-agent assignments before launching Codex. `main` was README/LICENSE-only at inspection; do not treat it as the engineering checkout. Preserve stable RM task IDs and explicit prerequisite blocks.
+
 ## Codex kickoff prompt
 
 ```text
