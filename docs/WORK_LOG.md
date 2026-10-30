@@ -850,3 +850,20 @@ private directory; generated PCM and seek-range outputs were kept temporary.
   list in this macOS session; no physical DAC negotiation/capture test could be
   performed here. This records environment availability only, not hardware
   behavior.
+
+## 2026-10-30 — Linux native adapter cross-target check
+
+Used the already-installed `aarch64-unknown-linux-gnu` Rust standard library to
+check the Linux direct PCM adapter from macOS without adding packages or
+network access.
+
+- `cargo check --locked --offline -p rust-music-native --all-targets --features
+  alsa --target aarch64-unknown-linux-gnu`: **exit 0**; backend and test targets
+  type-check.
+- `cargo clippy --locked --offline -p rust-music-native --all-targets --features
+  alsa --target aarch64-unknown-linux-gnu -- -D warnings`: **exit 0**.
+- `cargo test --locked --offline -p rust-music-native --features alsa --target
+  aarch64-unknown-linux-gnu --no-run`: **not linked**; the host macOS linker
+  rejected Linux `ld` flags (`--fix-cortex-a53-843419`, `--as-needed`, `-z`).
+  Linux test execution remains unverified and needs a Linux host/toolchain
+  linker. This does not validate ALSA device negotiation or playback.
