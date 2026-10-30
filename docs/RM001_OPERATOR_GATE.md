@@ -18,7 +18,7 @@ python3 scripts/check_literature.py
 sh scripts/capture_offline_gate.sh
 ```
 
-The capture wrapper writes a private transcript and machine-readable summary to an explicit directory **outside Git**. It reports the actual exit code and does not mark any roadmap status automatically. It requires a local Rust toolchain, makes no installs, and uses the authoritative `scripts/offline-gate.sh` without modifying it. For a deliberate evidence location:
+The capture wrapper writes a private transcript and machine-readable summary to an explicit directory **outside Git**. It resolves repository/evidence roots physically and refuses to run if Git cannot verify the checkout or if the tree is dirty. It reports the actual exit code and does not mark any roadmap status automatically. It requires a local Rust toolchain, makes no installs, and uses the authoritative `scripts/offline-gate.sh` without modifying it. For a deliberate evidence location:
 
 ```sh
 RUST_MUSIC_EVIDENCE_DIR="$HOME/rust-music-gate-evidence" sh scripts/capture_offline_gate.sh
