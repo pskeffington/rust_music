@@ -21,6 +21,7 @@ case "$(uname -s)" in
         ;;
     Darwin)
         cargo check --locked --offline -p rust-music-cli --features macos-output
+        cargo test --locked --offline -p rust-music-native --features macos
         ;;
 esac
 printf '%s\n' 'PASS: All Rust_Music workspace crates built/tested offline; zero registry/git crates.'

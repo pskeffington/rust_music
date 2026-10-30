@@ -265,3 +265,37 @@ impl Drop for MacAudioQueueSink {
         let _ = self.finish();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_rejects_invalid_public_format_before_audioqueue_creation() {
+        let mut sink = MacAudioQueueSink::default();
+        let invalid = AudioFormat {
+            sample_rate: 44_100,
+            channels: 0,
+            bits_per_sample: 16,
+        };
+        assert!(matches!(
+            sink.open(invalid),
+            Err(MusicError::Unsupported(_))
+        ));
+        assert!(sink.queue.is_null());
+        assert!(sink.context.is_none());
+    }
+
+    #[test]
+    fn write_rejects_out_of_range_pcm_before_queue_access() {
+        let mut sink = MacAudioQueueSink::default();
+        let format = AudioFormat::new(44_100, 1, 16).unwrap();
+        let invalid = PcmBlock {
+            format,
+            samples: vec![i32::from(i16::MAX) + 1],
+        };
+        assert!(matches!(sink.write(&invalid), Err(MusicError::Invalid(_))));
+        assert!(sink.queue.is_null());
+        assert!(sink.context.is_none());
+    }
+}

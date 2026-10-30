@@ -941,3 +941,16 @@ extension allowlist and FLAC/WAVE/AIFF/AIFF-C/CAF/MP4 signature checks. The
 contract now explicitly says that catalog discovery is provisional and that
 decoder initialization remains the playback admission boundary. No scan or
 playback behavior changed.
+
+## 2026-10-30 — Exercise macOS output guards without hardware
+
+Added macOS native-backend unit tests proving malformed public formats and
+out-of-range samples are rejected before the AudioQueue handle/context is
+created or used. These are pure early-rejection cases and do not open a device.
+Added the macOS native-feature test command to the Darwin branch of the
+mandatory offline gate so these regressions run on future Mac gate executions.
+
+- `cargo test --locked --offline -p rust-music-native --features macos`:
+  **exit 0**, 2/2 tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; workspace gates passed and the new
+  macOS backend tests ran. No physical playback or DAC behavior was tested.
