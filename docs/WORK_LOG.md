@@ -846,3 +846,7 @@ private directory; generated PCM and seek-range outputs were kept temporary.
 - These results strengthen local offline and decoder-parity evidence. They do
   not establish Rust_Boy cross-module arbitration, panel wiring, or physical
   device/DAC fidelity; those acceptances remain open.
+- `system_profiler SPAudioDataType -detailLevel mini` returned an empty device
+  list in this macOS session; no physical DAC negotiation/capture test could be
+  performed here. This records environment availability only, not hardware
+  behavior.
