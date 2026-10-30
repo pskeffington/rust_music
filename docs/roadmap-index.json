@@ -180,7 +180,7 @@
       "title": "Rust_Boy socket and shared audio-focus",
       "owner_agent": "host_integrator",
       "status": "partial_evidence",
-      "next_evidence": "Rust Music exports distinct org.rustboy.music identity and suspend/pop-out behavior preserving the mounted slot and selection; Pip-Boy adapter registration, user intents, worker scheduling, shared Radio/TV/Music arbitration and field acceptance remain unverified",
+      "next_evidence": "Pip-Boy has a shared in-process audio-focus broker and guards live Radio output startup/replacement; next verify a distinct Music adapter and TV use the same broker, user intents, worker scheduling and field acceptance",
       "evidence_doc": "docs/HOST_CONTRACT.md"
     },
     {
@@ -358,7 +358,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "blocked",
+      "status": "in_progress",
       "depends_on": [
         "RM-004"
       ],
@@ -368,7 +368,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
-      "blocker": "Rust Music exposes stable org.rustboy.music identity and suspend/pop-out behavior. Pip-Boy commit bccd59d adds a distinct MUSIC design manifest and registry entry, marked design_fixture_not_installed; it is not a runtime registration. Trusted adapter wiring, user-authorized Play/Stop/navigation input, worker scheduling, one shared Radio/TV/Music RAII audio-focus path, and operator host acceptance remain open. Pip-Boy changes are user-authorized; preserve unrelated pre-existing work"
+      "blocker": "Pip-Boy now has a shared in-process AudioFocusBroker; the live Radio output session acquires a RADIO lease before output startup/replacement, and local core/app tests pass. MUSIC remains design_fixture_not_installed with no trusted adapter, user-authorized Play/Stop/navigation bridge, worker scheduling or live shell mount. TV does not yet use the broker, and no real Music-vs-Radio/TV contention or operator host acceptance is verified. User-authorized Pip-Boy changes preserve unrelated pre-existing work"
     },
     {
       "id": "RM-007",

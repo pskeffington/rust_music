@@ -2,7 +2,8 @@
 """Verify checked-in Archive.org ALAC/AAC M4A fixtures, PCM parity and ingestion.
 
 FFmpeg and ffprobe are optional local oracle tools; neither is a runtime
-dependency. One AAC negative fixture is deterministic and synthetic.
+dependency. Archive.org AAC samples and one synthetic AAC fixture are negative
+codec-admission cases, not playback inputs.
 """
 import hashlib
 import pathlib
@@ -52,6 +53,18 @@ AAC_ARCHIVES = (
         "ca20e55a053594f39d28ec7920434c861a64dac83ed84cc226d6658a4916f0b9",
         44100,
         2,
+    ),
+    (
+        "ia-zyphr-festival-speed-aac.m4a",
+        "5ca7c557002eaf29c4df323411989c6fd6441dee21e3d5fca607408accf30e91",
+        48000,
+        2,
+    ),
+    (
+        "ia-thomas-park-bellshop-aac.m4a",
+        "45cd792f9f604210431ab8e11af90e569b351a8a10a8732468840222272c71d4",
+        48000,
+        1,
     ),
 )
 

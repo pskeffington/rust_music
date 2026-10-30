@@ -46,10 +46,10 @@ AIFF text tags pass deterministic size/UTF-8 tests, and a 2 MiB artwork value
 is skipped without being retained or decoded. Roadmap/literature validators and
 `git diff --check` pass. Generated FLAC/WAVE/AIFF parity and six private FLAC
 reference/native parity remain recorded in their ledgers; private audio stays
-outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual
-Rust_Boy/Pip-Boy shared focus and input routing, physical panel/output and
-device acceptance remain unverified. Keep PR #1 draft; Pip-Boy integration edits
-are user-authorized when needed, while preserving its unrelated pre-existing
-worktree changes. Do not push or merge. RM-012 host seek routing, real-world
-seektable compatibility across other encoders, Rust_Boy shared focus and
-physical panel/output remain unverified pending external acceptance evidence.
+outside Git. Rust Music keeps a distinct MUSIC module boundary. Pip-Boy now has a
+host-wide in-process audio-focus broker and its live RADIO output path holds the
+lease; MUSIC/TV integration, user input, physical panel/output and device
+acceptance remain unverified. Keep PR #1 draft; Pip-Boy integration edits are
+user-authorized while preserving unrelated pre-existing worktree changes. Do not
+push or merge. RM-012 host seek routing, other FLAC encoder compatibility and
+physical audio/panel acceptance remain unverified pending external evidence.

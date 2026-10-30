@@ -708,9 +708,9 @@ runner or imply playable integration. Radio remains a separate package.
 - Pip-Boy commit `bccd59d` updates its reference catalog, registry test, and
   universal adapter contract. The existing uncommitted changes in Pip-Boy's
   `crates/pipboy/src/main.rs` and `terminal_commands.rs` were preserved.
-- In `/Users/null/GitHub/pip_boy`,
-  `CARGO_TARGET_DIR=/private/tmp/pip-boy-target cargo test --locked --offline
-  -p pipboy-core`: **exit 0**, 281/281 tests. The first sandboxed run had one
+- In the Pip-Boy checkout,
+  `cargo test --locked --offline -p pipboy-core` (using a temporary Cargo target
+  directory): **exit 0**, 281/281 tests. The first sandboxed run had one
   unrelated loopback-listener permission failure; rerunning with local
   loopback permission passed the suite.
 - Pip-Boy still lacks a trusted Music runner, shared Radio/TV/Music lease
@@ -770,3 +770,79 @@ temporary storage.
 - This closes the six-file real-world seektable evidence gap only. Other FLAC
   encoders and host seek-input routing remain unverified; partial seeks do not
   validate full-stream PCM MD5.
+
+## 2026-10-29 — RM-006 Pip-Boy audio-focus foundation
+
+The user authorized edits in Pip-Boy so distinct packages can share the host
+container. Added a host-wide, non-preemptive in-process `AudioFocusBroker` with
+RAII leases for RADIO, MUSIC, and TV. Every live Radio output start and output
+replacement now acquires the RADIO lease before constructing its output engine;
+stop, terminal cleanup, construction failure, and drop release the lease.
+MUSIC remains a separate reference package and is not yet wired to the broker.
+
+- Pip-Boy `universal_adapter` synthetic lifecycle coverage now includes all five
+  package IDs independently, including `org.rustboy.music`; the registry API
+  still labels the fixture as not installed.
+- Indexed the shared audio-focus source in Pip-Boy's component catalog and
+  updated package/socket docs to distinguish registry fixture, Radio lease
+  integration, and the remaining Music/TV/UI bridge.
+- `cargo test --locked --offline -p pipboy-core` (temporary Cargo target):
+  **exit 0**, 283/283 tests.
+- `cargo check --locked --offline -p pipboy` (temporary Cargo target): **exit 0**.
+- `cargo test --locked --offline -p pipboy` (temporary Cargo target): **exit 0**,
+  77/77 tests. One earlier full-suite run had two
+  failures; after updating the expected design-fixture count from four to five,
+  the affected task test passed alone and the full suite passed.
+- `cargo test --locked --offline --workspace`: **exit 0**; 77 pipboy tests,
+  283 core tests, 2 adapter SDK tests, and 12 broker tests passed.
+- `cargo clippy --locked --offline --workspace --all-targets -- -D warnings`:
+  **exit 0**. `cargo fmt --all -- --check`: **exit 0**.
+- Pip-Boy component index and package fixture/catalog validators passed (18
+  components / 57 code entrypoints; five package fixtures).
+
+RM-006 advances to partial evidence: MUSIC's trusted adapter, explicit user
+intents, worker polling, TV integration, actual shared MUSIC/RADIO/TV contention,
+live shell mounting, and host/device acceptance remain open. The broker is only
+in-process and does not provide an OS sandbox or cross-process lease service.
+
+## 2026-10-30 — Additional Archive.org M4A denial profiles
+
+Enumerated the remaining lossless corpus gaps and added two small M4A tracks
+from distinct Archive.org album items. Both are AAC after `ffprobe`, so they
+extend container ingestion and fail-closed refusal coverage only. The corpus
+still needs an independent ALAC source/encoder, real ALAC M4A at 20-bit,
+32-bit, and mono profiles, real-world CAF LPCM/ALAC, and representative
+multi-track/video-bearing MP4 layouts if those remain intended parser targets.
+
+- `ia-zyphr-festival-speed-aac.m4a`: *When the festival has speed*, Zyphr;
+  Archive.org item license is uploader-labeled CC BY-NC-SA 4.0; 1,825,592
+  bytes; AAC, 48 kHz stereo; SHA-256
+  `5ca7c557002eaf29c4df323411989c6fd6441dee21e3d5fca607408accf30e91`.
+- `ia-thomas-park-bellshop-aac.m4a`: *Dried Blood And Painted Glass*, Thomas
+  Park; Archive.org item is uploader-marked CC0 1.0; 2,450,405 bytes; AAC,
+  48 kHz mono; SHA-256
+  `45cd792f9f604210431ab8e11af90e569b351a8a10a8732468840222272c71d4`.
+- Source item links, track names, licenses, hashes, and caveat are indexed in
+  the fixture README. The script validates their bytes and actual codecs and
+  requires `inspect` to reject each one.
+- Archive.org rights labels are uploader-supplied metadata, not independent
+  rights verification. Neither file is treated as lossless or playback input.
+
+## 2026-10-30 — Offline gate and private FLAC parity revalidation
+
+Re-ran the mandatory local gate and the six-track private FLAC corpus against
+the current checkout. The supplied FLAC files remained in their original
+private directory; generated PCM and seek-range outputs were kept temporary.
+
+- `sh scripts/offline-gate.sh`: **exit 0**. The local-only audit found 16
+  workspace crates, 29 path-only edges, zero registry/Git crates and zero
+  third-party system links. Rust formatting, warnings-denied Clippy, workspace
+  tests, release build, and macOS feature check passed.
+- `CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all
+  --verify-seek --require-complete <six supplied FLAC paths>`: **exit 0**.
+  All six passed reference FLAC integrity, reference FLAC/FFmpeg equality,
+  native Rust full-PCM hash/byte-count parity, and 132 SEEKTABLE sample plus
+  following-sample ranges.
+- These results strengthen local offline and decoder-parity evidence. They do
+  not establish Rust_Boy cross-module arbitration, panel wiring, or physical
+  device/DAC fidelity; those acceptances remain open.

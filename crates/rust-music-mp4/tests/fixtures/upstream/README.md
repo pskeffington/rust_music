@@ -69,17 +69,21 @@ for attribution and are not an independent rights audit.
 | --- | --- | --- | --- | --- | --- |
 | `ia-utopia-nothing-changes-aac.m4a` | [`MARAV955A`](https://archive.org/details/MARAV955A), *Nothing Changes*, Utopia | `02 Nothing Changes.m4a` | AAC, 48,000 Hz, mono | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) | `02de330aa3d135bd4faea0c47dadb1a0b28a8501fc486adde2db69da2c3743cc` |
 | `ia-foot292-movimento-iii-aac.m4a` | [`foot292`](https://archive.org/details/foot292), *Movimento*, Filipe Miranda | `foot292_03-filipe_miranda-movimento_iii.m4a` | AAC, 44,100 Hz, stereo | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) | `ca20e55a053594f39d28ec7920434c861a64dac83ed84cc226d6658a4916f0b9` |
+| `ia-zyphr-festival-speed-aac.m4a` | [`zyphr-when-the-festival-has-speed-2023-06-25-12-07`](https://archive.org/details/zyphr-when-the-festival-has-speed-2023-06-25-12-07), *When the festival has speed*, Zyphr | `Zyphr_-_when_the_festival_has_speed_2023-06-25_12_07.m4a` | AAC, 48,000 Hz, stereo | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) | `5ca7c557002eaf29c4df323411989c6fd6441dee21e3d5fca607408accf30e91` |
+| `ia-thomas-park-bellshop-aac.m4a` | [`driedbloodandpaintedglass`](https://archive.org/details/driedbloodandpaintedglass), *Dried Blood And Painted Glass*, Thomas Park | `Bellshop.m4a` | AAC, 48,000 Hz, mono | [CC0 1.0](https://creativecommons.org/publicdomain/mark/1.0/) | `45cd792f9f604210431ab8e11af90e569b351a8a10a8732468840222272c71d4` |
 
-Both are AAC rejection inputs, never playback fixtures. The mono 48 kHz track
-adds a second real channel/rate profile to the denial corpus; it does not add
-lossless mono ALAC coverage.
+These are AAC rejection inputs, never playback fixtures. The new samples were
+selected from two additional album items; one is marked CC BY-NC-SA and one
+CC0 by its uploader. The mono 48 kHz track adds another denial profile, not
+lossless mono ALAC coverage. Archive.org license labels are uploader-supplied
+and are not an independent rights audit.
 
 ## Corpus coverage and remaining files needed
 
 | Test need | Checked-in evidence | Still needed |
 | --- | --- | --- |
 | ALAC positive parity | Six Musopen files: five stereo 16-bit/44.1 kHz and one stereo 24-bit/48 kHz; exact Rust/FFmpeg PCM equality | An independent ALAC source/encoder, plus real M4A samples covering supported 20-bit/32-bit and mono profiles |
-| AAC denial in M4A | One CC0-labeled Archive.org sample, four separately licensed netlabel album tracks, and one generated AAC sample; all six are codec-probed and rejected | Broader container layouts only where they exercise parser profiles we intend to support |
+| AAC denial in M4A | Two CC0-labeled Archive.org samples, five other licensed album tracks, and one generated AAC sample; all eight are codec-probed and rejected | Broader container layouts only where they exercise parser profiles we intend to support |
 | MP4-family filename ingestion | Real `.m4a` inputs and byte-identical `.mp4a`/`.mp4` filename aliases are scanned by content signature | Multi-track/video-bearing container layouts remain untested; extension alone must never grant codec support |
 | CAF ALAC/LPCM | Generated ALAC 16/24-bit and signed LPCM 16/24/32-bit vectors pass exact PCM parity | Independently sourced real-world CAF files |
 
