@@ -933,3 +933,11 @@ AudioQueue, and Linux ALSA sinks validate inputs at their boundary as well.
 - Linux ALSA all-target `cargo check` and warnings-denied Clippy, plus Windows
   host/panel all-target `cargo check` and warnings-denied Clippy: **exit 0**.
   Cross-target test targets type-check; they were not linked or run.
+
+## 2026-10-30 — Correct host scan contract
+
+Updated `docs/HOST_CONTRACT.md` to match the current library scanner's bounded
+extension allowlist and FLAC/WAVE/AIFF/AIFF-C/CAF/MP4 signature checks. The
+contract now explicitly says that catalog discovery is provisional and that
+decoder initialization remains the playback admission boundary. No scan or
+playback behavior changed.
