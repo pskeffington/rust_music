@@ -12,6 +12,8 @@ This is the **entrypoint for agents and operators**. Use the smallest relevant s
 - **What is actually verified?** Per-gate ledgers [G2](G2_VALIDATION.md), [G5](G5_VALIDATION.md), [G6](G6_VALIDATION.md), [G7](G7_RIFF_CONFORMANCE.md), [G8](G8_REALWORLD_FLAC_CORPUS.md), [G9](G9_TIMING_PROGRESS.md), [G10](G10_AUDIOPHILE_FORMATS.md).
 - **Which Codex guidance loads?** Root [AGENTS.md](../AGENTS.md) and `.codex/agents/` definitions documented in [CODEX_AGENT_MAP.md](CODEX_AGENT_MAP.md).
 
+- **How does the operator capture a complete offline gate?** [RM-001 gate runbook](RM001_OPERATOR_GATE.md) and [evidence wrapper](../scripts/capture_offline_gate.sh).
+
 ## Crate ownership
 
 | Area | Repository entry | Owning agent | Gate / evidence |
