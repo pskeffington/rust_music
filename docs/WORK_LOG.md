@@ -902,3 +902,34 @@ it does not establish native output support or runtime behavior there.
 - Test binaries were type-checked but not linked or executed for either
   cross-target. Native OS audio adapters, host integration and physical output
   remain separate acceptance gates.
+
+## 2026-10-30 — Validate public PCM formats and sample widths
+
+Hardened the public integer PCM boundary. `AudioFormat::validate()` now checks
+fields even when callers construct a struct literal; `PcmBlock::new()` and
+`PcmBlock::validate()` reject invalid layouts, overlong blocks and samples
+outside the declared signed width. Frame counting no longer divides by zero on
+an invalid public block. The playback engine validates decoder formats once at
+load and checks each block before frame arithmetic or sink writes. Null, Mac
+AudioQueue, and Linux ALSA sinks validate inputs at their boundary as well.
+
+- Added core tests for zero-channel public values and 16/24-bit signed bounds;
+  engine tests prove invalid formats fail before output open and out-of-range
+  samples fail before any sink write.
+- `cargo test --locked --offline -p rust-music-core -p rust-music-engine`:
+  **exit 0**, 13/13 tests.
+- `sh scripts/offline-gate.sh`: **exit 0**; 16 crates audited, formatted,
+  warnings-denied Clippy, full workspace tests, release build and macOS feature
+  check passed.
+- `python3 scripts/test_m4a_corpus.py`: **PASS**; 6/6 Archive.org ALAC files
+  remained PCM-identical to FFmpeg and all 8 AAC fixtures were rejected.
+- `python3 scripts/test_aiff_reference.py`: **PASS**, 7/7 exact PCM vectors and
+  malformed/lossy rejection. `python3 scripts/test_wave_reference.py`:
+  **PASS**, 6/6 PCM vectors and malformed RIFF rejection.
+- `python3 scripts/test_caf_reference.py`: **exit 0**, 5/5 exact PCM vectors.
+- `CARGO_NET_OFFLINE=true python3 scripts/test_flac_user_corpus.py --mode all
+  --verify-seek --require-complete <six supplied paths>`: **PASS**, 6/6 native
+  full-PCM parity and 132 real seek ranges.
+- Linux ALSA all-target `cargo check` and warnings-denied Clippy, plus Windows
+  host/panel all-target `cargo check` and warnings-denied Clippy: **exit 0**.
+  Cross-target test targets type-check; they were not linked or run.

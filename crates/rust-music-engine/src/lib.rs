@@ -74,7 +74,9 @@ impl<S: PcmSink> Player<S> {
     }
 
     pub fn load(&mut self, decoder: Box<dyn Decoder>) -> Result<()> {
-        if !decoder.format().meets_audiophile_floor() {
+        let format = decoder.format();
+        format.validate()?;
+        if !format.meets_audiophile_floor() {
             return Err(MusicError::Unsupported(
                 "audiophile-only playback requires lossless PCM at least 16-bit / 44.1 kHz",
             ));
@@ -82,7 +84,7 @@ impl<S: PcmSink> Player<S> {
         self.stop()?;
         self.decoder = Some(decoder);
         self.snapshot.generation = self.snapshot.generation.wrapping_add(1);
-        self.snapshot.format = self.decoder.as_ref().map(|x| x.format());
+        self.snapshot.format = Some(format);
         self.snapshot.total_frames = self.decoder.as_ref().and_then(|x| x.total_frames());
         self.snapshot.frames_delivered = 0;
         self.snapshot.state = PlaybackState::Ready;
@@ -165,6 +167,11 @@ impl<S: PcmSink> Player<S> {
         let next = decoder.next_block();
         match next {
             Ok(Some(block)) => {
+                if let Err(error) = block.validate() {
+                    self.snapshot.state = PlaybackState::Failed;
+                    let _ = self.sink.finish();
+                    return Err(error);
+                }
                 if Some(block.format) != self.snapshot.format {
                     self.snapshot.state = PlaybackState::Failed;
                     let _ = self.sink.finish();
@@ -278,6 +285,20 @@ mod tests {
         expected: AudioFormat,
         actual: AudioFormat,
     }
+    struct OutOfRange {
+        format: AudioFormat,
+    }
+    impl Decoder for OutOfRange {
+        fn format(&self) -> AudioFormat {
+            self.format
+        }
+        fn next_block(&mut self) -> Result<Option<PcmBlock>> {
+            Ok(Some(PcmBlock {
+                format: self.format,
+                samples: vec![i32::from(i16::MAX) + 1],
+            }))
+        }
+    }
     struct Seekable {
         format: AudioFormat,
         cursor: u64,
@@ -347,6 +368,33 @@ mod tests {
             Err(MusicError::Unsupported(_))
         ));
         assert_eq!(player.status().state, PlaybackState::Empty);
+        assert!(player.sink().opened.is_none());
+    }
+    #[test]
+    fn invalid_public_format_is_rejected_before_opening_the_sink() {
+        let format = AudioFormat {
+            sample_rate: 44_100,
+            channels: 0,
+            bits_per_sample: 16,
+        };
+        let mut player = Player::new(NullSink::default());
+        assert!(matches!(
+            player.load(Box::new(OneBlock { format, step: 0 })),
+            Err(MusicError::Unsupported(_))
+        ));
+        assert_eq!(player.status().state, PlaybackState::Empty);
+        assert!(player.sink().opened.is_none());
+    }
+
+    #[test]
+    fn out_of_range_public_pcm_is_rejected_before_sink_write() {
+        let format = AudioFormat::new(44_100, 1, 16).unwrap();
+        let mut player = Player::new(NullSink::default());
+        player.load(Box::new(OutOfRange { format })).unwrap();
+        player.play().unwrap();
+        assert!(matches!(player.step(), Err(MusicError::Invalid(_))));
+        assert_eq!(player.status().state, PlaybackState::Failed);
+        assert_eq!(player.sink().frames_written, 0);
         assert!(player.sink().opened.is_none());
     }
     #[test]

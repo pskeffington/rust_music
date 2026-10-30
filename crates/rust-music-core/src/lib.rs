@@ -50,20 +50,26 @@ pub struct AudioFormat {
 
 impl AudioFormat {
     pub fn new(sample_rate: u32, channels: u8, bits_per_sample: u8) -> Result<Self> {
-        if !(1..=8).contains(&channels) {
-            return Err(MusicError::Unsupported("1..8 channels required"));
-        }
-        if !(4..=32).contains(&bits_per_sample) {
-            return Err(MusicError::Unsupported("4..32 bit PCM required"));
-        }
-        if !(1..=1_048_575).contains(&sample_rate) {
-            return Err(MusicError::Unsupported("invalid sample rate"));
-        }
-        Ok(Self {
+        let format = Self {
             sample_rate,
             channels,
             bits_per_sample,
-        })
+        };
+        format.validate()?;
+        Ok(format)
+    }
+    /// Validate even formats built with a struct literal through this public API.
+    pub fn validate(self) -> Result<()> {
+        if !(1..=8).contains(&self.channels) {
+            return Err(MusicError::Unsupported("1..8 channels required"));
+        }
+        if !(4..=32).contains(&self.bits_per_sample) {
+            return Err(MusicError::Unsupported("4..32 bit PCM required"));
+        }
+        if !(1..=1_048_575).contains(&self.sample_rate) {
+            return Err(MusicError::Unsupported("invalid sample rate"));
+        }
+        Ok(())
     }
     /// Listening policy only, separate from decoder test-vector support.
     /// Lossless CD-quality (16-bit / 44.1 kHz) is the playback floor.
@@ -80,18 +86,44 @@ pub struct PcmBlock {
 }
 impl PcmBlock {
     pub fn new(format: AudioFormat, samples: Vec<i32>) -> Result<Self> {
-        if samples.len() % usize::from(format.channels) != 0 {
+        let block = Self { format, samples };
+        block.validate()?;
+        Ok(block)
+    }
+    /// Check public fields before frame arithmetic or output conversion.
+    pub fn validate(&self) -> Result<()> {
+        self.format.validate()?;
+        let channels = usize::from(self.format.channels);
+        if self.samples.len() % channels != 0 {
             return Err(MusicError::Invalid("incomplete interleaved PCM frame"));
         }
-        if samples.len() / usize::from(format.channels) > 65_535 {
+        if self.samples.len() / channels > 65_535 {
             return Err(MusicError::Limit(
                 "PCM block exceeds maximum decoded frame size",
             ));
         }
-        Ok(Self { format, samples })
+        let bits = self.format.bits_per_sample;
+        if bits < 32 {
+            let magnitude = 1i64 << (bits - 1);
+            let minimum = -magnitude;
+            let maximum = magnitude - 1;
+            if self
+                .samples
+                .iter()
+                .any(|&sample| i64::from(sample) < minimum || i64::from(sample) > maximum)
+            {
+                return Err(MusicError::Invalid(
+                    "PCM sample exceeds declared integer width",
+                ));
+            }
+        }
+        Ok(())
     }
     pub fn frames(&self) -> usize {
-        self.samples.len() / usize::from(self.format.channels)
+        self.samples
+            .len()
+            .checked_div(usize::from(self.format.channels))
+            .unwrap_or_default()
     }
 }
 
@@ -132,10 +164,12 @@ pub struct NullSink {
 }
 impl PcmSink for NullSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
+        format.validate()?;
         self.opened = Some(format);
         Ok(())
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
+        block.validate()?;
         if self.opened != Some(block.format) {
             return Err(MusicError::Invalid("sink format mismatch"));
         }
@@ -176,6 +210,30 @@ mod tests {
             .unwrap()
             .meets_audiophile_floor());
     }
+    #[test]
+    fn public_pcm_blocks_reject_invalid_formats_and_out_of_range_samples() {
+        let zero_channels = AudioFormat {
+            sample_rate: 44_100,
+            channels: 0,
+            bits_per_sample: 16,
+        };
+        assert!(PcmBlock::new(zero_channels, vec![]).is_err());
+        let malformed = PcmBlock {
+            format: zero_channels,
+            samples: vec![1],
+        };
+        assert_eq!(malformed.frames(), 0);
+        assert!(malformed.validate().is_err());
+
+        let sixteen = AudioFormat::new(44_100, 1, 16).unwrap();
+        assert!(PcmBlock::new(sixteen, vec![i16::MIN.into(), i16::MAX.into()]).is_ok());
+        assert!(PcmBlock::new(sixteen, vec![i32::from(i16::MAX) + 1]).is_err());
+
+        let twenty_four = AudioFormat::new(48_000, 1, 24).unwrap();
+        assert!(PcmBlock::new(twenty_four, vec![-8_388_608, 8_388_607]).is_ok());
+        assert!(PcmBlock::new(twenty_four, vec![8_388_608]).is_err());
+    }
+
     #[test]
     fn null_sink_checks_format_and_frame_count() {
         let f = AudioFormat::new(48_000, 2, 24).unwrap();

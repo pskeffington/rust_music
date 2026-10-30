@@ -273,6 +273,7 @@ impl AlsaSink {
 }
 impl PcmSink for AlsaSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
+        format.validate()?;
         if self.handle.is_some() {
             return Err(MusicError::Invalid("ALSA output already open"));
         }
@@ -310,6 +311,7 @@ impl PcmSink for AlsaSink {
         Ok(())
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
+        block.validate()?;
         if self.format != Some(block.format) {
             return Err(MusicError::Invalid(
                 "Linux sink not open or PCM format changed",

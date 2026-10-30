@@ -115,6 +115,7 @@ impl Default for MacAudioQueueSink {
 }
 impl PcmSink for MacAudioQueueSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
+        format.validate()?;
         if !self.queue.is_null() {
             return Err(MusicError::Invalid("AudioQueue already open"));
         }
@@ -178,6 +179,7 @@ impl PcmSink for MacAudioQueueSink {
         Ok(())
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
+        block.validate()?;
         if self.queue.is_null() || self.format != Some(block.format) {
             return Err(MusicError::Invalid(
                 "AudioQueue not open or source format changed",

@@ -41,6 +41,8 @@ explicit local File open
 
 Decoder blocks preserve original signed sample values. 8-bit unsigned WAVE is normalized to centered signed integer PCM and converted back on output. All shifts/predictions happen with larger integer intermediates to prevent overflow. A result is not declared hardware bit-perfect until actual DAC sample rate/width, volume and signal-path conversion are verified. Metadata CRC is checked before committing a frame to the output sink.
 
+`AudioFormat` and `PcmBlock` validate their public fields and signed integer sample range before playback arithmetic or output conversion. Malformed dimensions and values outside the declared bit width are rejected rather than divided by zero or silently truncated by a native sink.
+
 ## FLAC implementation boundary
 
 - Native FLAC marker and exact STREAMINFO block check, unknown metadata bounded/stream-skipped.
