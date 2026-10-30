@@ -870,3 +870,18 @@ network access.
   rejected Linux `ld` flags (`--fix-cortex-a53-843419`, `--as-needed`, `-z`).
   Linux test execution remains unverified and needs a Linux host/toolchain
   linker. This does not validate ALSA device negotiation or playback.
+
+## 2026-10-30 — Host lease release on drain errors
+
+Added host-slot regression cases for a `PcmSink::finish()` failure during an
+explicit Stop and during EOF cleanup. Both require the MUSIC lease to be
+released even though the caller receives the drain error. These use a mock
+focus implementation; they strengthen Rust Music's side of the host contract
+without claiming shared RADIO/TV arbitration.
+
+- `cargo fmt --all -- --check`: **exit 0**.
+- `cargo test --locked --offline -p rust-music-host`: **exit 0**, 12/12 tests.
+- `cargo clippy --locked --offline -p rust-music-host --all-targets -- -D
+  warnings`: **exit 0**.
+- `sh scripts/offline-gate.sh`: **exit 0**; all 16 workspace crates audited,
+  formatted, linted, tested, release-built, and the macOS feature check passed.

@@ -304,6 +304,30 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FailFinishSink {
+        finish_attempts: usize,
+        opened: bool,
+    }
+    impl PcmSink for FailFinishSink {
+        fn open(&mut self, _format: rust_music::AudioFormat) -> Result<()> {
+            self.opened = true;
+            Ok(())
+        }
+        fn write(&mut self, _block: &rust_music::PcmBlock) -> Result<()> {
+            if self.opened {
+                Ok(())
+            } else {
+                Err(MusicError::Output("injected write while closed".into()))
+            }
+        }
+        fn finish(&mut self) -> Result<()> {
+            self.finish_attempts += 1;
+            self.opened = false;
+            Err(MusicError::Output("injected device-drain failure".into()))
+        }
+    }
+
     struct Temp(PathBuf);
     impl Temp {
         fn new() -> Self {
@@ -523,6 +547,45 @@ mod tests {
         assert!(!focus.claimed.load(Ordering::Acquire));
         assert_eq!(slot.sink().finish_attempts, 1);
         assert_eq!(slot.sink().opened, None);
+    }
+
+    #[test]
+    fn explicit_stop_releases_focus_even_when_device_drain_fails() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(FailFinishSink::default(), temp.scan());
+
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+        assert!(matches!(
+            slot.handle(Command::Stop, &focus),
+            Err(MusicError::Output(_))
+        ));
+        assert_eq!(slot.sink().finish_attempts, 1);
+        assert_eq!(slot.status().playback.state, PlaybackState::Stopped);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn eof_releases_focus_when_device_drain_fails() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(FailFinishSink::default(), temp.scan());
+
+        slot.handle(Command::Play, &focus).unwrap();
+        slot.handle(Command::Poll, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+        assert!(matches!(
+            slot.handle(Command::Poll, &focus),
+            Err(MusicError::Output(_))
+        ));
+        assert_eq!(slot.sink().finish_attempts, 1);
+        assert_eq!(slot.status().playback.state, PlaybackState::Failed);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
     }
 
     #[test]
