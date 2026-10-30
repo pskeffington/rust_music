@@ -368,7 +368,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
-      "blocker": "Rust Music now exposes stable org.rustboy.music identity and explicit suspend/pop-out behavior with retained module state. Pip-Boy registration, protocol adapter, user-authorized playback intent, shared Radio/TV/Music audio arbiter, and host acceptance are still absent; active goal permits read-only sibling-repository inspection only"
+      "blocker": "Rust Music exposes stable org.rustboy.music identity and suspend/pop-out behavior. Pip-Boy commit bccd59d adds a distinct MUSIC design manifest and registry entry, marked design_fixture_not_installed; it is not a runtime registration. Trusted adapter wiring, user-authorized Play/Stop/navigation input, worker scheduling, one shared Radio/TV/Music RAII audio-focus path, and operator host acceptance remain open. Pip-Boy changes are user-authorized; preserve unrelated pre-existing work"
     },
     {
       "id": "RM-007",

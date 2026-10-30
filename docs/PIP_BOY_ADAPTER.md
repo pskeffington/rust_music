@@ -5,6 +5,11 @@ independent Rust Music build can be hosted by Pip-Boy without taking ownership
 of the shell, Settings, or the shared audio device. It does not claim that a
 Pip-Boy adapter is already implemented or hardware-tested.
 
+Pip-Boy commit `bccd59d` now includes `org.rustboy.music` as a distinct
+reference manifest in its universal package catalog. The entry is explicitly
+`design_fixture_not_installed`; this is package identity/registry evidence,
+not a mounted adapter or playable module.
+
 ## Universal dock and Radio replacement model
 
 Treat Pip-Boy's universal package host as the **dock/container**, not as a
@@ -26,11 +31,11 @@ trusted built-ins, but has no dynamic external module loader or general
 reviewed package loader/IPC boundary and is outside this adapter-ready contract.
 
 The current built-in Radio is a passive catalogue and does not expose playback
-intents. A useful Music-for-Radio dock therefore requires host-side work to
-register the Music package, add user-facing Play/Stop/navigation actions, and
-bridge Pip-Boy's shared Radio/TV audio arbitration to `AudioFocus`. Keep the
-package identity and adapter separate so Music can coexist with Radio and the
-operator can switch between them safely.
+intents. A useful Music-for-Radio dock still requires a trusted runtime adapter,
+user-facing Play/Stop/navigation actions, worker scheduling, and a bridge from
+Pip-Boy's shared Radio/TV audio arbitration to `AudioFocus`. Keep the package
+identity and adapter separate so Music can coexist with Radio and the operator
+can switch between them safely.
 
 ## Keep the product crate independent
 
@@ -99,8 +104,9 @@ Play cannot strand the package as media owner.
   adapter that bridges it to `AudioFocus` and handles failed start/stop paths.
 - `MusicSlot::Poll` requires a worker scheduler; the synchronous adapter trait
   does not by itself provide one.
-- No actual Music package is in Pip-Boy's current package roster, and no
-  Radio/TV/Music interoperability or physical display/audio test is recorded.
+- Pip-Boy has a Music reference manifest, but no trusted Music adapter is
+  installed or mounted. No Radio/TV/Music interoperability or physical
+  display/audio test is recorded.
 - The host's current trusted built-in bootstrap is not a universal third-party
   package loader; module foreground switching is supported conceptually, but
   dynamic install, unload-and-replace, and external isolation are not.

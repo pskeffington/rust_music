@@ -11,6 +11,7 @@ Recorded 2026-10-29. Local workspace build, Clippy, tests and release build pass
 | Host slot and exclusive focus tests | PASS (mock focus) | Local `sh scripts/offline-gate.sh`; no autoplay, EOF/Stop/Drop release, denial before output, device-open/write failures, suspend, and catalog replacement release the host lease |
 | Playback engine failure tests | PASS | Local `sh scripts/offline-gate.sh`; format mismatch, low-quality denial, and drain failure safety |
 | All workspace fmt, clippy, test and build | PASS locally | Rust/Cargo 1.99.1/macOS; audit, rustfmt, Clippy, workspace tests, release build and macOS feature check |
+| Pip-Boy MUSIC package identity | PASS (reference-only) | Pip-Boy commit `bccd59d` adds `org.rustboy.music` as a separate manifest with `media.audio`, no background permission and `design_fixture_not_installed`; `CARGO_TARGET_DIR=/private/tmp/pip-boy-target cargo test --locked --offline -p pipboy-core` passed 281/281 tests with local-loopback permission |
 | Rust_Radio/Rust_TV real audio focus | PENDING | Unit tests use a mock lease; actual shared host arbiter integration is not in this repository |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink or structural tests |
 

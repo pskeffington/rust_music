@@ -47,7 +47,8 @@ is skipped without being retained or decoded. Roadmap/literature validators and
 reference/native parity remain recorded in their ledgers; private audio stays
 outside Git. Rust Music keeps a distinct MUSIC module boundary, but actual
 Rust_Boy/Pip-Boy shared focus and input routing, physical panel/output and
-device acceptance remain unverified. Keep PR #1 draft and do not modify sibling
-repositories under the current goal. RM-012 host seek routing, real-world
+device acceptance remain unverified. Keep PR #1 draft; Pip-Boy integration edits
+are user-authorized when needed, while preserving its unrelated pre-existing
+worktree changes. Do not push or merge. RM-012 host seek routing, real-world
 seektable compatibility across other encoders, Rust_Boy shared focus and
 physical panel/output remain unverified pending external acceptance evidence.

@@ -697,6 +697,26 @@ downloaded and verified; neither is counted as lossless decoder evidence.
   inspected voice-message candidate labeled Apple Lossless was AAC and was
   removed rather than retained as music or ALAC evidence.
 
+## 2026-10-29 — Pip-Boy MUSIC package identity
+
+Following the user's authorization to work in both repositories, Pip-Boy now
+has a distinct `org.rustboy.music` reference manifest in its universal package
+catalog. The manifest requests `media.audio`, disables background operation,
+and remains explicitly `design_fixture_not_installed`; it does not mount a
+runner or imply playable integration. Radio remains a separate package.
+
+- Pip-Boy commit `bccd59d` updates its reference catalog, registry test, and
+  universal adapter contract. The existing uncommitted changes in Pip-Boy's
+  `crates/pipboy/src/main.rs` and `terminal_commands.rs` were preserved.
+- In `/Users/null/GitHub/pip_boy`,
+  `CARGO_TARGET_DIR=/private/tmp/pip-boy-target cargo test --locked --offline
+  -p pipboy-core`: **exit 0**, 281/281 tests. The first sandboxed run had one
+  unrelated loopback-listener permission failure; rerunning with local
+  loopback permission passed the suite.
+- Pip-Boy still lacks a trusted Music runner, shared Radio/TV/Music lease
+  bridge, reviewed user-input/worker routing, and host/device acceptance. The
+  catalog manifest is registry evidence only, not the RM-006 acceptance.
+
 ## 2026-10-29 — RM-012 real-world FLAC seek parity
 
 Added a bounded `decode-range` CLI action for seek-capable inputs. It requires a
