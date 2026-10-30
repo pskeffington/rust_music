@@ -19,6 +19,10 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - When a toolchain/hardware/private corpus is unavailable, mark the task **blocked or unverified**, with explicit required operator command. Source implemented ≠ compiled ≠ PCM parity ≠ measured DAC.
 - Do not advance a dependent gate while its prerequisite evidence is still blocked. Do not automatically create schedules, install dependencies, change sibling repositories, push/merge branches, or configure hardware outside the user-authorized task.
 
+## RM-001 evidence capture
+
+- For a local operator gate, follow [docs/RM001_OPERATOR_GATE.md](docs/RM001_OPERATOR_GATE.md) and run `sh scripts/capture_offline_gate.sh` from the clean active PR branch. The wrapper records the real gate exit status and private transcript outside the repository; it does not claim success or change roadmap states. Do not upload private transcripts without review.
+
 ## Current handoff and branch sanity
 
 - Before any engineering pass, read [docs/ENGINEERING_HANDOFF_2026-10-30.md](docs/ENGINEERING_HANDOFF_2026-10-30.md). The live implementation is on draft PR #1 branch `build/native-codecs-g0`; `main` was README/LICENSE-only at the October 30 inspection. Never infer missing implementation from an accidental `main` checkout.
