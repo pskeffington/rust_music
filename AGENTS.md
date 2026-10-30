@@ -19,6 +19,11 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - When a toolchain/hardware/private corpus is unavailable, mark the task **blocked or unverified**, with explicit required operator command. Source implemented ≠ compiled ≠ PCM parity ≠ measured DAC.
 - Do not advance a dependent gate while its prerequisite evidence is still blocked. Do not automatically create schedules, install dependencies, change sibling repositories, push/merge branches, or configure hardware outside the user-authorized task.
 
+## Current handoff and branch sanity
+
+- Before any engineering pass, read [docs/ENGINEERING_HANDOFF_2026-10-30.md](docs/ENGINEERING_HANDOFF_2026-10-30.md). The live implementation is on draft PR #1 branch `build/native-codecs-g0`; `main` was README/LICENSE-only at the October 30 inspection. Never infer missing implementation from an accidental `main` checkout.
+- Keep `RM-001` first until an actual complete offline gate pass is observed. Review-only/index work can continue independently; never mark dependent native PCM, host, or hardware tasks complete from source or operator reference tests.
+
 ## Recorded checkpoint (2026-10-29)
 
 Branch `build/native-codecs-g0`, draft PR #1. Operator reported 7/7 AIFF/AIFF-C native CLI golden PCM cases PASS. Operator audit passed for 12 local crates/21 local edges; full offline gate stopped at rustfmt. The 14-file rustfmt diff and three audit warnings were repaired in commits ending `13f8e85975f7b4cae921593df2ab0e7f310b8d30`, but a **fresh complete offline gate** has not been reported. Native private FLAC corpus and physical DAC/host-focus acceptance remain open. Validate live status before repeating these claims.
