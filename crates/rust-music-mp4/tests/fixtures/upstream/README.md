@@ -57,13 +57,30 @@ license values are uploader-supplied and are not an independent rights audit.
 The optional corpus script verifies each fixture hash and observed codec,
 indexes each file, and confirms the decoder refuses AAC.
 
+## Additional Archive.org album AAC denial samples
+
+The user requested a small real-world M4A corpus selected from Archive.org.
+Two additional album items were selected from the Netlabels search results;
+the downloaded tracks are kept byte-for-byte and counted only as AAC
+ingestion/codec-denial fixtures. Their uploader-supplied licenses are recorded
+for attribution and are not an independent rights audit.
+
+| Fixture | Archive.org item / album / creator | Track | Observed stream | Item license | SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| `ia-utopia-nothing-changes-aac.m4a` | [`MARAV955A`](https://archive.org/details/MARAV955A), *Nothing Changes*, Utopia | `02 Nothing Changes.m4a` | AAC, 48,000 Hz, mono | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) | `02de330aa3d135bd4faea0c47dadb1a0b28a8501fc486adde2db69da2c3743cc` |
+| `ia-foot292-movimento-iii-aac.m4a` | [`foot292`](https://archive.org/details/foot292), *Movimento*, Filipe Miranda | `foot292_03-filipe_miranda-movimento_iii.m4a` | AAC, 44,100 Hz, stereo | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) | `ca20e55a053594f39d28ec7920434c861a64dac83ed84cc226d6658a4916f0b9` |
+
+Both are AAC rejection inputs, never playback fixtures. The mono 48 kHz track
+adds a second real channel/rate profile to the denial corpus; it does not add
+lossless mono ALAC coverage.
+
 ## Corpus coverage and remaining files needed
 
 | Test need | Checked-in evidence | Still needed |
 | --- | --- | --- |
 | ALAC positive parity | Six Musopen files: five stereo 16-bit/44.1 kHz and one stereo 24-bit/48 kHz; exact Rust/FFmpeg PCM equality | An independent ALAC source/encoder, plus real M4A samples covering supported 20-bit/32-bit and mono profiles |
-| AAC denial in M4A | One CC0-labeled Archive.org sample, two separately licensed netlabel album tracks, and one generated AAC sample; all four are codec-probed and rejected | Broader container-layout examples only where they exercise an input profile the parser intends to support |
-| MP4-family filename ingestion | Real `.m4a` inputs and a byte-identical `.mp4a` alias are scanned by content signature | A real `.mp4`-named audio input can strengthen the alias case; extension alone must never grant codec support |
+| AAC denial in M4A | One CC0-labeled Archive.org sample, four separately licensed netlabel album tracks, and one generated AAC sample; all six are codec-probed and rejected | Broader container layouts only where they exercise parser profiles we intend to support |
+| MP4-family filename ingestion | Real `.m4a` inputs and byte-identical `.mp4a`/`.mp4` filename aliases are scanned by content signature | Multi-track/video-bearing container layouts remain untested; extension alone must never grant codec support |
 | CAF ALAC/LPCM | Generated ALAC 16/24-bit and signed LPCM 16/24/32-bit vectors pass exact PCM parity | Independently sourced real-world CAF files |
 
 Corpus rows marked “still needed” are evidence gaps, not implied support. AAC

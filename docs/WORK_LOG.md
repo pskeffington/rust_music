@@ -717,6 +717,38 @@ runner or imply playable integration. Radio remains a separate package.
   bridge, reviewed user-input/worker routing, and host/device acceptance. The
   catalog manifest is registry evidence only, not the RM-006 acceptance.
 
+## 2026-10-29 — Additional Archive.org M4A ingestion corpus
+
+The user asked to enumerate needed corpus types and pull a small selection of
+Archive.org album files into the repo. Added two unchanged, attributed M4A
+tracks from separate Netlabels album items after checking item metadata and
+probing the actual streams. Both are AAC and therefore exercise container
+ingestion plus fail-closed codec refusal; neither is ALAC decoder evidence.
+One is mono/48 kHz, the other stereo/44.1 kHz.
+
+- `MARAV955A`, *Nothing Changes*, Utopia, `02 Nothing Changes.m4a`: AAC,
+  mono/48 kHz, uploader metadata says CC BY-NC-ND 4.0; SHA-256
+  `02de330aa3d135bd4faea0c47dadb1a0b28a8501fc486adde2db69da2c3743cc`.
+- `foot292`, *Movimento*, Filipe Miranda,
+  `foot292_03-filipe_miranda-movimento_iii.m4a`: AAC, stereo/44.1 kHz,
+  uploader metadata says CC BY-NC-SA 4.0; SHA-256
+  `ca20e55a053594f39d28ec7920434c861a64dac83ed84cc226d6658a4916f0b9`.
+- Attribution, license URLs, stream details, and remaining corpus types are
+  indexed in `crates/rust-music-mp4/tests/fixtures/upstream/README.md`; the
+  optional corpus script checks the hashes, codec, rate/channels, scan
+  ingestion, and decode refusal.
+- `python3 scripts/test_m4a_corpus.py`: **exit 0**; six ALAC files remained
+  byte-exact against FFmpeg, byte-identical `.mp4a`/`.mp4` filename aliases
+  were catalogued by signature, and all six AAC files were rejected.
+- `python3 scripts/check_roadmap_index.py`: **exit 0**, 15 gates / 17 tasks.
+- `python3 scripts/check_literature.py`: **exit 0**, 21 references / 16
+  standards. `git diff --check`: **pass**.
+
+Remaining corpus needs: independent real-world ALAC source/encoder coverage;
+M4A/ALAC at supported 20-bit and 32-bit profiles and mono; a real `.mp4`-named
+audio input for signature aliasing; and independently sourced real-world CAF
+LPCM/ALAC files. The checked-in mono AAC sample does not close mono ALAC.
+
 ## 2026-10-29 — RM-012 real-world FLAC seek parity
 
 Added a bounded `decode-range` CLI action for seek-capable inputs. It requires a

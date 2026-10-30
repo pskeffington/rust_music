@@ -41,6 +41,18 @@ AAC_ARCHIVES = (
         44100,
         2,
     ),
+    (
+        "ia-utopia-nothing-changes-aac.m4a",
+        "02de330aa3d135bd4faea0c47dadb1a0b28a8501fc486adde2db69da2c3743cc",
+        48000,
+        1,
+    ),
+    (
+        "ia-foot292-movimento-iii-aac.m4a",
+        "ca20e55a053594f39d28ec7920434c861a64dac83ed84cc226d6658a4916f0b9",
+        44100,
+        2,
+    ),
 )
 
 
@@ -99,6 +111,8 @@ def run():
         scan_root.mkdir()
         mp4a_alias = scan_root / "archive-alias.mp4a"
         shutil.copyfile(UPSTREAM / next(iter(CASES)), mp4a_alias)
+        mp4_alias = scan_root / "archive-alias.mp4"
+        shutil.copyfile(UPSTREAM / next(iter(CASES)), mp4_alias)
         for path in [
             *(UPSTREAM / name for name in CASES),
             *(UPSTREAM / name for name, _, _, _ in AAC_ARCHIVES),
@@ -107,11 +121,12 @@ def run():
             shutil.copyfile(path, scan_root / path.name)
         scan = rust_cli("scan", scan_root).stdout
         if (
-            f"{len(CASES) + len(AAC_ARCHIVES) + 2} tracks" not in scan
+            f"{len(CASES) + len(AAC_ARCHIVES) + 3} tracks" not in scan
             or "Mp4" not in scan
             or any(name not in scan for name in CASES)
             or any(name not in scan for name, _, _, _ in AAC_ARCHIVES)
             or "archive-alias.mp4a" not in scan
+            or "archive-alias.mp4" not in scan
         ):
             raise AssertionError(f"M4A signature ingestion failed: {scan}")
         for name, expected_hash, expected_rate, expected_channels in AAC_ARCHIVES:
@@ -138,7 +153,7 @@ def run():
         denied = rust_cli("inspect", generated_aac, ok=False)
         if denied.returncode == 0:
             raise AssertionError("generated AAC fixture was not rejected")
-        print("PASS ingestion: Archive.org ALAC/AAC M4As and .mp4a alias catalogued; all four AAC fixtures rejected")
+        print(f"PASS ingestion: Archive.org ALAC/AAC M4As and .mp4a/.mp4 aliases catalogued; {len(AAC_ARCHIVES) + 1} AAC fixtures rejected")
     print(f"PASS: {len(CASES)}/{len(CASES)} checked-in Internet Archive ALAC/M4A parity cases; temporary PCM outputs removed")
 
 
