@@ -862,6 +862,9 @@ network access.
   type-check.
 - `cargo clippy --locked --offline -p rust-music-native --all-targets --features
   alsa --target aarch64-unknown-linux-gnu -- -D warnings`: **exit 0**.
+- `cargo build --locked --offline --release -p rust-music-native --features
+  alsa --target aarch64-unknown-linux-gnu`: **exit 0**; optimized Linux library
+  build succeeds.
 - `cargo test --locked --offline -p rust-music-native --features alsa --target
   aarch64-unknown-linux-gnu --no-run`: **not linked**; the host macOS linker
   rejected Linux `ld` flags (`--fix-cortex-a53-843419`, `--as-needed`, `-z`).
