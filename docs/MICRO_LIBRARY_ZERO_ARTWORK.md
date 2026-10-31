@@ -376,3 +376,14 @@ An explicit 20,000-entry app load returned the bounded error
 defaults cap the app scan at 2,048 tracks. Therefore the independent 20k Rust
 library example does not establish app behavior at that scale. No private
 media was loaded, and all generated fixtures were removed after the tests.
+
+### Repeated 2k UI search responses (2026-10-31)
+
+With the same 2,000-entry generated catalog, five UI queries returned 1, 1,
+10, 1,000 and 0 tracks for `synthetic-01999`, `synthetic-00000`,
+`synthetic-0199`, `synthetic-01` and `no-such-track`. Field-set to
+accessibility-result round-trips were 854.0, 861.4, 1,099.2, 1,165.0 and
+1,442.8 ms (median 1,099.2 ms). These figures include CUA/accessibility
+overhead and do not measure the search function alone or establish p95. No
+track was played; fixtures were removed. Direct reproducible query latency
+remains unmeasured at the app level.

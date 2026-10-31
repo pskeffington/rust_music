@@ -684,3 +684,15 @@ The same 20k folder is above the UI's configured 2,048-track default, so the
 standalone app's 20k memory/search behavior remains unmeasured. The separate
 Rust library example still profiles 20k entries; that is not a substitute for
 an app-level scan.
+
+### 2026-10-31 repeated 2k UI search responses
+
+On the same rebuilt app code, the explicit 2,000-entry generated catalog
+returned the expected result counts for `synthetic-01999` (1),
+`synthetic-00000` (1), `synthetic-0199` (10), `synthetic-01` (1,000), and
+`no-such-track` (0). Five measured field-set plus accessibility-state
+round-trips took **854.0, 861.4, 1,099.2, 1,165.0 and 1,442.8 ms** (median
+**1,099.2 ms**, range **854.0–1,442.8 ms**). These include CUA and accessibility
+overhead; they are not direct search-function latency or a p95 qualification.
+The empty result was visible at the final query. No track was played; the app
+was quit and the generated directory removed.

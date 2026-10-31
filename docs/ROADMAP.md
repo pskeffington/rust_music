@@ -136,6 +136,12 @@ tagged-library memory pass. An explicit 20k app load was rejected with the
 configured 2,048-track budget error. The app-wide 20k, cold-start and real
 library memory gates remain open.
 
+**Repeated 2k UI search observation (2026-10-31):** five generated catalog
+queries returned expected counts 1, 1, 10, 1,000 and 0. Field-set plus
+accessibility round-trips ranged **854–1,443 ms** (median **1,099 ms**).
+Automation/accessibility overhead is included; this is not direct search
+latency or p95. No test entry was played.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map
