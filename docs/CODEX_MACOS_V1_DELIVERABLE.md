@@ -989,3 +989,17 @@ output, negotiated PCM at either route, a physical DAC response, or the
 AudioQueue invalid-device error/reopen path: the OS followed the default route
 automatically and no output capture was made. Keep those acceptance items
 open.
+
+### 2026-10-31 current-bundle LaunchServices retry
+
+The bundle rebuilt at `0dd8f3104c0a62393632c75e9821a9f1b656cd15` has
+`CFBundleExecutable=RustMusic`, an executable arm64 Mach-O at the declared
+path, and a valid strict ad-hoc signature. Sandboxed
+`/usr/bin/open -n target/macos/RustMusic.app` exited **1** with
+`kLSNoExecutableErr` (-10827). Retrying `/usr/bin/open -n` against the same
+bundle through the host context exited **0**. The resulting
+UI showed Ready / No Track, no scan or autoplay, and disabled transport
+controls. Activity Monitor's Rust filter showed no playback child. This
+reproduces the known shell-sandbox LaunchServices limitation and confirms a
+fresh host-context launch of the current bundle; it does not establish
+Developer ID signing, notarization, or distribution acceptance.
