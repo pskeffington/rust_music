@@ -40,6 +40,11 @@ case "$SWIFT_ARCH" in
   arm64|x86_64) ;;
   *) echo "Unsupported macOS build architecture: $SWIFT_ARCH" >&2; exit 2 ;;
 esac
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+  apps/rust-music-macos/PlaybackUIState.swift \
+  apps/rust-music-macos/PlaybackUIStateTests.swift \
+  -o "$ROOT/target/macos/PlaybackUIStateTests"
+"$ROOT/target/macos/PlaybackUIStateTests"
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
   apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
