@@ -48,6 +48,7 @@ final class PlayerModel: ObservableObject {
     @Published var isPlaying = false
     @Published var isScanning = false
 
+    private var scanCancellationRequested = false
     private var scanProcess: Process?
     private var playProcess: Process?
     private var parentGuardPipe: Pipe?
@@ -99,6 +100,7 @@ final class PlayerModel: ObservableObject {
 
     func cancelScan() {
         guard let scanProcess, scanProcess.isRunning else { return }
+        scanCancellationRequested = true
         scanProcess.terminate()
         status = "Canceling library scan… the previous catalog is preserved."
     }
@@ -120,6 +122,7 @@ final class PlayerModel: ObservableObject {
         }
         scanProcess = process
         isScanning = true
+        scanCancellationRequested = false
         status = "Scanning the selected folder… playback will not start."
         Task { [weak self] in
             let (bytes, exitStatus) = await Task.detached(priority: .userInitiated) {
@@ -140,6 +143,8 @@ final class PlayerModel: ObservableObject {
             }
             self.scanProcess = nil
             self.isScanning = false
+            let wasCancelled = self.scanCancellationRequested
+            self.scanCancellationRequested = false
             switch result {
             case .success(let tracks):
                 self.libraryRoot = root
@@ -147,7 +152,9 @@ final class PlayerModel: ObservableObject {
                 self.selectedIndex = tracks.first?.id
                 self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
             case .failure(let failure):
-                self.status = failure.message
+                self.status = wasCancelled
+                    ? "Library scan canceled; the previous catalog is preserved."
+                    : failure.message
             }
         }
     }
