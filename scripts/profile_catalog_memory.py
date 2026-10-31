@@ -50,24 +50,41 @@ def read_line(process, timeout, description):
     raise TimeoutError(f"timed out waiting for probe {description}")
 
 
-def rss_kib(pid):
+def rss_kib(pid, memory_probe=None):
+    if memory_probe is None:
+        result = subprocess.run(
+            ["/bin/ps", "-o", "rss=", "-p", str(pid)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        value = result.stdout.strip()
+        if not value:
+            raise RuntimeError(f"process {pid} disappeared during RSS sampling")
+        return int(value)
+
     result = subprocess.run(
-        ["/bin/ps", "-o", "rss=", "-p", str(pid)],
+        [str(memory_probe), str(pid)],
         check=True,
         capture_output=True,
         text=True,
         timeout=5,
     )
-    value = result.stdout.strip()
-    if not value:
-        raise RuntimeError(f"process {pid} disappeared during RSS sampling")
-    return int(value)
+    try:
+        fields = dict(item.split("=", 1) for item in result.stdout.split())
+        resident_bytes = int(fields["resident_bytes"])
+    except (KeyError, ValueError) as error:
+        raise RuntimeError("process memory probe returned an invalid result") from error
+    if resident_bytes < 0:
+        raise RuntimeError("process memory probe returned a negative resident size")
+    return resident_bytes // 1024
 
 
-def stable_rss_kib(pid, samples=3, interval=0.1):
+def stable_rss_kib(pid, memory_probe=None, samples=3, interval=0.1):
     values = []
     for index in range(samples):
-        values.append(rss_kib(pid))
+        values.append(rss_kib(pid, memory_probe))
         if index + 1 < samples:
             time.sleep(interval)
     return int(statistics.median(values)), values
@@ -85,7 +102,7 @@ def parse_ready(line, expected_tracks, expected_tagged, expected_pid):
         raise RuntimeError("probe reported a different tagged count")
 
 
-def run_once(binary, count, tagged_count, timeout):
+def run_once(binary, count, tagged_count, timeout, memory_probe=None):
     fixture_root = Path(tempfile.mkdtemp(prefix="rust-music-rss-profile-"))
     process = None
     result = None
@@ -109,14 +126,14 @@ def run_once(binary, count, tagged_count, timeout):
         )
         ready = read_line(process, timeout, "READY")
         parse_ready(ready, count, tagged_count, process.pid)
-        before, before_samples = stable_rss_kib(process.pid)
+        before, before_samples = stable_rss_kib(process.pid, memory_probe)
 
         process.stdin.write(b"scan\n")
         process.stdin.flush()
         scanned = read_line(process, timeout, "SCANNED")
         if scanned != f"SCANNED tracks={count} tagged={tagged_count}":
             raise RuntimeError(f"unexpected scan result: {scanned!r}")
-        after, after_samples = stable_rss_kib(process.pid)
+        after, after_samples = stable_rss_kib(process.pid, memory_probe)
 
         process.stdin.write(b"release\n")
         process.stdin.flush()
@@ -204,6 +221,14 @@ def main():
         default=0,
         help="number of files with synthetic FLAC TITLE/ARTIST/ALBUM comments",
     )
+    parser.add_argument(
+        "--memory-probe",
+        type=Path,
+        help=(
+            "optional local macOS proc_pid_rusage helper; its resident_bytes is "
+            "used instead of /bin/ps when process-list access is unavailable"
+        ),
+    )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args()
@@ -213,6 +238,11 @@ def main():
     binary = args.binary.resolve(strict=True)
     if not binary.is_file():
         parser.error("binary must be a file")
+    memory_probe = args.memory_probe
+    if memory_probe is not None:
+        memory_probe = memory_probe.resolve(strict=True)
+        if not memory_probe.is_file() or not os.access(memory_probe, os.X_OK):
+            parser.error("memory-probe must name an executable local helper")
     if not args.counts or any(count < 0 or count > MAX_TRACKS for count in args.counts):
         parser.error(f"every count must be between 0 and {MAX_TRACKS}")
     if args.tagged_count < 0 or any(args.tagged_count > count for count in args.counts):
@@ -229,7 +259,7 @@ def main():
     for count in args.counts:
         rows = []
         for repeat in range(1, args.repeats + 1):
-            row = run_once(binary, count, args.tagged_count, args.timeout)
+            row = run_once(binary, count, args.tagged_count, args.timeout, memory_probe)
             rows.append(row)
             print(
                 f"tracks={count} tagged={args.tagged_count} run={repeat} "

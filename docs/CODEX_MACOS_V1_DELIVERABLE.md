@@ -1609,3 +1609,52 @@ removed (cleanup exit **0**). This observes the current bundle's GUI state
 transitions and post-quit app/child absence, but does not measure acoustic
 loopback, confirm sound at the headphones, verify DAC fidelity, or exercise
 invalid-device recovery. No user library or private media was used.
+
+### 2026-10-31 current-candidate app memory sample — inconclusive
+
+`cargo build --locked --offline --release -p rust-music-library --example
+profile_micro_library_memory` exited **0**. The bundled profile driver command
+`python3 scripts/profile_catalog_memory.py
+target/release/examples/profile_micro_library_memory --counts 2000 20000
+--repeats 3` exited **1** because this environment denied `/bin/ps` with
+`Operation not permitted`. No catalog RSS result is claimed from that run.
+
+For a current-bundle app-level observation, the local C sampler compiled with
+`clang -Wall -Wextra -Werror -O2` and `proc_pid_rusage(RUSAGE_INFO_V4)` read a
+fresh app before and after an explicit scan of 2,000 generated 175-byte FLAC
+metadata signatures (TITLE/ARTIST/ALBUM comments; no audio frames). Five idle
+physical-footprint samples were all **40,354,680 B**. Five post-scan samples
+were **35,832,720 B** three times and **35,750,800 B** twice; the median delta
+was **-4,521,960 B (-4.312 MiB)**. Resident-size median increased from
+**90,603,520 B** to **94,060,544 B** (**+3,457,024 B / 3.297 MiB**). Activity
+Monitor simultaneously reported 14.11 GB memory used and 9.31 GB swap used.
+The opposite-sign metrics and host pressure make this pair unsuitable for
+catalog-retained-memory acceptance; no 8 MiB pass is inferred. The app was
+quit, no `rust-music-cli` process remained in the Activity Monitor filter,
+and the fixture and probe were removed. Repeatability under a controlled host
+baseline and a process-sampler path that works in the restricted shell remain
+open.
+
+### 2026-10-31 catalog RSS profiler proc_pid_rusage fallback
+
+The catalog profile driver now accepts optional `--memory-probe PATH`, using
+the existing locally compiled `scripts/profile_macos_process_memory.c` helper
+to read `resident_bytes` through `proc_pid_rusage(RUSAGE_INFO_V4)` when `/bin/ps`
+is unavailable. The ordinary `/bin/ps` path remains the default. The helper
+compiled with `clang -Wall -Wextra -Werror -O2`; its use adds no Rust or Python
+package dependency.
+
+After building
+`profile_micro_library_memory` with Cargo locked and offline, the helper-based
+profile command completed all three repeats per scenario. For synthetic
+metadata-only FLAC comments without frames, 2,000 all-tagged tracks measured a
+median incremental RSS estimate of **1,104 KiB** (1,024–1,136 KiB); 20,000
+all-tagged tracks measured **7,616 KiB** (7,536–7,776 KiB); and 20,000
+untagged WAV signatures measured **5,264 KiB** (5,168–5,280 KiB). Every 20k
+all-tagged repeat was below the 8,192 KiB catalog-core engineering target.
+These are child-process RSS differences, not exact live heap allocation or
+full-app memory. They do not resolve the conflicting app-level sample above;
+app-wide memory acceptance remains open. The full
+`sh scripts/offline-gate.sh` run with this profiler change in the worktree
+exited **0**: 17 local crates, 32 path-only edges, zero registry/Git crates,
+zero third-party system links, and 17/17 simulated AudioQueue tests.

@@ -468,3 +468,23 @@ Stopped on explicit Stop. After Cmd-Q, the app inventory reported
 Music app process disappeared on refresh. This is current-bundle control and
 process-exit evidence; it is not acoustic loopback, headphone confirmation,
 DAC fidelity, or real invalid-device recovery. The fixture was removed.
+
+The 2,000-track tagged app-memory recheck was inconclusive. Five idle
+`proc_pid_rusage` physical-footprint samples were 40,354,680 B; after the
+explicit scan, the median was 35,832,720 B (delta -4,521,960 B), while median
+resident size increased by 3,457,024 B. Activity Monitor showed 14.11 GB
+memory used and 9.31 GB swap. The opposing metrics under host pressure do not
+pass the 8 MiB target. The catalog profile driver also exited 1 because this
+environment denies `/bin/ps`; the library example built successfully, but its
+RSS run is unavailable here. Keep app-wide memory acceptance open.
+
+The profiler now supports an optional `--memory-probe` path using the existing
+local C helper and `proc_pid_rusage(RUSAGE_INFO_V4)` resident size, retaining
+`/bin/ps` as the default. Three-repeat catalog-core RSS deltas were 1,104 KiB
+median for 2k all-tagged FLAC metadata, 7,616 KiB for 20k all-tagged FLAC
+metadata, and 5,264 KiB for 20k untagged WAV signatures. All 20k all-tagged
+repeats were below 8,192 KiB. The fixtures had no audio frames; these are
+catalog child-process estimates and do not qualify full-app memory.
+The full Rust offline gate exited 0 in the same worktree: 17 local crates,
+32 path-only edges, zero registry/Git crates, and 17/17 simulated AudioQueue
+tests.
