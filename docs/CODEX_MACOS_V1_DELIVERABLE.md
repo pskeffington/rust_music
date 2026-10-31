@@ -508,6 +508,13 @@ passing. A direct executable invocation exited **134**. Attempted
 the temporary app copy worked, but the shell `open -n` path remains
 **UNVERIFIED** and must be resolved before accepting LaunchServices packaging.
 
+The packaged child smoke
+`python3 scripts/test_release_package_process.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0**. It
+completed RBPK v1 Hello, Activate with an empty view, Shutdown acknowledgment,
+and child exit; binary SHA-256 was
+`2082adacc6b1e94abe44c808cf23f1b28f46a5b1be817b0d1b4f11f2312fe401`.
+
 ### 2026-10-31 live PR ancestry check
 
 The connected GitHub read of PR #1 reports it open, draft, unmerged and
