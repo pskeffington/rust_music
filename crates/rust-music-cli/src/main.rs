@@ -46,6 +46,126 @@ const PCM_GUID: [u8; 16] = [
     1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71,
 ];
 
+const MAX_CATALOG_OUTPUT_BYTES: usize = 20 * 1024 * 1024;
+
+fn append_hex(output: &mut String, value: &str) {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in value.as_bytes() {
+        output.push(HEX[usize::from(byte >> 4)] as char);
+        output.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+}
+
+fn container_name(container: rust_music_library::AudioContainer) -> &'static str {
+    match container {
+        rust_music_library::AudioContainer::Flac => "flac",
+        rust_music_library::AudioContainer::Wave => "wave",
+        rust_music_library::AudioContainer::Aiff => "aiff",
+        rust_music_library::AudioContainer::Caf => "caf",
+        rust_music_library::AudioContainer::Mp4 => "mp4",
+    }
+}
+
+fn catalog_tsv(root: &std::path::Path, query_text: &str) -> Result<String> {
+    use rust_music_library::{scan, ScanLimits, TrackQuery, TrackSort, MAX_PAGE_SIZE};
+
+    let library = scan(root, ScanLimits::default())?;
+    let mut output = String::new();
+    let mut offset = 0usize;
+    let mut emitted = 0usize;
+    loop {
+        let page = library.query(&TrackQuery {
+            text: query_text.to_owned(),
+            sort_by: TrackSort::Path,
+            offset,
+            limit: MAX_PAGE_SIZE,
+            ..TrackQuery::default()
+        })?;
+        for track in &page.tracks {
+            let relative = track
+                .relative_path
+                .to_str()
+                .ok_or(MusicError::Invalid("catalog path is not UTF-8"))?;
+            let index = library
+                .tracks()
+                .binary_search_by(|candidate| candidate.relative_path.cmp(&track.relative_path))
+                .map_err(|_| MusicError::Invalid("catalog track index is inconsistent"))?;
+            output.push_str("track\t");
+            use std::fmt::Write as _;
+            write!(output, "{}\t{}\t", index, container_name(track.container))
+                .expect("writing to String cannot fail");
+            append_hex(&mut output, track.display_title());
+            output.push('\t');
+            append_hex(
+                &mut output,
+                track
+                    .tags
+                    .as_ref()
+                    .and_then(|tags| tags.artist.as_deref())
+                    .unwrap_or(""),
+            );
+            output.push('\t');
+            append_hex(
+                &mut output,
+                track
+                    .tags
+                    .as_ref()
+                    .and_then(|tags| tags.album.as_deref())
+                    .unwrap_or(""),
+            );
+            output.push('\t');
+            append_hex(&mut output, relative);
+            output.push('\n');
+            emitted = emitted.saturating_add(1);
+            if output.len() > MAX_CATALOG_OUTPUT_BYTES {
+                return Err(MusicError::Limit("catalog output exceeds its size bound"));
+            }
+        }
+        if offset.saturating_add(page.tracks.len()) >= page.total_matches {
+            break;
+        }
+        offset = offset.saturating_add(page.tracks.len());
+    }
+    use std::fmt::Write as _;
+    writeln!(
+        output,
+        "summary\t{}\t{}\t{}",
+        emitted, library.examined_entries, library.skipped_entries
+    )
+    .expect("writing to String cannot fail");
+    if output.len() > MAX_CATALOG_OUTPUT_BYTES {
+        return Err(MusicError::Limit("catalog output exceeds its size bound"));
+    }
+    Ok(output)
+}
+
+fn resolve_library_track(
+    root: &std::path::Path,
+    relative: &std::path::Path,
+) -> Result<std::path::PathBuf> {
+    use rust_music_library::{scan, ScanLimits};
+    use std::path::Component;
+
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(MusicError::Invalid(
+            "managed library path must be relative and safe",
+        ));
+    }
+    let library = scan(root, ScanLimits::default())?;
+    let index = library
+        .tracks()
+        .iter()
+        .position(|track| track.relative_path == relative)
+        .ok_or(MusicError::Invalid(
+            "selected library track is missing or unsupported",
+        ))?;
+    library.checked_path(index)
+}
+
 fn riff_overhead(format: AudioFormat) -> u32 {
     if format.channels > 2 {
         60
@@ -368,7 +488,7 @@ where
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 ))]
-fn play_managed(path: &str, device: Option<&str>) -> Result<()> {
+fn play_managed(path: &std::path::Path, device: Option<&str>) -> Result<()> {
     let parent_watch = watch_parent_disconnect(std::io::stdin());
     play(open_file(path)?, device, Some(&parent_watch))
 }
@@ -377,7 +497,7 @@ fn play_managed(path: &str, device: Option<&str>) -> Result<()> {
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 )))]
-fn play_managed(_path: &str, _device: Option<&str>) -> Result<()> {
+fn play_managed(_path: &std::path::Path, _device: Option<&str>) -> Result<()> {
     Err(MusicError::Unsupported(
         "managed playback needs a native audio output feature",
     ))
@@ -881,7 +1001,7 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
     #[cfg(all(
         debug_assertions,
         feature = "test-support",
@@ -913,7 +1033,24 @@ fn run() -> Result<()> {
         if args.next().is_some() {
             return Err(MusicError::Invalid("too many managed playback arguments"));
         }
-        return play_managed(&path, device.as_deref());
+        return play_managed(std::path::Path::new(&path), device.as_deref());
+    }
+    if action == "play-managed-root" {
+        let root = args.next().ok_or(MusicError::Invalid(
+            "play-managed-root requires a library root",
+        ))?;
+        let relative = args.next().ok_or(MusicError::Invalid(
+            "play-managed-root requires a relative library path",
+        ))?;
+        let device = args.next();
+        if args.next().is_some() {
+            return Err(MusicError::Invalid(
+                "too many managed library playback arguments",
+            ));
+        }
+        let checked =
+            resolve_library_track(std::path::Path::new(&root), std::path::Path::new(&relative))?;
+        return play_managed(&checked, device.as_deref());
     }
     let path = args
         .next()
@@ -929,6 +1066,14 @@ fn run() -> Result<()> {
             }
             println!("{} tracks | {} entries checked | {} skipped",
                 library.len(), library.examined_entries, library.skipped_entries);
+            Ok(())
+        }
+        "catalog" => {
+            let query = args.next().unwrap_or_default();
+            if args.next().is_some() {
+                return Err(MusicError::Invalid("too many catalog arguments"));
+            }
+            print!("{}", catalog_tsv(std::path::Path::new(&path), &query)?);
             Ok(())
         }
         "preview" => {
@@ -978,7 +1123,7 @@ fn run() -> Result<()> {
             }
             export_wav_range(open_file(path)?, start, count, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | serve [ALSA_DEVICE]")),
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]")),
     }
 }
 fn main() {
@@ -996,11 +1141,57 @@ mod tests {
         all(target_os = "linux", feature = "alsa-output")
     ))]
     use rust_music_ipc::{read_frame, write_frame, Envelope, Reply, Request, PROTOCOL_VERSION};
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn header(format: AudioFormat, data_bytes: u32) -> Vec<u8> {
         let mut out = Vec::new();
         write_header(&mut out, format, data_bytes).unwrap();
         out
+    }
+
+    fn temp_root(label: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("rust-music-{label}-{}-{stamp}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn catalog_output_is_bounded_tsv_with_utf8_hex_and_text_search() {
+        let root = temp_root("catalog");
+        fs::write(root.join("Café.wav"), b"RIFF1234WAVE").unwrap();
+        fs::write(root.join("Other.flac"), b"fLaC").unwrap();
+
+        let output = catalog_tsv(&root, "CAFÉ").unwrap();
+        assert_eq!(
+            output,
+            "track\t0\twave\t436166c3a9\t\t\t436166c3a92e776176\nsummary\t1\t2\t0\n"
+        );
+        assert!(!output.contains(root.to_str().unwrap()));
+        assert!(catalog_tsv(&root, "bad\nquery").is_err());
+        assert!(catalog_tsv(&root, &"x".repeat(513)).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn managed_library_resolution_rejects_traversal_and_missing_tracks() {
+        let root = temp_root("managed-root");
+        fs::write(root.join("song.wav"), b"RIFF1234WAVE").unwrap();
+        assert_eq!(
+            resolve_library_track(&root, std::path::Path::new("song.wav")).unwrap(),
+            root.canonicalize().unwrap().join("song.wav")
+        );
+        assert!(resolve_library_track(&root, std::path::Path::new("../song.wav")).is_err());
+        assert!(resolve_library_track(&root, std::path::Path::new("missing.wav")).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
