@@ -1735,7 +1735,9 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
 - The app source compiled successfully with the installed Swift compiler at
   macOS 13.0 target to a temporary output outside the repository (exit 0), and the
   source scan still found no image or visualization APIs. The app bundle was
-  not replaced or relaunched because a live app session was present; the
-  bundle build and runtime accessibility check remain pending for this small
-  identifier-only change. The prior strict bundle build/launch evidence stays
-  tied to `fb5e70d`.
+  staged outside the repository using that Swift binary and the current bundled
+  CLI. Its plist lint, strict deep signature check, arm64 executable check and
+  macOS 13.0 minimum check passed. It was not opened or LaunchServices
+  registered; the normal target bundle was not replaced because a live app
+  session was present. Runtime accessibility-tree verification remains
+  pending. Prior LaunchServices evidence stays tied to `fb5e70d`.
