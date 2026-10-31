@@ -91,9 +91,9 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
 | ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root query/sort/pagination plus atomic cancel-aware scan API; multiple roots/reconciliation and UI worker wiring remain |
-| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model plus bounded versioned named-playlist CRUD and atomic `.rmp` persistence; UI/host wiring remains |
-| ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, repeat modes and seeded shuffle; host transport/focus wiring remains |
-| ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
+| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model, versioned `.rmp` persistence, CLI CRUD, and standalone text UI for create/rename/delete/add/queue; host workflow and import/export remain |
+| ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, CLI/UI queue editing, selection-only navigation, repeat and seeded shuffle; explicit Play is separate; standalone queue-to-host focus workflow remains |
+| ML-06 | Text-only desktop and 1 KiB panel presentation | partial: explicit folder selection, cancellable bounded catalog load, text search/list, queue and playlist controls, explicit Play/Stop, and selection-only Previous/Next; Pause, volume, panel input wiring and full host workflow remain |
 | ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: catalog build/search profiled at 0/1/100/2k/20k; cold app startup, incremental memory, restart/corruption remain |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
@@ -166,6 +166,23 @@ partial catalog. Callers can replace the committed catalog only after a full
 successful result, so cancel preserves the prior snapshot. A deterministic
 mid-scan cancellation test verifies that path; UI worker ownership and progress
 presentation remain unimplemented.
+
+### Standalone catalog/queue/playlist workflow slice (2026-10-31)
+
+The macOS app now offers explicit folder selection, a bounded Rust CLI catalog
+scan with cancellation, text search and catalog rows, explicit Play and Stop,
+and selection-only Previous/Next. Persistent queue and named-playlist CLI
+state is loaded only after a successful explicit library selection. The UI
+supports queue add/remove/select, repeat, shuffle, playlist create/rename/
+delete/add, and queueing a playlist. State records remain in app-support
+storage scoped by canonical root; catalog paths are revalidated before managed
+playback. Selecting queue rows or using Next/Previous does not start playback
+or acquire audio focus. `sh scripts/offline-gate.sh` and
+`sh scripts/build-macos-app.sh` both exited 0 at the recorded implementation
+snapshot; local ad-hoc app bundle signature verification passed. The image and
+visualizer symbol search over the app source returned no matches. Pause,
+volume, autoplay preference, EQ, host transport/focus bridge, physical output,
+and live Radio/TV contention are not implemented or verified by this slice.
 
 ### Initial synthetic catalog profile (2026-10-31)
 

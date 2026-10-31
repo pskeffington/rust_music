@@ -2,6 +2,21 @@
 
 **Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+## 2026-10-31 standalone text-library workflow
+
+At implementation commit `2546cae`, the Rust CLI provides root-scoped
+persistent queue and named-playlist operations. Its state tests passed 12/12
+within the offline gate. The standalone macOS app now connects explicit
+folder selection and catalog search to queue/playlist controls and explicit
+Play/Stop. Queue selection and Previous/Next do not start playback or acquire
+focus. `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 path-only
+edges, zero registry/Git crates); `sh scripts/build-macos-app.sh` exited 0 and
+the local ad-hoc bundle signature verified. Roadmap/literature checks exited
+0 and no image or visualizer symbols were found in app source. This does not
+complete standalone-to-host focus transport, Pause/volume, autoplay preference,
+EQ, physical output, panel, or live Radio/TV acceptance. No private codec
+parity suites were rerun for this UI/state change.
+
 ## Text library foundation and cancellable scans — 2026-10-31
 
 At source commit `e5d6b34`, named playlists use bounded, versioned `.rmp`

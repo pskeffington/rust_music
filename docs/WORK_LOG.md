@@ -4,6 +4,23 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-31 — Connect standalone text library, queue, and playlists
+
+- Added the macOS UI workflow for explicit library selection, cancellable
+  catalog load, bounded text search, persistent queue editing/navigation,
+  repeat/shuffle, named playlist CRUD, playlist-to-queue, and explicit
+  Play/Stop. Queue selection and Previous/Next remain selection-only.
+- At implementation commit `2546cae`, the CLI queue/playlist state tests passed
+  12/12 within `sh scripts/offline-gate.sh` (exit 0); the gate covered 17 local
+  crates and 32 path-only edges with no registry/Git crates. The macOS app
+  bundle build/signature check exited 0. Roadmap/literature validators and
+  `git diff --check` exited 0; app image/visualizer symbol search had no hits.
+- The UI remains text-only and uses no new runtime dependencies. Queue path
+  validation occurs before managed playback. Pause/volume, native host focus
+  transport, opt-in autoplay, EQ, cold startup/incremental-memory profiles,
+  hardware output and live Radio/TV contention remain open. Private codec
+  parity was not rerun.
+
 ## 2026-10-31 — Add durable playlists and cancellation-aware scans
 
 - Added `rust-music-library::playlist_store` with named playlist CRUD,
