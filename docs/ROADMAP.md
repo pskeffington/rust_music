@@ -410,3 +410,16 @@ stopped. Queue and playlist test entries were removed, the app quit, and the
 fixture was deleted. This extends current-bundle search and selection-only
 queue evidence; representative-library behavior and direct interactive latency
 remain open. No private media was used.
+
+**RM-006 / RM-018 current-bundle broker recheck (2026-10-31):** on the clean
+Pip-Boy checkout at `bfbb9c76d147911feb6d359ba0f2342a8a0cd97e`, the focused
+offline `actual_rust_music_child_runs_under_host_supervisor_when_configured`
+test passed **1/1** against the current Rust Music app-bundled CLI (product
+source `1941cadab95eae3490bf4d599748acb60b21b8b1`, SHA-256
+`14fe5c2cdd3a611b715a2a2fad626c4342bdc2a303da3005ec62e1c7b19dcaff`). It
+observed supervised handshake/activation, MUSIC excluding RADIO, suspend
+releasing the claim, RADIO acquisition, resume reacquiring MUSIC, and shutdown
+releasing the claim. Build output was directed to temporary storage and
+Pip-Boy source stayed clean. This does not open the audio sink, verify audible
+MUSIC output or TV contention, register/allowlist the package, or demonstrate
+live shell/mobile acceptance. RM-006 and RM-018 remain in progress.

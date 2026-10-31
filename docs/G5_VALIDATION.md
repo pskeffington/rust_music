@@ -67,6 +67,28 @@ bridge, live TV contention, physical panel, or DAC output.
 | Physical headphone route transition during active playback | PARTIAL (operator-assisted) | On 2026-10-31, a generated 330 Hz, 16-bit/44.1 kHz tone played through Rust Music and macOS AudioQueue while the operator unplugged/reconnected Shure headphones on the analog port. System Settings changed External Headphones → MacBook Air Speakers (46%) → External Headphones (93%); Rust Music remained PLAYING with no visible error, then Stop and Quit succeeded. This establishes route change/return, not acoustic continuity or a DAC sample measurement. See [MAC v1.0 device evidence](CODEX_MACOS_V1_DELIVERABLE.md#2026-10-31-active-headphone-route-loss-and-return). |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink, structural tests, or the observed default-route transition |
 
+## 2026-10-31 current-bundle shared-focus broker recheck
+
+The clean Pip-Boy checkout remained at
+`bfbb9c76d147911feb6d359ba0f2342a8a0cd97e` on
+`codex/rust-music-shared-focus-integration`. Against the current locally built
+Rust Music bundle CLI from product source
+`1941cadab95eae3490bf4d599748acb60b21b8b1` (CLI SHA-256
+`14fe5c2cdd3a611b715a2a2fad626c4342bdc2a303da3005ec62e1c7b19dcaff`), the
+focused test
+`cargo test --locked --offline -p pipboy-core actual_rust_music_child_runs_under_host_supervisor_when_configured -- --nocapture`
+exited **0** (1/1 passed, 304 filtered). `CARGO_NET_OFFLINE=true` and a
+temporary `CARGO_TARGET_DIR` outside both repositories were used. Pip-Boy
+source remained clean and unchanged.
+
+The actual Rust Music child completed the supervised RBPK handshake and
+inert activation. The broker's MUSIC claim excluded RADIO; suspending MUSIC
+released the claim and allowed RADIO to acquire it; after RADIO released,
+resuming MUSIC reacquired it; child shutdown released the claim. This refreshes
+cross-process lifecycle/broker evidence only. It does not start an audio sink,
+verify audible MUSIC output or TV contention, register/allowlist the bundle,
+or demonstrate live shell/mobile acceptance.
+
 ## 2026-10-31 simulated AudioQueue error recovery and offline gate
 
 - Source commit `a65fbe95970f6d2a8171d3011cbcebe65d6d10db` adds two serialized
