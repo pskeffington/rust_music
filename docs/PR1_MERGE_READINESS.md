@@ -20,6 +20,12 @@ or PCM paths. These APIs are not yet wired to the standalone UI or host queue.
 bundle's ad-hoc signature passed strict `codesign` verification. Developer ID,
 notarization, and distribution signing remain unverified.
 
+At app commit `8f0d64d`, the remaining SF Symbol widgets were removed from the
+macOS shell to keep the current interface text-only. The artwork/image search
+over the app, IPC and panel source returned no matches; the macOS bundle build
+and strict local ad-hoc signature verification exited 0. The shell remains a
+single-file Play/Stop inspector and does not yet implement the library UX.
+
 ## 2026-10-31 catalog and package hardening pass
 
 At this recording, the latest implementation snapshot on

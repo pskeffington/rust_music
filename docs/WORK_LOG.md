@@ -24,6 +24,13 @@ Private audio paths and recordings are deliberately excluded.
   persistent queue-to-host wiring, opt-in explicit-load autoplay, Pause,
   equalizer, measured startup/incremental memory, native device recovery, live
   Radio/TV contention, panel/DAC, and distribution signing remain open.
+- At app commit `8f0d64d`, removed SF Symbol image widgets from the macOS shell
+  so its header, transport buttons, status and policy notice render as text
+  only. `rg -n 'Image\\(|systemImage|AsyncImage|NSImage|UIImage|visualiz'
+  apps/rust-music-macos crates/rust-music-panel crates/rust-music-ipc` found
+  no matches, and `sh scripts/build-macos-app.sh` exited 0 with strict local
+  bundle signature verification. The app remains a single-file inspector with
+  Play/Stop; no library browser workflow is claimed.
 
 ## 2026-10-30 — Add WavPack high-quality cross-channel predictor coverage
 
