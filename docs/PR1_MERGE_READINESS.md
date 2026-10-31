@@ -284,10 +284,12 @@ physical panel/DAC and distribution approval remain open. The overall release
 decision is unchanged: local branch is unpushed, PR #1 stays draft, and mainline
 integration remains blocked.
 
-After that active-playback check, a fresh process launch returned the empty
-Ready / No Track accessibility tree in **891 ms**. Activity Monitor reported
+After that active-playback check, five fresh process launches returned the
+empty Ready / No Track accessibility tree in **891, 858, 753, 798 and 779 ms**
+(median **798 ms**, range **753–891 ms**). Every run showed no loaded library
+or autoplay and exited before the next run. Activity Monitor reported
 **28.2 MB** in its `anonymousMemory` column for the idle app (PID 12236), with no
-CLI child. The app was then quit and both `listApps()` and the refreshed
-Activity Monitor filter showed no Rust Music or CLI process. This is one
-startup and memory sample, not a cold-start distribution, RSS measurement, or
-threshold result.
+CLI child. After Quit, both `listApps()` and the refreshed Activity Monitor
+filter showed no Rust Music or CLI process. This is a five-run process-launch
+sample, not a system-boot cold-start profile or performance threshold, and one
+idle-memory reading, not repeatable memory profiling or RSS.

@@ -47,17 +47,20 @@ active synthetic silent AudioQueue playback. No private corpus was rerun.
 | Volume | User-visible functional native volume | Implemented as bounded software attenuation (0–100), with strict 100% integer-sample bypass. It is not hardware gain or bit-perfect processing. The app slider changed 100→95→100 during the two-tone output smoke. |
 | Application | Valid bundle, LaunchServices and shutdown | Local bundle build/plist/ad-hoc code-sign validation and LaunchServices launch evidence are in PR readiness ledger. Revalidate after binary/UI changes; distribution signature/notarization remains open. |
 | Security | Bounded parsers, safe paths, no network/artwork | Workspace-local Cargo edges and fail-closed bounded inputs are enforced by offline gate. Maintain no image/artwork/visualizer functionality and never modify source audio during library operations. |
-| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. One fresh-process launch-to-Ready accessibility sample took 891 ms and showed Ready / No Track with no scan/autoplay; Activity Monitor reported 28.2 MB anonymous memory at idle with no CLI child. These are single observations, not thresholds. Cold-start distribution, repeatable incremental catalog memory, peak RSS, transition latency, and attenuation processing cost remain unmeasured. |
+| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Five fresh-process launch-to-Ready accessibility samples took 891, 858, 753, 798 and 779 ms (median 798 ms, range 753–891 ms); all showed Ready / No Track with no scan/autoplay, and each app process exited before the next run. One separate idle sample showed 28.2 MB Activity Monitor anonymous memory with no CLI child. These are process-launch samples, not a system-boot cold-start profile or performance threshold. Repeatable incremental catalog memory, peak RSS, transition latency, and attenuation processing cost remain unmeasured. |
 | Release | Reproducible build and independent acceptance | Local offline/app build evidence exists at recorded commits. Require fresh build evidence at candidate SHA, independent code/security review, operator hardware record, clean mainline build and app launch before declaring v1.0 ready. |
 
 ### 2026-10-31 fresh-process startup and idle-memory sample
 
-A fresh app process returned the empty Ready / No Track accessibility tree in
-**891 ms**. Activity Monitor reported **28.2 MB** in its `anonymousMemory`
-column for the idle app (PID 12236), with no `rust-music-cli` child. The app was
-then quit; `listApps()` and a refreshed Activity Monitor filter showed no Rust
-Music or CLI process. This is one launch and one idle-memory sample, not a
-cold-start distribution, RSS measurement, or performance-threshold result.
+Five fresh app processes returned the empty Ready / No Track accessibility
+tree in **891, 858, 753, 798 and 779 ms** (median **798 ms**, range **753–891
+ms**). Every run displayed no loaded library and no autoplay, then exited
+before the next run. Activity Monitor separately reported **28.2 MB** in its
+`anonymousMemory` column for the idle app (PID 12236), with no `rust-music-cli`
+child; after Quit, `listApps()` and the refreshed Activity Monitor filter
+showed no Rust Music or CLI process. This is a five-run process-launch sample,
+not a system-boot cold-start profile or performance threshold, and one idle
+memory reading, not repeatable memory profiling or RSS.
 
 ## Operating constraints
 
