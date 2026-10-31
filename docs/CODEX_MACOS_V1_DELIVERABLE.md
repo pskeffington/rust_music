@@ -849,4 +849,19 @@ check above.
 
 The same command in the restricted shell exited **1** with AudioQueueStart
 OSStatus `-66680`, which Apple's Audio Toolbox documentation identifies as
-`kAudioQueueErr_InvalidDevice` ([Apple result code](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueerr_invaliddevice)). The host-level retry passed. This indicates an environment-specific output restriction; the error is preserved rather than counted as a product pass or ignored. Physical device loss/recovery remains untested.
+`kAudioQueueErr_InvalidDevice` (see [Apple's result code](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueerr_invaliddevice)).
+The host-level retry passed. This indicates an environment-specific output
+restriction; the error is preserved rather than counted as a product pass or
+ignored. Physical device loss/recovery remains untested.
+
+### 2026-10-31 exact-history offline and app-build refresh
+
+At local pre-recording HEAD `5da93936b87486d8eca057f6e06c11ae5fd8281c`,
+`sh scripts/offline-gate.sh` exited **0** across 17 local crates and 32
+path-only edges, with zero registry/Git crates and zero third-party system
+links. The same command sequence rebuilt the macOS bundle, reran the 18-case
+build-path test and Swift playback-state regression, and passed strict ad-hoc
+signature verification (all exit **0**). Roadmap-index, literature, and
+`git diff --check` validation passed. This history adds only release evidence
+documents after code candidate `ab829b3`; no product source changed. The
+focused feature-gated subprocess suite remains 7/7 at unchanged CLI code.
