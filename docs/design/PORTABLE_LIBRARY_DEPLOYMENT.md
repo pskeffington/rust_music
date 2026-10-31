@@ -81,3 +81,9 @@ User edits **on the Pip-Boy** should initially be treated as device-local prefer
 - **LIBSYNC-07 P2:** physical removable-volume and Raspberry Pi/Pip-Boy tests for reconnect, power interruption, latency/memory and usable playback.
 
 Prioritize MAC-01/02/03 and current PR #1 acceptance. Task IDs are a proposed supplemental index until reconciled with `docs/roadmap-index.json`. Preserve local work, one writer per scope, add verification evidence; do not mark tasks complete based on this document.
+
+## Engineering slice — 2026-10-31 sync planner (source committed, not gate-verified)
+
+The new `crates/rust-music-library/src/sync_plan.rs` module exports `MediaEntry`, `Snapshot`, `SyncPlan`, `validate_snapshot` and `plan_sync` through the library crate. It implements bounded, deterministic **pure delta planning** with a caller-supplied 32-byte SHA-256 value, byte-size comparison, generation rollback rejection, transfer-byte overflow protection, duplicate IDs, ASCII-casefold path collisions and a list of stale managed paths. Unit tests are present for empty/incremental cases, rename, traversal/collisions, rollback and overflow. The planner never scans, hashes, opens, deletes or copies media and never autoplays.
+
+**Important limitations:** digest bytes are trusted inputs (not independently calculated), stale path list is **not an authorized delete command**, full Unicode normalization and casefolding are not yet implemented, filesystem-safe no-follow operations and atomic publication are missing, and no compiled/test/hardware result was observed in this connector-only pass. Do not deploy packages or claim RM-023 complete until verification and a safe transfer/publisher implementation exist. Also note that current root-scoped `TrackId` values are not portable identities; consumers must use separate verified portable IDs. Next implement canonical manifest serialization/golden vectors and digest-checked staging, followed by integration tests.
