@@ -360,7 +360,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator captures negotiated PCM format, rate/channel accuracy, drain/stop, device changes and loopback evidence; does not infer bit-perfect from CLI",
-      "blocker": "RM-001 passed; physical audio hardware and measured DAC acceptance are still required"
+      "blocker": "RM-001 passed; physical audio hardware and measured DAC acceptance are still required On 2026-10-31 macOS Sound Output listed External Headphones (selected), MacBook Air Speakers, and ASUS VG32V HDMI. A bounded three-second Bonjour browse found RAOP/AirPlay advertisements named PowerAmp Living Room, White, Black, and this Mac's null’s Laptop; each dns-sd process was stopped by SIGINT (exit -2). The names do not identify UniFi/iHome models conclusively. No candidate appeared in Sound Output and no route was changed or played. This is LAN discovery only; physical route, device loss/recovery, and DAC acceptance remain open."
     },
     {
       "id": "RM-006",

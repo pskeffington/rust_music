@@ -1705,3 +1705,16 @@ claim. Representative-library measurement and full-app memory acceptance
 remain open. After each run the app exited; the process sampler returned “No
 such process” for the final PID. The generated fixture and helper were
 removed. No private media was used.
+
+### 2026-10-31 local AirPlay discovery check
+
+The macOS Sound Output panel listed External Headphones (selected), MacBook
+Air Speakers, and ASUS VG32V HDMI. A bounded local Bonjour browse found RAOP
+and AirPlay service advertisements named `PowerAmp Living Room`, `White`, and
+`Black`; it also found this Mac's own `null’s Laptop` service. The browse
+commands were stopped with SIGINT after three seconds each (exit **-2**).
+Those advertisements show that candidate AirPlay endpoints are present on
+the LAN, but the service names do not identify them conclusively as the
+UniFi or iHome units. None appeared in the macOS Sound Output list at the
+time, and no route was selected or changed. This is discovery evidence only,
+not Rust Music output, disconnect/recovery, or device-identity acceptance.

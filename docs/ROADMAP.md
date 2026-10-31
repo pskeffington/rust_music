@@ -513,3 +513,12 @@ result in 3.692 seconds including CUA/AX overhead. Treat these as synthetic
 observations only: host pressure and divergent app-memory deltas leave
 repeatable full-app memory acceptance open. The app and final PID exited and
 temporary files were removed.
+
+**RM-005 local AirPlay discovery (2026-10-31):** the macOS Sound Output list
+showed External Headphones (selected), MacBook Air Speakers, and ASUS VG32V
+HDMI. A three-second Bonjour browse found RAOP/AirPlay service names `PowerAmp
+Living Room`, `White`, `Black`, and this Mac's `null’s Laptop`. The discovery
+commands were stopped with SIGINT after each bounded browse (exit -2). The
+names do not prove which are UniFi or iHome hardware, and no candidate was
+available in the Sound Output list. No output route was changed or played.
+Physical AirPlay output and device-recovery acceptance remain open.
