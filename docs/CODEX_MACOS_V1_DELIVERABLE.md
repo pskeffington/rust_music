@@ -16,6 +16,14 @@ release approval.
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL / AUTOMATED LOCAL GATES PASS** | At source commit `d129c87ba3f8a3030b3234bedcee524041105759` (based on `799c49f6a48002dc0e4559ad3dd259c47e866535`), `sh scripts/offline-gate.sh` exited 0: 17 local crates, 32 path-only edges, zero registry/Git crates, and 17/17 simulated AudioQueue tests. `sh scripts/build-macos-app.sh` exited 0 with 18/18 symlink guards, optimized Swift UI/catalog harnesses, and strict local bundle signature validation. Its 20k synthetic catalog harness measured indexed construction at 119.158 ms p50 / 119.653 ms p95, search at 5,799.250 µs p50 / 6,040.750 µs p95, and 1,300,000 bytes of cached-index payload. The full `package_process` integration suite passed 8/8, including managed catalog EOF exit evidence. These synthetic measurements do not measure filesystem scanning, app-wide incremental memory, or interactive UI latency and have no accepted performance threshold. A separate read-only review found no blocking issue in the lifecycle diff. Prior private FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack parity evidence is retained; private media was not rerun. Real AudioQueue error/reopen behavior, live host focus, physical DAC/panel, repeatable app-memory measurement, and distribution acceptance remain open. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At tested code candidate `d129c87ba3f8a3030b3234bedcee524041105759`, branch `build/native-codecs-g0` stood 119 commits ahead of its local tracking ref; this was before a subsequent documentation-only evidence update. Local `origin/main` (`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`) is an ancestor. The latest recorded read-only GitHub check found PR #1 open, draft, unmerged, and `mergeable=true` / `mergeable_state=clean`, with remote head `2947e6737622c3c668003130006823df0bdde3e0` and base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`; the remote head had zero status contexts and zero check runs. The local branch has not been pushed. Local ancestry and clean mergeability do not establish remote synchronization or release approval. No push or merge while required host, hardware, performance and release gates remain open. Preserve backup branches and stash through post-merge validation. |
 
+### Operator functional confirmation — 2026-10-31
+
+The operator confirms that Rust Music library loading and audio output are
+working across the recent app iterations. This is direct user acceptance of
+the basic functional path. It is not instrumented acoustic capture, a DAC
+fidelity measurement, invalid-device AudioQueue recovery, or a substitute for
+the separate host, panel, performance and distribution gates below.
+
 ### 2026-10-31 current-candidate offline and app-bundle refresh
 
 At documentation candidate commit `0dd8f3104c0a62393632c75e9821a9f1b656cd15`
