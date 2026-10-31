@@ -785,6 +785,10 @@ fn process_error(code: ErrorCode, message: &str) -> Reply {
 ))]
 fn error_reply(error: MusicError) -> Reply {
     match error {
+        MusicError::Cancelled(_) => process_error(
+            ErrorCode::InvalidRequest,
+            "music library scan was cancelled",
+        ),
         MusicError::Unsupported(_) => process_error(
             ErrorCode::Unsupported,
             "lossless format or device profile is unsupported",
