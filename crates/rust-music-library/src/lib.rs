@@ -144,16 +144,79 @@ pub struct Track {
     pub title: String,
     /// Small allowlisted text metadata. Cover art and unknown fields are never
     /// decoded or retained; malformed/oversized values fall back to filename.
-    pub tags: Option<TrackTags>,
+    pub tags: Option<Box<TrackTags>>,
     pub container: AudioContainer,
     pub size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrackTags {
-    pub title: Option<String>,
-    pub artist: Option<String>,
-    pub album: Option<String>,
+    text: String,
+    title: TagSpan,
+    artist: TagSpan,
+    album: TagSpan,
+}
+
+/// Compact byte range into one UTF-8 metadata buffer. The sentinel start value
+/// represents a missing field; all accepted tag strings together are bounded
+/// below 1,500 bytes, so 16-bit offsets cover every parser-accepted value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TagSpan {
+    start: u16,
+    end: u16,
+}
+
+impl TagSpan {
+    const MISSING: Self = Self {
+        start: u16::MAX,
+        end: u16::MAX,
+    };
+
+    fn value(self, text: &str) -> Option<&str> {
+        if self.start == u16::MAX {
+            None
+        } else {
+            text.get(usize::from(self.start)..usize::from(self.end))
+        }
+    }
+}
+
+impl Default for TagSpan {
+    fn default() -> Self {
+        Self::MISSING
+    }
+}
+
+#[derive(Debug, Default)]
+struct ParsedTrackTags {
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+}
+
+impl ParsedTrackTags {
+    fn is_empty(&self) -> bool {
+        self.title.is_none() && self.artist.is_none() && self.album.is_none()
+    }
+
+    fn into_compact(self) -> TrackTags {
+        let capacity = self
+            .title
+            .as_ref()
+            .map_or(0, String::len)
+            .saturating_add(self.artist.as_ref().map_or(0, String::len))
+            .saturating_add(self.album.as_ref().map_or(0, String::len));
+        let mut text = String::with_capacity(capacity);
+        let title = TrackTags::append_value(&mut text, self.title);
+        let artist = TrackTags::append_value(&mut text, self.artist);
+        let album = TrackTags::append_value(&mut text, self.album);
+        TrackTags {
+            text,
+            title,
+            artist,
+            album,
+        }
+    }
 }
 
 impl Track {
@@ -162,8 +225,38 @@ impl Track {
     pub fn display_title(&self) -> &str {
         self.tags
             .as_ref()
-            .and_then(|tags| tags.title.as_deref())
+            .and_then(|tags| tags.title())
             .unwrap_or(&self.title)
+    }
+}
+
+impl TrackTags {
+    /// Sanitized embedded title, if it is present.
+    pub fn title(&self) -> Option<&str> {
+        self.title.value(&self.text)
+    }
+
+    /// Sanitized embedded artist, if it is present.
+    pub fn artist(&self) -> Option<&str> {
+        self.artist.value(&self.text)
+    }
+
+    /// Sanitized embedded album, if it is present.
+    pub fn album(&self) -> Option<&str> {
+        self.album.value(&self.text)
+    }
+
+    fn append_value(text: &mut String, value: Option<String>) -> TagSpan {
+        let Some(value) = value else {
+            return TagSpan::MISSING;
+        };
+        let start = text.len();
+        text.push_str(&value);
+        let end = text.len();
+        TagSpan {
+            start: u16::try_from(start).expect("bounded metadata start fits u16"),
+            end: u16::try_from(end).expect("bounded metadata end fits u16"),
+        }
     }
 }
 
@@ -287,7 +380,7 @@ fn text_matches(track: &Track, needle: &str) -> bool {
                 .tags
                 .as_ref()
                 .into_iter()
-                .flat_map(|tags| [tags.artist.as_deref(), tags.album.as_deref()]),
+                .flat_map(|tags| [tags.artist(), tags.album()]),
         )
         .flatten()
         .any(|field| field.to_lowercase().contains(needle))
@@ -309,12 +402,12 @@ fn compare_tracks(left: &Track, right: &Track, sort_by: TrackSort, descending: b
             compare_optional_text(Some(left.display_title()), Some(right.display_title()))
         }
         TrackSort::Artist => compare_optional_text(
-            left.tags.as_ref().and_then(|tags| tags.artist.as_deref()),
-            right.tags.as_ref().and_then(|tags| tags.artist.as_deref()),
+            left.tags.as_ref().and_then(|tags| tags.artist()),
+            right.tags.as_ref().and_then(|tags| tags.artist()),
         ),
         TrackSort::Album => compare_optional_text(
-            left.tags.as_ref().and_then(|tags| tags.album.as_deref()),
-            right.tags.as_ref().and_then(|tags| tags.album.as_deref()),
+            left.tags.as_ref().and_then(|tags| tags.album()),
+            right.tags.as_ref().and_then(|tags| tags.album()),
         ),
         TrackSort::Container => left.container.cmp(&right.container),
     };
@@ -428,7 +521,7 @@ fn add_tag(slot: &mut Option<String>, raw: &[u8]) {
     }
 }
 
-fn tag_slot<'a>(tags: &'a mut TrackTags, key: &[u8]) -> Option<&'a mut Option<String>> {
+fn tag_slot<'a>(tags: &'a mut ParsedTrackTags, key: &[u8]) -> Option<&'a mut Option<String>> {
     if key.eq_ignore_ascii_case(b"TITLE") {
         Some(&mut tags.title)
     } else if key.eq_ignore_ascii_case(b"ARTIST") {
@@ -442,7 +535,7 @@ fn tag_slot<'a>(tags: &'a mut TrackTags, key: &[u8]) -> Option<&'a mut Option<St
 
 fn read_flac_tags(file: &mut File) -> Option<TrackTags> {
     file.seek(SeekFrom::Start(4)).ok()?;
-    let mut tags = TrackTags::default();
+    let mut tags = ParsedTrackTags::default();
     let mut total = 0u64;
     let mut saw_last = false;
     let mut items_left = MAX_TAG_ITEMS;
@@ -520,7 +613,7 @@ fn read_flac_tags(file: &mut File) -> Option<TrackTags> {
             break;
         }
     }
-    (saw_last && !tags.is_empty()).then_some(tags)
+    (saw_last && !tags.is_empty()).then(|| tags.into_compact())
 }
 
 fn read_aiff_tags(file: &mut File) -> Option<TrackTags> {
@@ -532,7 +625,7 @@ fn read_aiff_tags(file: &mut File) -> Option<TrackTags> {
     }
     let mut remaining =
         u64::from(u32::from_be_bytes(form[4..8].try_into().ok()?)).checked_sub(4)?;
-    let mut tags = TrackTags::default();
+    let mut tags = ParsedTrackTags::default();
     let mut total = 0u64;
     for _ in 0..MAX_TAG_CHUNKS {
         if remaining < 8 {
@@ -574,13 +667,7 @@ fn read_aiff_tags(file: &mut File) -> Option<TrackTags> {
             break;
         }
     }
-    (!tags.is_empty()).then_some(tags)
-}
-
-impl TrackTags {
-    fn is_empty(&self) -> bool {
-        self.title.is_none() && self.artist.is_none() && self.album.is_none()
-    }
+    (!tags.is_empty()).then(|| tags.into_compact())
 }
 
 fn read_tags(file: &mut File, container: AudioContainer) -> Option<TrackTags> {
@@ -680,7 +767,7 @@ fn scan_with_cancel_check(
                         id,
                         relative_path,
                         title,
-                        tags: read_tags(&mut file, container),
+                        tags: read_tags(&mut file, container).map(Box::new),
                         container,
                         size_bytes,
                     });
@@ -1046,14 +1133,56 @@ mod tests {
         let track = lib.track(0).unwrap();
         assert_eq!(track.title, "fallback");
         assert_eq!(track.display_title(), "Bach – aria");
-        assert_eq!(
-            track.tags,
-            Some(TrackTags {
-                title: Some("Bach – aria".into()),
-                artist: Some("KimikoIshizaka".into()),
-                album: Some("Open Goldberg Variations".into()),
-            })
+        let tags = track.tags.as_ref().unwrap();
+        assert_eq!(tags.title(), Some("Bach – aria"));
+        assert_eq!(tags.artist(), Some("KimikoIshizaka"));
+        assert_eq!(tags.album(), Some("Open Goldberg Variations"));
+    }
+
+    #[test]
+    fn track_and_packed_tags_keep_optional_metadata_compact() {
+        assert!(
+            std::mem::size_of::<Track>() <= 96,
+            "Track grew to {} bytes",
+            std::mem::size_of::<Track>()
         );
+        assert!(
+            std::mem::size_of::<TrackTags>() <= 48,
+            "TrackTags grew to {} bytes",
+            std::mem::size_of::<TrackTags>()
+        );
+        assert_eq!(std::mem::size_of::<TagSpan>(), 4);
+        assert_eq!(
+            std::mem::size_of::<Option<Box<TrackTags>>>(),
+            std::mem::size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn packed_metadata_ranges_preserve_maximum_utf8_values_and_field_order() {
+        let t = Temp::new();
+        let title = "🦀".repeat(MAX_TAG_CHARS + 2);
+        let artist = "𝄞".repeat(MAX_TAG_CHARS + 1);
+        let album = "é".repeat(MAX_TAG_CHARS + 3);
+        fs::write(
+            t.0.join("packed.flac"),
+            flac_with_comments(&[
+                [b"TITLE=".as_slice(), title.as_bytes()].concat(),
+                [b"ARTIST=".as_slice(), artist.as_bytes()].concat(),
+                [b"ALBUM=".as_slice(), album.as_bytes()].concat(),
+            ]),
+        )
+        .unwrap();
+
+        let library = scan(&t.0, ScanLimits::default()).unwrap();
+        let tags = library.track(0).unwrap().tags.as_ref().unwrap();
+        let expected_title = "🦀".repeat(MAX_TAG_CHARS);
+        let expected_artist = "𝄞".repeat(MAX_TAG_CHARS);
+        let expected_album = "é".repeat(MAX_TAG_CHARS);
+        assert_eq!(tags.title(), Some(expected_title.as_str()));
+        assert_eq!(tags.artist(), Some(expected_artist.as_str()));
+        assert_eq!(tags.album(), Some(expected_album.as_str()));
+        assert_eq!(tags.text.len(), MAX_TAG_CHARS * (4 + 4 + 2));
     }
 
     #[test]
@@ -1072,10 +1201,10 @@ mod tests {
         let lib = scan(&t.0, ScanLimits::default()).unwrap();
         let track = lib.track(0).unwrap();
         assert_eq!(track.display_title(), "fallback");
-        assert_eq!(
-            track.tags.as_ref().unwrap().artist.as_deref(),
-            Some("Valid artist")
-        );
+        let tags = track.tags.as_ref().unwrap();
+        assert_eq!(tags.title(), None);
+        assert_eq!(tags.artist(), Some("Valid artist"));
+        assert_eq!(tags.album(), None);
     }
 
     #[test]
@@ -1094,7 +1223,7 @@ mod tests {
         let lib = scan(&t.0, ScanLimits::default()).unwrap();
         let track = lib.track(0).unwrap();
         assert_eq!(track.display_title(), "Piano – nocturne");
-        assert_eq!(track.tags.as_ref().unwrap().artist, None);
+        assert_eq!(track.tags.as_ref().unwrap().artist(), None);
     }
 
     #[cfg(unix)]

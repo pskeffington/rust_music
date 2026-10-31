@@ -102,7 +102,7 @@ fn catalog_tsv(root: &std::path::Path, query_text: &str) -> Result<String> {
                 track
                     .tags
                     .as_ref()
-                    .and_then(|tags| tags.artist.as_deref())
+                    .and_then(|tags| tags.artist())
                     .unwrap_or(""),
             );
             output.push('\t');
@@ -111,7 +111,7 @@ fn catalog_tsv(root: &std::path::Path, query_text: &str) -> Result<String> {
                 track
                     .tags
                     .as_ref()
-                    .and_then(|tags| tags.album.as_deref())
+                    .and_then(|tags| tags.album())
                     .unwrap_or(""),
             );
             output.push('\t');
