@@ -12,7 +12,8 @@
   "navigation": "docs/REPOSITORY_INDEX.md",
   "related_registries": [
     "docs/literature-index.json",
-    "docs/lossless-formats.json"
+    "docs/lossless-formats.json",
+    "docs/mac07-pass-index.json"
   ],
   "policy": {
     "runtime_cargo_dependencies": "local-workspace-only",
