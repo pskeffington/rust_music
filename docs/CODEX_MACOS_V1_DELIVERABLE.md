@@ -41,6 +41,15 @@ closure, active-playback parent closure, and acknowledged shutdown during
 active playback. These use test support output and do not replace the observed
 GUI/AudioQueue close test or a physical device-error test.
 
+A separate read-only security/reliability review of the SwiftUI app and
+package-process boundary at that same source candidate found no concrete
+defect in its reviewed scope. It confirmed bounded IPC frames, explicit
+user-started scanning, close-time scan/child shutdown, checked relative paths,
+and no network/artwork/image-cache/visualizer path. It retained the documented
+check-then-open filesystem race and unverified asynchronous AudioQueue loss
+and host TV-contention cases. This review is scoped evidence, not full-product
+security approval.
+
 ### 2026-10-31 candidate verification at `c1ce494`
 
 At source commit `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, the focused
