@@ -837,9 +837,7 @@
       "id": "RM-028",
       "title": "MAC07-00/01 reproduce and repair GUI FLAC playback regression",
       "priority": "P0",
-      "depends_on": [
-        "RM-020"
-      ],
+      "depends_on": [],
       "acceptance": "Same real FLAC file plays audibly via macOS GUI and native CLI, failing regression turns green, truthful output diagnostics captured.",
       "blocker": "Operator confirms CLI audio but GUI cannot play real FLAC; source root cause not yet established."
     },
