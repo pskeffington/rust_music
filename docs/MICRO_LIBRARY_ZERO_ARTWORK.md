@@ -80,8 +80,8 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
 | ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root search, sort and pagination implemented; multiple roots/reconciliation remain |
-| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model/import/export and reorder operations; persistence remains |
-| ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | planned |
+| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model/import/export and reorder operations; named playlist persistence remains |
+| ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, repeat modes and seeded shuffle; host transport/focus wiring remains |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
 | ML-07 | Synthetic scale, restart/corruption and performance profiles | planned |
 
@@ -121,5 +121,16 @@ authentication. `cargo test --locked --offline -p rust-music-library` passes
 Unicode queries, pagination, query bounds, safe M3U8 round trips, and playlist
 limits. The new playlist model accepts only bounded UTF-8 relative paths with
 supported lossless-container suffixes; it does no filesystem access. Playlist
-durability, queue state, multiple roots, presentation, and scale profiling
-remain unimplemented.
+durability, multiple roots, host queue transport/focus wiring, presentation,
+and scale profiling remain unimplemented.
+
+`rust-music-library::queue` adds a bounded versioned text record, Unix atomic
+save/load restricted to `.rmq` state files, relative lossless paths, repeat
+Off/One/All, explicit selection/next/previous and deterministic seeded
+shuffle. Queue navigation never starts playback or acquires audio focus. The
+six queue tests cover state round trip, malformed records, bounds, navigation,
+repeat/shuffle, and queue-file persistence while refusing a symlink target;
+the audio file fixture remains byte-identical. Non-Unix queue persistence
+currently returns `Unsupported`. Local filesystem path replacement races
+remain documented; resolve every queue entry through the selected library's
+checked-path API before playback.

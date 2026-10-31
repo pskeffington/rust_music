@@ -45,6 +45,35 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
 | AudioQueue OSStatus failure and teardown recovery | PASS (simulated API failures) | `cargo test --locked --offline -p rust-music-native --features macos` passed 12/12 after adding an injectable API seam. Cases include create/partial-allocation failure, enqueue/start/stop/dispose errors, retained-orphan retry before a later open, graceful buffer callback drain before synchronous disposal, and timeout escalation to immediate stop/dispose. Independent review found no blocking synchronization or registry defect. The fake callback executes synchronously; this does not simulate physical device loss, a callback already running on another thread, disconnect/reconnect, audible output, or DAC behavior. |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink or structural tests |
 
+## 2026-10-31 device availability check
+
+- `system_profiler SPAudioDataType -detailLevel mini` exited 0 but reported
+  `Devices:` with no entries. The native-app UI was inaccessible because the
+  Mac was locked, so no physical output, disconnect/reconnect, or panel/DAC
+  test could be performed in this pass. The AudioQueue unit tests above use a
+  fake API and do not substitute for this hardware gate.
+- After the latest backend change, `sh scripts/build-macos-app.sh` exited 0;
+  `plutil -lint target/macos/RustMusic.app/Contents/Info.plist` and
+  `codesign --verify --deep --strict` also exited 0. This verifies packaging,
+  not physical device availability.
+
+## 2026-10-31 queue and integrated offline gate
+
+- `cargo test --locked --offline -p rust-music-library` exited 0 (21/21),
+  including the catalog/search, M3U8, queue navigation/repeat/shuffle and
+  Unix atomic queue persistence tests. `next_candidate` and
+  `previous_candidate` only select state; playback and focus remain explicit
+  host actions. Queue file tests reject symlink destinations and confirm a
+  source audio sentinel remains unchanged.
+- The first full-gate run found Clippy's `should_implement_trait` warning for
+  the queue method named `next`; it exited 101. The methods were renamed to
+  candidate selection terms. The subsequent `sh scripts/offline-gate.sh`
+  exited 0 across 17 local crates, 32 local edges, all tests, Clippy, release
+  build and macOS feature checks. No private PCM corpus was rerun.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, `cargo fmt --all -- --check`, and
+  `git diff --check` exited 0.
+
 ## Operational requirements
 
 - The `rust-music-host` source does not call `try_acquire_music` until the host explicitly issues `Play`. Repeated Play while already playing is idempotent.

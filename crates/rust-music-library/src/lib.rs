@@ -16,6 +16,8 @@ use std::{
 
 /// Bounded, text-only M3U8 playlist import/export and edit model.
 pub mod playlist;
+/// Bounded, persistent text-only queue state and navigation model.
+pub mod queue;
 
 const MAX_TAG_BLOCKS: usize = 128;
 const MAX_TAG_BLOCK_BYTES: u32 = 16 * 1024 * 1024;
