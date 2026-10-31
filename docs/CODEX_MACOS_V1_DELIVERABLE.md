@@ -594,3 +594,11 @@ It observed normal EOF child PID 22405 exit 0, malformed-protocol child PID
 with only the header, confirming none of those PIDs remained. This is
 CLI-child lifecycle evidence with the injected test sink; it does not add
 physical-device recovery or audible-output evidence.
+
+At source commit `eb69a8c6ef0f8c91d5c68294c5cb2faaf0940adb`,
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0** with **7/7**
+tests passing: wrong package identity, inert handshake/shutdown, removed-track
+rejection, managed playback-error cleanup, repeated parent-pipe close,
+active-playback parent-pipe close, and active-playback Shutdown exit. These
+use test support and do not establish physical device recovery.
