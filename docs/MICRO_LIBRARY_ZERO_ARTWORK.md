@@ -83,7 +83,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model/import/export and reorder operations; named playlist persistence remains |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, repeat modes and seeded shuffle; host transport/focus wiring remains |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
-| ML-07 | Synthetic scale, restart/corruption and performance profiles | planned |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: catalog build/search profiled at 0/1/100/2k/20k; cold app startup, incremental memory, restart/corruption remain |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
 engineering target: under 8 MiB additional idle catalog memory for a defined
@@ -134,3 +134,27 @@ the audio file fixture remains byte-identical. Non-Unix queue persistence
 currently returns `Unsupported`. Local filesystem path replacement races
 remain documented; resolve every queue entry through the selected library's
 checked-path API before playback.
+
+### Initial synthetic catalog profile (2026-10-31)
+
+Built with `cargo build --release --locked --offline -p rust-music-library
+--example profile_micro_library` (exit 0), then ran
+`/usr/bin/time -l target/release/examples/profile_micro_library` (exit 0).
+Fixtures are empty/small WAV signatures only; no audio payload is generated.
+The machine was idle apart from the profile and reported no audio devices.
+
+| Tracks | Catalog scan | Search p50 | Search p95 |
+| ---: | ---: | ---: | ---: |
+| 0 | <1 ms | 83 ns | 125 ns |
+| 1 | <1 ms | 125 ns | 209 ns |
+| 100 | 2 ms | 4.417 µs | 22.125 µs |
+| 2,000 | 30 ms | 73.083 µs | 83.709 µs |
+| 20,000 | 316 ms | 684.083 µs | 732.084 µs |
+
+The finalized run took 2.92 s including fixture creation, scanning and 51
+searches at each size. Peak process RSS was 11,239,424 bytes (10.72 MiB), which includes
+the executable and profiling harness; it is not incremental catalog memory.
+Cold application startup and incremental idle memory were not isolated, so the
+under-8-MiB additional-memory target remains unverified. The exact fixture
+generator and query are in
+[`examples/profile_micro_library.rs`](../crates/rust-music-library/examples/profile_micro_library.rs).
