@@ -81,6 +81,25 @@ The sandboxed error is not host LaunchServices failure. This smoke did not
 start a playback child; active-child close evidence remains in the earlier
 MAC-02 and package-process records.
 
+### 2026-10-31 repeated same-process 20k app catalog footprint
+
+Two fresh Rust Music processes explicitly loaded the same synthetic catalog
+of 20,000 empty 12-byte RIFF/WAVE signatures. Each app showed `LOADED 20000
+TRACKS. PLAYBACK IS STOPPED.` Five idle physical-footprint readings per app
+were stable at 31,605,648 B and 32,424,872 B. Five post-scan readings were
+stable at 38,667,152 B and 39,257,000 B. The same-process deltas were
+7,061,504 B (6.734 MiB) and 6,832,128 B (6.516 MiB), median **6,946,816 B
+(6.625 MiB)**. The local `proc_pid_rusage(RUSAGE_INFO_V4)` probe was compiled
+with `clang -Wall -Wextra -Werror -O2` and read only these local PIDs.
+
+Resident-size readings were noisy and decreased in the second run, so they
+are not used as the delta. The measured physical-footprint deltas are below
+the 8 MiB engineering target for this minimal, untagged synthetic catalog,
+but do not qualify typical tagged music libraries, search/UI residency,
+startup, or an app-wide acceptance threshold. Playback was never started;
+Cmd-Q returned the app to `isRunning=false`, and both fixture and probe were
+removed.
+
 At current pre-recording docs candidate `153ccced8444345e3340917ca65e1c8c2234300e`,
 the focused subprocess regression was rerun against unchanged current CLI
 source: `cargo test --locked --offline -p rust-music-cli --features
