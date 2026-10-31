@@ -92,6 +92,14 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 **G14:** Independent WASAPI and AAudio device adapters with real target qualification.
 **RM-020 / ML-00–ML-07:** The catalog has stable canonical-root IDs, bounded text/container filtering, deterministic sorting/pagination, cancel-aware explicit scans, bounded M3U8 editing, Unix-persistent queue state with repeat/seeded shuffle, and bounded versioned named playlists. The standalone macOS UI provides explicit folder load/search, queue/playlists and Play/Pause/Resume/Stop/Next/Previous/software volume. Rebuilt-app checks covered silent-library browsing, playlist/queue restore after restart, no autoplay, and an earlier nonzero synthetic WAV smoke through AudioQueue with operator-reported audible output. At 7c1b1d0, the full offline gate and app bundle/plist/strict local signature checks passed; focused CLI tests passed 19/19 plus 7/7. Three 20k synthetic process-RSS profiles measured 5,248 / 5,568 / 7,824 KiB medians for no-tag/10%-tagged/all-tagged mixes. These are RSS estimates, not full-app memory qualification. Remaining work: app-wide memory and cold-start profiling, transition latency, multiple-root reconciliation, non-Unix queue persistence, device disconnect/recovery, physical DAC/panel, and Rust Boy shared focus. Optional explicit-load autoplay and native EQ remain follow-on gates. Preserve the zero-artwork policy.
 
+**RM-020 catalog-core profile refresh (2026-10-31, source `4afaf1b`):** the
+release profile was run twice at 0/1/100/2k/20k generated WAV-signature
+entries. Search p95 was 78.0–78.1 µs at 2k and 743.1–746.5 µs at 20k;
+20k catalog construction varied from 344 to 672 ms. These are Rust core
+measurements, not SwiftUI search/render or whole-app performance acceptance.
+App startup, full-app memory, transition qualification, and real tagged-library
+behavior remain open; RM-020 stays in progress.
+
 **RM-020 macOS acceptance update (2026-10-31):** SwiftUI chassis source at
 `d65efc16f5e694ba40acdac6b4662ae94542b88d` builds and signs; the host
 LaunchServices `/usr/bin/open -n` path returned 0 and the UI remained Ready / No

@@ -387,3 +387,15 @@ accessibility-result round-trips were 854.0, 861.4, 1,099.2, 1,165.0 and
 overhead and do not measure the search function alone or establish p95. No
 track was played; fixtures were removed. Direct reproducible query latency
 remains unmeasured at the app level.
+
+### Current Rust catalog-core scan/search profile (2026-10-31)
+
+At `4afaf1baab544212c43eb5433298c1f82801c7b6`, the release example build and
+two direct runs of `target/release/examples/profile_micro_library` exited 0.
+The helper generated temporary 12-byte WAV signatures and no user media was
+read. Catalog build times were 0/0 ms at 0 and 1 tracks, 3/2 ms at 100,
+33/174 ms at 2,000, and 344/672 ms at 20,000. Search p95 was 0.125/0.125 µs,
+0.292/0.709 µs, 5.584/5.917 µs, 78.042/78.125 µs, and 743.125/746.458 µs
+respectively. The 20k build-time spread needs more samples. This is core-only
+measurement; SwiftUI search/render, app startup, full-app memory, and real
+tagged-library performance remain open.

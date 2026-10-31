@@ -802,3 +802,25 @@ edges, with zero registry/Git crates and zero third-party system links.
 Roadmap-index and literature validators and `git diff --check` also exited
 **0**. These checks do not change the open physical-device, host-focus,
 distribution-signing, or app-wide performance acceptance states.
+
+### 2026-10-31 current catalog-core scan/search profile
+
+At HEAD `4afaf1baab544212c43eb5433298c1f82801c7b6`,
+`cargo build --locked --offline --release -p rust-music-library --example
+profile_micro_library` exited **0**. Two direct runs of
+`target/release/examples/profile_micro_library` also exited **0**. The helper
+creates temporary directories containing only synthetic 12-byte WAV
+signatures; it does not read user media or play audio.
+
+| Tracks | Catalog build ms (run 1 / 2) | Search p50 µs (run 1 / 2) | Search p95 µs (run 1 / 2) |
+| ---: | ---: | ---: | ---: |
+| 0 | 0 / 0 | 0.083 / 0.083 | 0.125 / 0.125 |
+| 1 | 0 / 0 | 0.125 / 0.167 | 0.292 / 0.709 |
+| 100 | 3 / 2 | 3.959 / 4.375 | 5.584 / 5.917 |
+| 2,000 | 33 / 174 | 72.042 / 68.916 | 78.042 / 78.125 |
+| 20,000 | 344 / 672 | 683.834 / 691.625 | 743.125 / 746.458 |
+
+The 20k build-time spread is substantial and needs more repeated profiles.
+These measure the Rust catalog core, not SwiftUI filtering/rendering, app
+startup, full-app memory, or real tagged-library behavior; those MAC-03
+measurements remain open.
