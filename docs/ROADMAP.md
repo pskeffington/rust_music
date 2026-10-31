@@ -274,6 +274,19 @@ also exited **0**. Private decoder parity suites were not rerun. These checks
 do not close the open host, physical-output, device-error, or full-app
 performance acceptance gates.
 
+**RM-019 / MAC-02 reconnect and quit observation (2026-10-31):** with System
+Settings showing External Headphones / Headphone port selected, Rust Music
+loaded and played a generated two-second -40 dBFS 16-bit/44.1 kHz WAV; the UI
+reported AudioQueue PLAYING then PLAYBACK FINISHED. Activity Monitor showed
+app PID 44595 and CLI child PID 45461 before Cmd-Q. After quit, the old CLI
+row was absent and only a fresh Ready / No Track app PID 45526 remained, with
+no CLI child. The synthetic fixture was removed. This is normal-quit process
+cleanup and selected-route evidence; no acoustic capture or actual device
+error/reopen was observed. `system_profiler` listed no devices and shell
+`pgrep` could not access `sysmond`, so System Settings and Activity Monitor
+were the direct observations. RM-019 lifecycle evidence is strengthened;
+physical output and device-recovery acceptance stay open.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

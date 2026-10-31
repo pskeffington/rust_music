@@ -1157,3 +1157,25 @@ signature validation. `python3 scripts/check_roadmap_index.py`,
 Private FLAC/WAV/AIFF decoder parity was not rerun. This refreshed automated
 gate does not satisfy live Rust Boy focus, physical DAC/panel, real device
 error/recovery, or the open app-memory/direct-latency acceptance criteria.
+
+### 2026-10-31 Shure reconnect, low-level output, and normal quit
+
+After operator reconnection, System Settings visibly selected **External
+Headphones / Headphone port**, with output unmuted at 93%. The standalone app
+explicitly loaded a generated two-second mono 16-bit/44.1 kHz 440 Hz WAV at
+approximately -40 dBFS; the UI reported AudioQueue PLAYING and then PLAYBACK
+FINISHED. Activity Monitor showed app PID 44595 and its `rust-music-cli` child
+PID 45461 while the app was open. Cmd-Q was sent after playback finished; a
+subsequent Activity Monitor view showed neither the old child nor a CLI row,
+and showed a fresh Ready / No Track Rust Music PID 45526 without a CLI child.
+The CUA app binding had relaunched the app after quit. The generated fixture
+was removed (cleanup exit 0).
+
+`system_profiler SPAudioDataType -detailLevel mini` exited **0** in the
+restricted shell but listed no devices, and shell `pgrep` exited **3** because
+`sysmond` process-list access is unavailable; the UI observations above are
+the process/device evidence for this pass. This establishes selected route,
+successful app output state transitions, and normal-quit child disappearance.
+It is not acoustic loopback, DAC fidelity, proof of audible sound, or an
+AudioQueue invalid-device failure/reopen test. Physical device recovery,
+hardware panel/DAC acceptance and live Rust Boy focus remain open.
