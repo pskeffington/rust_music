@@ -12,6 +12,7 @@ use std::{
     fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering as AtomicOrdering},
 };
 
 /// Bounded, text-only M3U8 playlist import/export and edit model.
@@ -590,6 +591,29 @@ fn read_tags(file: &mut File, container: AudioContainer) -> Option<TrackTags> {
 /// partial playlist. Call on a worker thread, never from the Rust_Boy UI tick.
 /// The filesystem is read-only; no file contents are cached or sent anywhere.
 pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
+    scan_cancellable(root, limits, &AtomicBool::new(false))
+}
+
+/// Explicit bounded scan that can be cancelled by a caller-owned flag.
+/// Cancellation returns no partial catalog, allowing the caller to keep its
+/// previously committed library snapshot intact. Polling occurs between each
+/// filesystem entry, on the worker performing the scan.
+pub fn scan_cancellable(
+    root: impl AsRef<Path>,
+    limits: ScanLimits,
+    cancellation: &AtomicBool,
+) -> Result<Library> {
+    scan_with_cancel_check(root, limits, || cancellation.load(AtomicOrdering::Relaxed))
+}
+
+fn scan_with_cancel_check(
+    root: impl AsRef<Path>,
+    limits: ScanLimits,
+    is_cancelled: impl Fn() -> bool,
+) -> Result<Library> {
+    if is_cancelled() {
+        return Err(MusicError::Cancelled("library scan cancelled"));
+    }
     let limits = limits.validate()?;
     let metadata = fs::symlink_metadata(root.as_ref())?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
@@ -606,6 +630,9 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
     let mut skipped_entries = 0usize;
     while let Some((dir, depth)) = pending.pop() {
         for item in fs::read_dir(&dir)? {
+            if is_cancelled() {
+                return Err(MusicError::Cancelled("library scan cancelled"));
+            }
             let item = item?;
             examined_entries = examined_entries.saturating_add(1);
             if examined_entries > limits.max_entries {
@@ -658,6 +685,9 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
                 }
             }
         }
+    }
+    if is_cancelled() {
+        return Err(MusicError::Cancelled("library scan cancelled"));
     }
     tracks.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
     Ok(Library {
@@ -923,6 +953,23 @@ mod tests {
             }
         )
         .is_err());
+    }
+
+    #[test]
+    fn cancelled_scan_returns_no_partial_catalog_and_preserves_committed_snapshot() {
+        let t = Temp::new();
+        fs::write(t.0.join("a.wav"), wave_file()).unwrap();
+        let committed = scan(&t.0, ScanLimits::default()).unwrap();
+        fs::write(t.0.join("b.wav"), wave_file()).unwrap();
+        let checks = std::cell::Cell::new(0usize);
+        let attempted = scan_with_cancel_check(&t.0, ScanLimits::default(), || {
+            let next = checks.get() + 1;
+            checks.set(next);
+            next > 2
+        });
+        assert!(matches!(attempted, Err(MusicError::Cancelled(_))));
+        assert_eq!(committed.len(), 1);
+        assert_eq!(committed.track(0).unwrap().title, "a");
     }
 
     #[test]

@@ -90,7 +90,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-00 | Baseline inventory of scanner, host slot, UI, persistence, tests and footprint | complete; current scanner is explicit and bounded, but has no stable IDs, search, playlists, or durable queue |
 | ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
-| ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root search, sort and pagination implemented; multiple roots/reconciliation remain |
+| ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root query/sort/pagination plus atomic cancel-aware scan API; multiple roots/reconciliation and UI worker wiring remain |
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model plus bounded versioned named-playlist CRUD and atomic `.rmp` persistence; UI/host wiring remains |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, repeat modes and seeded shuffle; host transport/focus wiring remains |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
@@ -159,6 +159,13 @@ audio files. This is a data-model/persistence slice; no standalone or host
 workflow is implied by it. Like queue and catalog state, the symlink metadata
 check and subsequent file open can race a hostile local filesystem actor;
 hosts requiring that threat model need an OS no-follow/openat-style API.
+
+`scan_cancellable` accepts a caller-owned `AtomicBool`, checks it between
+filesystem entries, and returns a cancellation error without exposing a
+partial catalog. Callers can replace the committed catalog only after a full
+successful result, so cancel preserves the prior snapshot. A deterministic
+mid-scan cancellation test verifies that path; UI worker ownership and progress
+presentation remain unimplemented.
 
 ### Initial synthetic catalog profile (2026-10-31)
 

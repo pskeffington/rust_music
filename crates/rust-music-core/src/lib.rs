@@ -7,6 +7,7 @@ use std::{error::Error, fmt, io};
 #[derive(Debug)]
 pub enum MusicError {
     Io(io::Error),
+    Cancelled(&'static str),
     Invalid(&'static str),
     Unsupported(&'static str),
     Limit(&'static str),
@@ -17,6 +18,7 @@ impl fmt::Display for MusicError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(e) => write!(f, "I/O: {e}"),
+            Self::Cancelled(s) => write!(f, "cancelled: {s}"),
             Self::Invalid(s) => write!(f, "invalid audio: {s}"),
             Self::Unsupported(s) => write!(f, "unsupported audio: {s}"),
             Self::Limit(s) => write!(f, "audio resource limit: {s}"),
