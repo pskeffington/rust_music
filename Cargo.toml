@@ -17,6 +17,7 @@ members = [
   "crates/rust-music-library",
   "crates/rust-music-host",
   "crates/rust-music-panel",
+  "crates/rust-music-ipc",
 ]
 
 [workspace.package]

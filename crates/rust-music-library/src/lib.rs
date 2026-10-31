@@ -99,6 +99,17 @@ pub struct Library {
     pub skipped_entries: usize,
 }
 impl Library {
+    /// Empty, no-I/O catalog for a package that has been mounted but has not
+    /// yet received an explicit user library-scan request.
+    pub fn empty() -> Self {
+        Self {
+            root: PathBuf::new(),
+            tracks: Vec::new(),
+            examined_entries: 0,
+            skipped_entries: 0,
+        }
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

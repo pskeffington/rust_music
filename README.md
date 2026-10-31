@@ -32,6 +32,7 @@ unverified.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
 - **Development CLI**: bounded library scan, inspect/full decode, lossless source to WAV, sample-bounded seek-range export for seek-capable decoders, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
+- **Standalone macOS app**: native SwiftUI shell around the local Rust CLI with explicit file selection, decoder inspection, Play and Stop. Build with `sh scripts/build-macos-app.sh`; the app bundle is local-only and does not package music.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
@@ -63,17 +64,19 @@ cargo run --locked --offline -p rust-music-cli --features macos-output -- play ~
 cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/Music/track.flac hw:0,0
 ```
 
-All **16 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF and CAF vectors and six private real-world FLAC tracks pass native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
+All **17 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF, CAF and bounded WavPack vectors and six private real-world FLAC tracks pass recorded native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
 
 ## Module and research guide
 
 - [Architecture and micro-interface](docs/ARCHITECTURE.md)
 - [Rust_Boy host and audio-focus contract](docs/HOST_CONTRACT.md)
+- [Package-process protocol contract and boundaries](docs/PACKAGE_PROCESS.md)
 - [Pip-Boy universal adapter integration contract](docs/PIP_BOY_ADAPTER.md)
 - [Repository and machine navigation](docs/REPOSITORY_INDEX.md)
 - [Phased roadmap and evidence gates](docs/ROADMAP.md)
 - [Machine-readable gate/task/owner index](docs/roadmap-index.json)
 - [Codex agent routing and handoff instructions](docs/CODEX_AGENT_MAP.md)
+- [Pinned software-agent workflow and Rust Music role mapping](docs/AGENT_SKILLS_INTEGRATION.md)
 - [Codex production and release playbook](docs/CODEX_PRODUCTION_PLAYBOOK.md)
 - [Dated work and validation log](docs/WORK_LOG.md)
 - [Codex root instructions](AGENTS.md)
@@ -89,6 +92,7 @@ All **16 workspace crates** are locally authored and have zero third-party Cargo
 - [G8 real-world FLAC corpus (checksums only; private audio not committed)](docs/G8_REALWORLD_FLAC_CORPUS.md)
 - [Pip-Boy adapter contract and open integration gaps](docs/PIP_BOY_ADAPTER.md)
 - [G9 exact playback timing](docs/G9_TIMING_PROGRESS.md)
+- [Micro library zero-artwork policy](docs/MICRO_LIBRARY_ZERO_ARTWORK.md)
 - [G10 audiophile-only format policy and native AIFF implementation](docs/G10_AUDIOPHILE_FORMATS.md)
 - [Machine-readable lossless format admission matrix](docs/lossless-formats.json)
 - [Cited comparative literature matrix](docs/LITERATURE_MATRIX.md)

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-29",
+  "updated": "2026-10-31",
   "repository": "pskeffington/rust_music",
   "active_development_branch": "build/native-codecs-g0",
   "draft_pr": 1,
@@ -96,7 +96,10 @@
       "owns": [
         "crates/rust-music-host/",
         "crates/rust-music-library/",
-        "crates/rust-music-panel/"
+        "crates/rust-music-panel/",
+        "apps/rust-music-macos/",
+        "scripts/build-macos-app.sh",
+        "scripts/test_release_package_process.py"
       ],
       "reads": [
         "docs/HOST_CONTRACT.md",
@@ -236,7 +239,7 @@
       "title": "RF64 and WavPack lossless extensions",
       "owner_agent": "codec_engineer",
       "status": "partial_evidence",
-      "next_evidence": "Bounded RF64/ds64 and synthetic large-size streaming pass; WavPack bounded framing parser exists, while independent PCM decode/parity and correction handling remain",
+      "next_evidence": "Bounded RF64/ds64 and synthetic large-size streaming pass; WavPack selected packed-16/24-bit FFmpeg and Tiny Encoder 4.40 profiles pass exact PCM parity. Native real-world WavPack, broader modes, trailing tags, hybrid correction and public admission remain open",
       "evidence_doc": "docs/G10_AUDIOPHILE_FORMATS.md"
     },
     {
@@ -368,7 +371,7 @@
       ],
       "create_paths": [],
       "acceptance": "Operator-run host integration demonstrates single focus owner across MUSIC/RADIO/TV and safe unload after errors",
-      "blocker": "Pip-Boy now has a shared in-process AudioFocusBroker; the live Radio output session acquires a RADIO lease before output startup/replacement, and local core/app tests pass. MUSIC remains design_fixture_not_installed with no trusted adapter, user-authorized Play/Stop/navigation bridge, worker scheduling or live shell mount. TV does not yet use the broker, and no real Music-vs-Radio/TV contention or operator host acceptance is verified. User-authorized Pip-Boy changes preserve unrelated pre-existing work"
+      "blocker": "Pip-Boy now has a shared in-process AudioFocusBroker; the live Radio output session acquires a RADIO lease before output startup/replacement, and local core/app tests pass. MUSIC remains design_fixture_not_installed with no trusted adapter, user-authorized Play/Stop/navigation bridge, worker scheduling or live shell mount. TV does not yet use the broker, and no real Music-vs-Radio/TV contention or operator host acceptance is verified. Rust Music and Pip-Boy are separate Cargo workspaces; a sibling-only path dependency would break independent Pip-Boy builds, so integration needs a reviewed pinned Rust Music revision or a bounded packaged-process protocol. User-authorized Pip-Boy changes preserve unrelated pre-existing work"
     },
     {
       "id": "RM-007",
@@ -516,7 +519,7 @@
       "owner_agent": "codec_engineer",
       "review_agent": "safety_reviewer",
       "priority": "P2",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "RM-001"
       ],
@@ -524,12 +527,15 @@
         "Cargo.toml",
         "Cargo.lock",
         "crates/rust-music-wavpack/src/lib.rs",
+        "crates/rust-music-wavpack/tests/fixtures/",
         "crates/rust-music/src/lib.rs",
+        "docs/G10_AUDIOPHILE_FORMATS.md",
+        "docs/ROADMAP.md",
         "docs/lossless-formats.json"
       ],
       "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "Bounded block framing, entropy-variable parsing, adjusted-binary vectors, adaptive median-zone selection, and bounded mono/stereo residual word sequencing now exist; one FFmpeg-generated mono fixture traverses all declared residuals and a distinct-median stereo vector exercises channel interleave. The crate is not exposed by the facade. Real stereo residual evidence, decorrelation/sample reconstruction, CRC validation, independent PCM parity, and hybrid .wvc matching are not implemented; do not register or admit WavPack yet."
+      "blocker": "Generated FFmpeg 9.0.2 PCM parity passes for 882-frame mono and joint-stereo one-block streams; 4,410-frame mono, mixed joint/true-stereo, all-true-stereo, and deterministic pseudorandom 16-bit stereo multiblock streams; padded-24-bit mono/stereo streams with exact INT32_INFO [0,8,0,0]; and a high-entropy padded-24-bit stereo stream covering signed extrema. Independent WavPack Tiny Encoder 4.40 fast-mode vectors pass exact packed-16/24-bit high-entropy stereo PCM parity; default-, high- and very-high-quality-mode 20,000-frame packed-16-bit stereo streams also pass exact parity; the high-mode terms [18,18,18,-2,2,3,5,-1,17,4] extend support to cross-channel terms -2/-1 and lag predictors 2–5. A deterministic synthetic 1,063,147-frame packed-24-bit stereo stream passes exact parity against its generated PCM golden and FFmpeg decode; this does not establish compatibility with native real-world WavPack files. Supporting packed-24-bit resolves the observed 3-byte sample layout; known optional metadata is skipped while unknown mandatory metadata still fails closed. Decoded block checksums pass. Removing the unsupported ±1024 clamp on positive-term adaptive weights restored exact stereo parity; the bounded 24-bit path checksums reconstructed PCM before validating its 24-bit range. Encoded-block checksum tests reject bit flips and missing declared metadata. Native real-world WavPack source files, further independent-encoder parity, predictor terms other than -2/-1/2/3/4/5/17/18, other integer layouts/depths, trailing tags, and validated hybrid .wvc pairing remain. Keep WavPack unregistered and unadmitted."
     },
     {
       "id": "RM-015",
@@ -591,6 +597,53 @@
       "create_paths": [],
       "acceptance": "Bounded library scan recognizes .m4a/.mp4/.mp4a by ftyp and panel labels M4A; six licensed Archive.org ALAC fixtures at 16/44.1 and 24/48 pass exact PCM parity against FFmpeg; AAC remains rejected; fixture hashes and license provenance are recorded",
       "blocker": "Acceptance passed locally: six Internet Archive/Musopen CC0 ALAC M4A samples decoded byte-exactly (five 16-bit/44.1 kHz and one 24-bit/48 kHz); scan ingests MP4-family containers and four AAC fixtures (three Archive.org music items and one generated file) are rejected. The added album tracks are AAC only and do not widen ALAC parity; independent ALAC source/encoder and supported 20/32-bit and mono profiles remain open"
+    },
+    {
+      "id": "RM-018",
+      "gate": "G5",
+      "title": "Define bounded Pip-Boy package-process protocol",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "in_progress",
+      "depends_on": [
+        "RM-006"
+      ],
+      "focus_paths": [
+        "crates/rust-music-ipc/",
+        "crates/rust-music-cli/src/main.rs",
+        "crates/rust-music-cli/tests/package_process.rs",
+        "scripts/test_release_package_process.py",
+        "docs/PIP_BOY_ADAPTER.md",
+        "docs/PACKAGE_PROCESS.md",
+        "docs/G5_VALIDATION.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Matching bounded RBPK v1 codecs in Rust Music and Pip-Boy, strict identity/sequence and field limits, no-autoplay endpoint, shared host audio lease ownership, matching golden vectors, malformed-frame tests, and supervised child lifecycle/deadline tests. Before production mount, verify a reviewed executable digest, packaged Rust Music release-binary interoperability, live shell registration/user intents, shared lease interaction, and platform acceptance",
+      "blocker": "The Rust Music unit-side RBPK v1 contract is documented in docs/PACKAGE_PROCESS.md and matches Pip-Boy's host protocol specification. Strict frame/field bounds, identity and sequence validation, no-autoplay endpoint behavior, matching hello vector, spawned Cargo-built CLI lifecycle including wrong-identity fail-closed/no-reply behavior, and a local release-feature binary Hello/Activate/Shutdown smoke are covered. The release binary digest is recorded in docs/G5_VALIDATION.md, but it has not been reviewed or entered into Pip-Boy's trusted executable roster. Pip-Boy's ledger reports supervised-runner deadlines, termination/reap, stderr drain and process-exit audio-focus cleanup tests passing; this Rust Music session has not rerun those sibling tests. The trusted roster remains empty and no Rust Music release is mounted by live startup; host-supervised release interoperability, shared audio contention, shell/mobile acceptance and platform process behavior remain open. Keep RM-018 in progress until host acceptance is recorded."
+    },
+    {
+      "id": "RM-019",
+      "gate": "G5",
+      "title": "Qualify standalone macOS app lifecycle and package",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "priority": "P1",
+      "status": "in_progress",
+      "depends_on": [
+        "RM-001"
+      ],
+      "focus_paths": [
+        "apps/rust-music-macos/",
+        "scripts/build-macos-app.sh",
+        "scripts/test_release_package_process.py",
+        "crates/rust-music-cli/src/main.rs",
+        "docs/PACKAGE_PROCESS.md",
+        "docs/G5_VALIDATION.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Build the standalone app bundle from a clean offline macOS checkout; launch it, inspect supported and rejected files, verify explicit Play/Stop and window-close child cleanup, and confirm no network or background scan. Record actual output-device checks separately; this task cannot certify bit-perfect hardware.",
+      "blocker": "The Rust/Swift bundle built and launched locally. UI inspection of a generated supported WAV, explicit Play/Stop, and refusal of a generated MP3 were observed. Closing the window stopped playback, but independent verification that the child process exited was unavailable. The app does not perform a background scan or network request by design; physical AudioQueue/DAC acceptance remains separate. Keep RM-019 in progress until child cleanup is confirmed and packaged release checks are repeated from a clean checkout."
     }
   ]
 }

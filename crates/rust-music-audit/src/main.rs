@@ -25,6 +25,11 @@ fn requirement(ok: bool, context: impl Into<String>) -> Result<(), String> {
     }
 }
 
+fn allowed_command_spawn(path: &Path, line: &str) -> bool {
+    path.ends_with("rust-music-cli/tests/package_process.rs")
+        && line == "let child = Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))"
+}
+
 // Strictly allow in-workspace dependencies of the form:
 // rust-music-x = { path = "../rust-music-x" [, optional = true] }
 fn parse_dependency(line: &str) -> Result<(&str, &str), String> {
@@ -224,8 +229,13 @@ fn scan_rust(path: &Path, report: &mut Audit) -> Result<(), String> {
                 "snd_pcm_open(",
                 "asound",
             ] {
+                // One exact test-only exception launches Cargo's own built CLI
+                // binary for the RBPK subprocess lifecycle regression. Product
+                // code and every other process-spawn form remain forbidden.
+                let allowed_test_spawn =
+                    forbidden == "Command::new(" && allowed_command_spawn(&path, line);
                 requirement(
-                    !code_only.contains(forbidden),
+                    allowed_test_spawn || !code_only.contains(forbidden),
                     format!("forbidden external/network use {forbidden}: {loc}"),
                 )?;
             }
@@ -346,6 +356,24 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_exact_cargo_cli_lifecycle_test_may_spawn_a_child() {
+        let path = Path::new("crates/rust-music-cli/tests/package_process.rs");
+        assert!(allowed_command_spawn(
+            path,
+            "let child = Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))"
+        ));
+        assert!(!allowed_command_spawn(
+            path,
+            "let child = Command::new(\"/bin/sh\")"
+        ));
+        assert!(!allowed_command_spawn(
+            Path::new("crates/rust-music-cli/src/main.rs"),
+            "let child = Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))"
+        ));
+    }
+
     #[test]
     fn no_registry_or_non_local_dependency_syntax() {
         assert_eq!(

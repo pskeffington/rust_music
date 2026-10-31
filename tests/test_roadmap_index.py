@@ -55,6 +55,7 @@ class RoadmapIndexTests(unittest.TestCase):
 
     def test_blocked_task_must_have_dependency(self):
         value = self.mutated()
+        value["tasks"][1]["status"] = "blocked"
         value["tasks"][1]["depends_on"] = []
         with self.assertRaises(InvalidIndex):
             validate_registry(value, ROOT, check_files=False)

@@ -16,3 +16,4 @@ rust-music = { path = "../rust-music" }
 rust-music-library = { path = "../rust-music-library" }
 rust-music-host = { path = "../rust-music-host" }
 rust-music-panel = { path = "../rust-music-panel" }
+rust-music-ipc = { path = "../rust-music-ipc" }

@@ -4,6 +4,354 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-30 — Add WavPack high-quality cross-channel predictor coverage
+
+- Extended the bounded decorrelation subset with terms -2/-1 and lag terms
+  4/5. Cross-channel inverse reconstruction now restores the dependent channel
+  before using it as the second predictor and applies the cross-term weight
+  clamp; unrelated predictor terms and mono cross-channel streams remain
+  rejected.
+- Added a Tiny Encoder 4.40 `-h` pure-lossless two-block vector over the same
+  deterministic 20,000-frame stereo PCM source as the default-mode fixture.
+  The encoded terms are `[18,18,18,-2,2,3,5,-1,17,4]`; Rust matches all 40,000
+  samples and FFmpeg 9.0.2 decodes byte-for-byte to the existing PCM golden.
+  WavPack SHA-256:
+  `8db14f06ecb6c44d5282908908bf575a1d2d471ada391ac960cbc5fa71899cec`; shared
+  PCM SHA-256 remains
+  `f73bb995471938f0edc927a840f4de77e65da3f03a5e3e0e5a376eb6e79b7e35`.
+- `cargo fmt --all -- --check` and `cargo test --locked --offline
+  -p rust-music-wavpack` passed (48/48). `sh scripts/offline-gate.sh` exited 0
+  on 17 local crates and 32 path-only edges, with zero registry/Git crates;
+  roadmap/literature validators and `git diff --check` passed.
+- This vector establishes only the tested Tiny Encoder high-mode profile.
+  WavPack remains unregistered; native real-world WavPack files, other
+  predictor profiles/depths, trailing tags, hybrid correction, and playback
+  host acceptance remain open.
+
+## 2026-10-30 — Extend WavPack default-mode predictor coverage
+
+- Added bounded decorrelation predictor terms 2 and 3, which extend the
+  previously verified 17/18 subset. Terms outside 2, 3, 17, and 18 remain
+  rejected. The predictor state keeps a fixed eight-slot history per channel;
+  metadata histories are length-checked for each admitted term.
+- Added `tiny-encoder-4.40-random-default-stereo16.wv`, a synthetic 20,000-frame
+  stereo stream produced by Tiny Encoder 4.40 default pure-lossless mode. Both
+  blocks carry terms `[18, 18, 2, 17, 3]`. Rust matches all 40,000 integer
+  samples, and FFmpeg 9.0.2 independently decodes the fixture byte-for-byte to
+  the retained PCM golden. WavPack SHA-256:
+  `551802997b9ee302a74d387c7dace173b9844ccedc950c112a65f2ecc788df0e`; PCM
+  SHA-256: `f73bb995471938f0edc927a840f4de77e65da3f03a5e3e0e5a376eb6e79b7e35`.
+  The fixture README records its deterministic recipe and encoder provenance.
+- Focused validation passed: `cargo test --locked --offline
+  -p rust-music-wavpack` (47/47), including exact term admission and malformed
+  history-length rejection. `ffprobe` identified the stream as stereo 44.1 kHz
+  WavPack and the FFmpeg decode `cmp` passed.
+- `sh scripts/offline-gate.sh` exited 0 on the updated source: 17 local crates,
+  32 internal path-only edges, zero registry/Git crates; formatting, warnings-
+  denied Clippy, workspace tests, release build, and macOS feature check passed.
+  Roadmap and literature validators plus `git diff --check` also passed.
+- WavPack remains unregistered and unadmitted. Real-world native `.wv` files,
+  other predictor terms/depths, trailing tags, hybrid correction pairing, and
+  playback/host acceptance remain open.
+
+## 2026-10-30 — Smoke-test the local release package process
+
+- Built the macOS release CLI with
+  `cargo build --locked --offline --release -p rust-music-cli
+  --features macos-output` (exit 0). Added and ran
+  `python3 scripts/test_release_package_process.py --binary
+  target/release/rust-music-cli` (exit 0); the helper sends correctly framed
+  RBPK v1 requests and verifies Hello negotiation, an inert empty Activate
+  view, Shutdown acknowledgment, clean exit within three seconds, and empty
+  stderr. It never builds or installs the executable itself.
+- Release CLI SHA-256:
+  `d1de04c2d8e3af36b75fa5fd5eb8147245144db87dbb6ab485170fd58beb3ffa`.
+  This identifies the locally built executable only; Pip-Boy has not reviewed
+  or allowlisted this digest, and no live package mount or shared audio-focus
+  contention was exercised. RM-018 remains in progress.
+- Updated G5, RM-018, package-process evidence, and the repository index. No
+  Pip-Boy files were modified.
+
+## 2026-10-30 — Recheck bounded package-unit protocol
+
+- Re-ran the unit codec, in-memory endpoint checks, and spawned macOS process
+  lifecycle: `cargo test --locked --offline -p rust-music-ipc` (7/7),
+  `cargo test --locked --offline -p rust-music-cli --features macos-output
+  package_stream_` (4/4 endpoint tests), and
+  `cargo test --locked --offline -p rust-music-cli --features macos-output
+  --test package_process` (1/1 subprocess test); all exited 0.
+- `python3 scripts/check_roadmap_index.py` and `git diff --check` exited 0.
+  The unit contract and RM-018 index already cover the fixed frame, field,
+  catalog, queue, and lifecycle limits; no protocol change was needed. These
+  local checks do not prove Pip-Boy allowlisting, live mounting, shared audio
+  contention, or platform acceptance.
+- `sh scripts/offline-gate.sh` also completed with its final PASS: 17 local
+  crates, 32 path-only edges, zero registry/Git crates, workspace tests,
+  release build, and macOS feature checks.
+
+## 2026-10-30 — Verify package identity rejection in child process
+
+- Extended the macOS subprocess test to send a syntactically valid Hello for
+  `org.rustboy.radio` to the Rust Music unit. The child returns no protocol
+  frame and exits unsuccessfully within the three-second deadline. The happy
+  path still proves hello, inert activation, shutdown acknowledgment, and clean
+  exit.
+- `cargo fmt --all -- --check` and the focused check
+  `cargo test --locked --offline -p rust-music-cli --features macos-output
+  --test package_process` pass; the subprocess suite is now 2/2. The first
+  formatter check identified line wrapping, which was corrected before the
+  successful rerun. The subsequent `sh scripts/offline-gate.sh` completed
+  with final PASS across 17 local crates, 32 path-only edges, zero registry/Git
+  crates, workspace tests, release build, and macOS feature checks. Roadmap and
+  literature validators and `git diff --check` also exited 0.
+
+## 2026-10-30 — Add CC0 recording-derived WavPack stress parity
+
+- Verified Internet Archive item `hr102` identifies track 6 “SPOT” under an
+  uploader-supplied CC0 1.0 Universal label and public-domain declaration.
+  The 32-bit/44.1 kHz source FLAC SHA-256 is
+  `bddf6b1f45de52810a75679a853c425cb36ff2883d5fdd7bbf310170b4114b50`; the
+  source FLAC is not stored in the repo. FFmpeg 9.0.2 converted it to a
+  packed-24-bit PCM test target; this conversion changes samples, so no parity
+  claim is made against the original 32-bit FLAC.
+- Tiny Encoder 4.40 fast lossless mode encoded the derived PCM to legacy stream
+  version `0x405`. Rust matched all 1,063,147 stereo frames sample-by-sample,
+  streaming comparisons one decoded WavPack block at a time. FFmpeg 9.0.2 also
+  decoded the `.wv` byte-for-byte against the derived PCM. WavPack SHA-256:
+  `fdc150e9202e92501f5b11738e931d853dceee933c2678e1de45f12630b65c24`; PCM
+  SHA-256:
+  `5cf11ed0fc0f0097b458969e967a470948a2368c855501a2e50ff016c79d3917`.
+- The fixture README records item/license provenance, conversion caveat,
+  hashes, and reproduction steps. Only the derived `.wv` and packed PCM golden
+  are included; no source FLAC, third-party encoder code, or executable is in
+  the repo or workspace.
+- `cargo fmt --all -- --check`, `cargo test --locked --offline
+  -p rust-music-wavpack` (45/45), the full offline gate (17 local crates, 32
+  local path edges, no registry/Git crates), roadmap/literature validators,
+  and `git diff --check` all passed. Native WavPack inputs, trailing tags,
+  further independent encoders, and hybrid correction remain open.
+
+## 2026-10-30 — Verify packed-16/24 WavPack with Tiny Encoder 4.40
+
+- Used the official BSD-licensed Tiny Encoder 4.40 source as a temporary
+  independent oracle outside the repository. Its default compression profile
+  uses unsupported decorrelation terms and remains rejected; fast mode emits
+  supported lossless terms. Tiny Encoder emits legacy stream version `0x405`,
+  while the matching FFmpeg 9.0.2 fixtures use `0x410`.
+- Exact parity passed for 4,410 high-entropy stereo frames at packed 16-bit and
+  packed 24-bit. The packed-24 fixture revealed the decoder only admitted
+  packed 16-bit or 24-in-32 streams, so the bounded profile gate now admits
+  3-byte packed 24-bit PCM and enforces its signed range. The independent
+  stream also contains optional duplicate entropy metadata; the decoder skips
+  optional metadata while still rejecting unknown mandatory metadata and
+  duplicate required metadata.
+- Tiny Encoder stream SHA-256 values:
+  16-bit `0a7b48c427168dcdc1e2c67b6321e3b318839888f568a8758fcae7319fc76019`;
+  24-bit `4dea0dc5820f32c7f1a6bf0febc094ae2e5a2aeb7f9996234a91bc5c196bf5aa`.
+  The external archive SHA-256 and full synthetic generation recipe are in the
+  fixture README. No reference code or executable was added to the repository
+  or Cargo workspace.
+- `cargo fmt --all -- --check` and `cargo test --locked --offline
+  -p rust-music-wavpack` passed (44/44). `sh scripts/offline-gate.sh` passed
+  across 17 local crates and 32 path-only edges with no registry/Git crates;
+  roadmap/literature validators and `git diff --check` also passed. WavPack
+  remains unregistered: real-world files, other independent encoders, trailing
+  tags, hybrid correction pairing, and playback admission remain open.
+
+## 2026-10-30 — Add high-entropy padded-24-bit WavPack parity
+
+- Generated deterministic 4,410-frame stereo signed-24-bit PCM with full-range
+  extrema and pseudorandom samples, then encoded it with local FFmpeg 9.0.2.
+  Rust's bounded decoder accepts the exact padded-24-bit `INT32_INFO` profile
+  and matches all 8,820 samples over its 4,096- and 314-frame blocks. FFmpeg
+  also decodes the tagless stream byte-for-byte to the original generated PCM.
+- WavPack SHA-256:
+  `9e51d6b43aca74ca6204135788fc886d93b31d74f51f53e50233ac43472ad243`;
+  PCM SHA-256:
+  `9c4ab90d7e5c55513d72afef6f1d8397ea6ff7cd61bd1e7d249ae191327c82cc`.
+  The exact generation recipe and hashes are in the fixture README.
+- The focused test `cargo test --locked --offline -p rust-music-wavpack
+  decodes_deterministic_noise_padded_24_bit_stereo_blocks_exactly --
+  --nocapture` exited 0 (1/1). This broadens generated encoder coverage; it
+  does not close independent-encoder, real-world, hybrid-correction, or
+  playback-admission gates. The full crate suite passed 42/42, followed by
+  `sh scripts/offline-gate.sh` (17 local crates, 32 local path edges, no
+  registry/Git crates), `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`; all passed.
+
+## 2026-10-30 — Add bounded padded-24-bit WavPack profiles
+
+- Extended the WavPack decoder to accept only the observed padded-24-bit
+  `INT32_INFO=[0, 8, 0, 0]` profile in addition to packed 16-bit. The decoder
+  checks the WavPack decoded-sample checksum before validating signed 24-bit
+  range; it does not claim support for general 32-bit PCM, other integer
+  layouts, or WVX data. Extended layouts are explicitly tested for exact
+  metadata admission/rejection.
+- Added generated 4,410-frame mono and stereo streams with 4,096- and
+  314-frame blocks, plus packed signed-24-bit PCM golden data. All four streams
+  (two blocks each) match the source PCM exactly. WavPack remains
+  unregistered/unadmitted.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 41/41;
+  this includes padded-24-bit PCM parity, exact `INT32_INFO` admission tests,
+  the 16-bit mono/stereo corpus, and malformed stream bounds.
+- Stereo WavPack SHA-256:
+  `a7b51346754d60ab260220c2f1ceb3ef0f2fce312deb8aaaf49db105bcd3e30a`.
+  stereo PCM SHA-256:
+  `909cfa8bbc39faaa86887d125a08b65910633b3ef02a0d5529237ca0b0345edf`.
+- Mono WavPack SHA-256:
+  `9a6f0627d0c48150ecf8428d3b5bf07edea3601938f6b9947d91ad5a7f870c12`.
+  Mono PCM SHA-256:
+  `7049d5b60f120cc6d5902590fc9b5ac30458b577ca2ed4f2ba977e0bbc362357`.
+- Updated the G10/G12 ledgers, RM-014 blocker, fixture guide, and repository
+  index. `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32
+  path-only edges, with zero registry/Git crates; warnings-denied Clippy,
+  workspace tests (including WavPack 41/41), release build, and macOS feature
+  checks passed. The roadmap/literature validators and `git diff --check`
+  exited 0.
+
+## 2026-10-30 — Add a deterministic WavPack stereo stress vector
+
+- Added a 4,410-frame deterministic pseudorandom 16-bit stereo PCM source and
+  an FFmpeg WavPack fixture. The two contiguous blocks use joint stereo for
+  4,096 frames and true stereo for the final 314 frames. The checked-in PCM
+  source remains the independent golden; no third-party music is included.
+- Rust decoded all 8,820 interleaved samples exactly, including the mode
+  transition; the block decoder validates each decoded-sample checksum. The
+  focused test `cargo test --locked --offline -p rust-music-wavpack
+  decodes_deterministic_noise_stereo_multiblock_pcm_exactly -- --nocapture`
+  exited 0. FFmpeg is the only local WavPack encoder available, so independent
+  encoder and real-world coverage remain open.
+- The first full offline-gate attempt stopped at rustfmt for line wrapping in
+  the new test. After `cargo fmt --all`, `sh scripts/offline-gate.sh` exited 0:
+  17 local crates, 32 path-only edges, zero registry/Git crates, warnings-
+  denied Clippy, workspace tests (including WavPack 38/38), release build,
+  and macOS feature checks passed. Roadmap/literature validators and
+  `git diff --check` exited 0.
+- WavPack SHA-256: `b40c22e2e5e0ab4cecd1545b4121c6177e09616053234d28edc7ce5e87db567d`.
+  PCM SHA-256: `83e264462b2b805777a3eab217f79e3cddbc92be2411c160639eb130ac5a27af`.
+- Updated the fixture recipe, RM-014 blocker, G10/G12 evidence, and tracked the
+  PCM fixture explicitly through `.gitignore` exceptions.
+
+## 2026-10-30 — Fix WavPack stereo adaptive-weight parity
+
+- The bounded true-stereo decoder's first mismatch was at interleaved sample
+  2,101 and differed by one PCM unit. The WavPack technical description and
+  5.8.1 decoder source show that positive-term predictor weights are not clipped
+  to unit gain; the local updater incorrectly clamped them at ±1024. Removed
+  that clamp and added a direct regression for both sides of the former bound.
+- Replaced the fail-closed true-stereo checks with exact PCM regressions. The
+  mixed-mode five-block stream and the all-true-stereo five-block stream now
+  match all 4,410 stereo frames (8,820 interleaved samples) against FFmpeg
+  9.0.2 PCM, with every decoded block checksum validated. WavPack remains
+  unregistered and unadmitted pending broader compatibility evidence.
+- Focused tests: `cargo test --locked --offline -p rust-music-wavpack
+  multiblock_stereo -- --nocapture` and
+  `cargo test --locked --offline -p rust-music-wavpack
+  decodes_ffmpeg_true_stereo_multiblock_pcm_exactly -- --nocapture`: **exit 0**.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 37/37.
+  `sh scripts/offline-gate.sh`: **exit 0** across 17 local crates, 32
+  path-only edges, zero registry/Git crates, and one OS framework link; fmt,
+  warnings-denied Clippy, workspace tests, release build, and macOS feature
+  checks passed. `python3 scripts/check_roadmap_index.py` and
+  `git diff --check` also passed. The decoder remains unregistered; the
+  remaining RM-014 work is broader encoder/real-world and profile coverage.
+
+## 2026-10-30 — Characterize WavPack stereo multiblock failure
+
+- Added generated FFmpeg 9.0.2 16-bit stereo WavPack streams with five
+  contiguous blocks: one mixed joint/true-stereo file and one all-true-stereo
+  file. The first joint-stereo 1,024-frame block matches exactly. True-stereo
+  blocks are now refused explicitly before reconstruction.
+- A temporary diagnostic bypass confirmed the original mixed-mode stream's
+  second block has a one-unit PCM mismatch at interleaved sample index 2,101
+  and fails the decoded-sample checksum; checksum enforcement was restored,
+  then the decoder was narrowed to reject the currently unsupported true-
+  stereo mode before it can emit PCM. WavPack remains unregistered/unadmitted.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 36/36.
+  The mono five-block stream continues to match all 4,410 frames exactly.
+- `sh scripts/offline-gate.sh`: **exit 0** across 17 local crates and 32
+  path-only edges, including formatting, Clippy, tests, release build and macOS
+  feature checks. Roadmap validation and `git diff --check` passed. Broader
+  WavPack parity and true-stereo decoder support remain open.
+
+## 2026-10-30 — Harden package-unit admission checks
+
+- Added serve-loop regressions proving the Rust Music unit rejects a mismatched
+  package identity and an Activate request before Hello. Both failures produce
+  no reply and do not initialize the audio sink; the existing skipped-request
+  ID regression remains in place.
+- `cargo test --locked --offline -p rust-music-cli --features macos-output`:
+  **exit 0**, 10 unit tests and 1 spawned child lifecycle test passed.
+- `sh scripts/offline-gate.sh` reached its final success marker after the
+  workspace tests, release build and macOS feature checks. The complete Rust
+  gate passed across 17 local crates and 32 path-only edges.
+- This strengthens local process-boundary evidence only. It does not verify a
+  reviewed release binary, live Pip-Boy adapter mount, shared audio contention,
+  or device acceptance; RM-006 and RM-018 remain open for those host proofs.
+
+## 2026-10-30 — Establish the Rust Music package-unit contract
+
+- Added `docs/PACKAGE_PROCESS.md` as the Rust Music endpoint-side contract for
+  `org.rustboy.music` over RBPK v1: wire bounds, lifecycle side effects,
+  host-only authorization/audio ownership, deadlines, and the distinction
+  between local child-process evidence and production host acceptance.
+- Linked and indexed the contract, aligned RM-018's blocker text with the
+  recorded implementation, and kept RM-018 in progress because no reviewed
+  release binary is mounted through live Pip-Boy startup.
+- `cargo test --locked --offline -p rust-music-ipc`: **exit 0**, 7/7 tests.
+  `cargo test --locked --offline -p rust-music-cli --features macos-output
+  --test package_process`: **exit 0**, 1/1 spawned child lifecycle test.
+- `sh scripts/offline-gate.sh`: **exit 0** across 17 local crates and 32
+  path-only edges; offline audit, formatting, warnings-denied Clippy, workspace
+  tests, release build, and macOS feature checks passed. The first attempt
+  stopped on rustfmt in the existing WavPack source; formatting was applied
+  before the passing run.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **exit 0**.
+  No Pip-Boy files were edited in this pass.
+
+## 2026-10-30 — Bound package-unit lifecycle and in-flight work
+
+- Expanded `docs/PACKAGE_PROCESS.md` with the unit process state sequence
+  (startup, ready, shutdown, fault/EOF), invalid-frame termination behavior,
+  serialized one-request-at-a-time semantics, and the host supervisor's
+  deadline/kill/reap responsibilities.
+- Indexed the operational limits already enforced by the endpoint: one
+  request/reply in flight, a one-element request/reply worker channel, and
+  default library scan caps of 8,192 entries, 2,048 tracks, and depth 6.
+  The contract explicitly states that byte bounds do not guarantee wall-clock
+  completion and that child-process isolation is not an OS sandbox.
+- No implementation behavior changed and no tests were run for this
+  documentation-only clarification. RM-018 remains in progress pending a
+  reviewed packaged executable, live host mount, shared audio contention, and
+  platform acceptance evidence.
+
+## 2026-10-30 — Validate WavPack v5 encoded-block checksums
+
+- Added fail-closed checksum validation to `read_block` for WavPack v5 blocks.
+  It validates checksum metadata shape, the required header flag, 16-bit folded
+  and 32-bit checksum values, and every metadata boundary before returning the
+  encoded block to downstream decoders.
+- Synthetic regressions validate both widths, reject a covered metadata bit
+  flip, and reject a header flag with no checksum metadata. The official
+  WavPack v5 format and reference implementation show that this checksum is
+  over encoded block words and is distinct from the header checksum over
+  decoded audio samples. The latter remains unimplemented; the codec remains
+  unregistered.
+- `cargo test --locked --offline -p rust-music-wavpack` passed 30/30.
+
+## 2026-10-30 — Record WavPack stereo reconstruction evidence
+
+- Current RM-014 source tests reconstruct decorrelated and joint-stereo samples
+  for a generated 882-frame stereo fixture and compare all 1,764 interleaved
+  samples to the retained PCM source. Updated G12, G10, fixture provenance and
+  roadmap blocker text to reflect this evidence without claiming full WavPack
+  support.
+- `cargo test --locked --offline -p rust-music-wavpack` passed 28/28 in the
+  latest full offline gate. CRC validation, mono PCM parity, broader independent
+  encoders/real recordings, multiblock decode, and hybrid correction remain
+  incomplete.
+
 ## 2026-10-29 — RM-014 bounded entropy word sequencing
 
 Added a stateful bounded WavPack mono/stereo word stage around the existing
@@ -954,3 +1302,216 @@ mandatory offline gate so these regressions run on future Mac gate executions.
   **exit 0**, 2/2 tests.
 - `sh scripts/offline-gate.sh`: **exit 0**; workspace gates passed and the new
   macOS backend tests ran. No physical playback or DAC behavior was tested.
+
+## 2026-10-30 — Add real stereo WavPack parser fixture
+
+Added a locally generated 16-bit stereo WavPack fixture and verified that the
+bounded parser reads its block, sub-block sequence and distinct per-channel
+entropy medians. A focused attempt to traverse its residual words failed with
+`WavPack unary code exceeds configured bound`; this reproduces the real-stereo
+decoder gap and keeps WavPack out of the public facade. No PCM parity or codec
+support is claimed. RM-014 is now in progress.
+
+- Temporary real-stereo residual traversal experiment:
+  **exit 101**, exposed `WavPack unary code exceeds configured bound`; that
+  failing experiment was replaced with a passing parser/metadata regression,
+  and the decoder failure remains documented as open evidence.
+- Fixture SHA-256:
+  `1abae79d2a9ab2293d8700f161b5a332f8e2c9e866f03a151fe4ea7b87e141ff`.
+- `cargo fmt --all -- --check`, focused stereo parser/entropy test,
+  `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **exit 0**.
+- `sh scripts/offline-gate.sh`: **exit 0**; all 16 workspace crates passed
+  formatting, warnings-denied Clippy, tests, release build and macOS feature
+  checks after the new fixture regression was added.
+
+## 2026-10-30 — Correct WavPack adjusted-binary bit order
+
+The real stereo fixture isolated the word-reader problem to the adjusted-binary
+prefix: the wire prefix is assembled least-significant bit first. Updated the
+reader and fixed codeword vectors to represent that wire order. The generated
+stereo stream now traverses all 1,764 residual words, and the existing mono
+stream still traverses all 882. This is not PCM reconstruction or parity;
+decorrelation and CRC validation remain required, and WavPack stays unregistered.
+
+- `cargo fmt --all -- --check`: **exit 0**.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 28/28.
+- `sh scripts/offline-gate.sh`: **exit 0**; all 16 workspace crates passed
+  formatting, warnings-denied Clippy, tests, release build and macOS feature
+  checks; zero registry/Git crates were used.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **exit 0**.
+
+# 2026-10-30 — Rust Music native GUI theme
+
+- Added a Rust Music-owned SwiftUI interface and local macOS app build script.
+  The window adopts the Pip-Boy phosphor-green palette while remaining a
+  distinct Music app. It opens one user-selected file, validates with the Rust
+  decoder, and starts/stops the Rust CLI AudioQueue path only on explicit input.
+- `scripts/build-macos-app.sh` completed successfully using the local Rust and
+  Swift toolchains; no audio corpus is bundled. `target/macos/RustMusic.app` is
+  ignored build output.
+- Demonstrated the White Zombie FLAC in the GUI; Rust reported 44.1 kHz,
+  stereo, 16-bit PCM and FLAC CRC validation. This is decoder acceptance and
+  app-path evidence, not hardware bit-perfect or DAC certification.
+- Pip-Boy's working tree already has a shared Radio audio-focus broker and a
+  distinct uninstalled MUSIC catalog record. The trusted MUSIC adapter, live
+  package switch binding, user-selected library path, off-UI playback worker,
+  and shared lease bridge remain the next G5 integration scope. The standalone
+  palette does not count as embedded host theme or module activation evidence.
+- Added a distinct phosphor-green style to the Pip-Boy handheld MUSIC reference
+  row and a regression assertion. `node --check crates/pipboy/assets/micro.js`,
+  `node tools/test_micro_ui.cjs`, and `node tools/test_micro_viewport.cjs`
+  (with the local Chrome executable configured) passed. Repository navigation,
+  component-index, and link validators also passed. The module row stays disabled.
+## 2026-10-30 — Establish bounded Pip-Boy package process protocol
+
+- Added `rust-music-ipc` with strict `RBPK` v1 length-prefixed stdio frames,
+  typed lifecycle/library/playback requests, 16 KiB frame cap, bounded identity,
+  strings and 32-track view pages. Added `rust-music-cli serve`; it handshakes
+  before handling requests, does not scan on Activate, and accepts library scan
+  only as an explicit absolute-root request. Music stays a distinct package.
+- Added the matching Pip-Boy SDK codec/adapter bridge, shared cross-repository
+  hello vector, strict page/library limits, and explicit `media.library.read`
+  scope vocabulary. The parent host remains the owner of the shared audio
+  lease; IPC `audio_claimed` is informational only.
+- A spawned-process experiment exposed that unflushed binary stdout frames
+  stall the request/reply channel. Both codecs now flush complete frames; the
+  serve-loop test covers handshake, inert activation, and clean shutdown.
+- Deferred creation of the Linux/macOS output sink until a successful explicit
+  Play reaches `PcmSink::open`; the endpoint test asserts activation/shutdown
+  leave the device factory untouched.
+- Process transport is not a sandbox. Production fixed-path supervision,
+  deadline enforcement, timeout kill/reap, process-exit cleanup, shell inputs
+  and real MUSIC mounting are still open RM-018 acceptance items.
+- Rewrote three WavPack channel-index loops as equivalent iterator loops after
+  the workspace's warnings-denied Clippy gate flagged the pre-existing dirty
+  WavPack implementation; decoder behavior is unchanged.
+- Verified: `cargo test --locked --offline -p rust-music-ipc -p
+  rust-music-cli` passed (13 tests); `cargo test --locked --offline -p
+  rust-music-cli --features macos-output` passed (15 tests including the
+  in-memory serve loop test). `python3 scripts/check_roadmap_index.py` and
+  `python3 scripts/check_literature.py` passed. Pip-Boy
+  `cargo fmt --all && cargo test --locked --offline -p rust-boy-adapter-sdk -p
+  pipboy-core` exited 0 (7 SDK tests, 294 core tests, 5 core integration
+  tests). The full `sh scripts/offline-gate.sh` then exited 0 across 17 local
+  crates/32 local edges; roadmap/literature validators and `git diff --check`
+  also passed. The test-only in-memory endpoint lifecycle test is covered with
+  `--features macos-output`; actual OS process supervision remains open.
+
+## 2026-10-30 — Reconcile package-process supervisor status
+
+- Reviewed Pip-Boy's current `docs/PACKAGE_PROCESS_PROTOCOL.md` and
+  `pipboy-core::package_process`. The sibling repo now records a supervised
+  child runner with transaction deadlines, termination/reap, stderr draining,
+  shutdown handling, and process-exit audio-focus cleanup; its ledger reports
+  targeted tests passing. Production acceptance is still open because the
+  trusted executable roster is empty and no released Rust Music unit is mounted
+  by live startup.
+- Corrected Rust Music's G5/roadmap integration status accordingly and clarified
+  in the IPC crate that frame-size bounds do not provide an I/O deadline:
+  blocking stdio reads must run under the host supervisor's wall-clock limit.
+- No tests or builds were run in this documentation reconciliation pass.
+
+## 2026-10-30 — Exercise the Rust Music child process protocol
+
+- Added a macOS-only CLI integration test that launches the Cargo-built
+  `rust-music-cli serve` executable as a child and exchanges real stdio frames.
+  It validates protocol negotiation, inert activation (empty catalog, no audio
+  claim), shutdown acknowledgment, and successful child exit. Each reply and
+  process exit is bounded by a three-second test deadline; a child guard kills
+  and reaps the process if an assertion fails.
+- `cargo test --locked --offline -p rust-music-cli --features macos-output
+  --test package_process`: **exit 0**, 1/1. This is local spawned-binary
+  evidence, not packaged-release, live Pip-Boy mount, audio-focus, or hardware
+  acceptance.
+- The first full offline-gate attempt rejected the test's process spawn. The
+  Rust-only auditor now permits only the exact Cargo-provided
+  `CARGO_BIN_EXE_rust-music-cli` spawn on this one test line; a regression test
+  rejects shell commands and the same spawn outside that file.
+- `cargo test --locked --offline -p rust-music-cli --features macos-output`:
+  **exit 0**, 8 unit tests and the spawned-process test passed.
+- `sh scripts/offline-gate.sh`: **exit 0**; 17 local crates, 32 path-only
+  edges, 21 Rust sources, no registry/Git crates or third-party system links;
+  formatting, warnings-denied Clippy, workspace tests, release build, and
+  macOS feature checks passed.
+- `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check`: **exit 0**.
+
+## 2026-10-30 — Validate WavPack decoded-audio checksum
+
+- Added `verify_decoded_pcm_checksum` to the WavPack foundation. It bounds the
+  expected interleaved sample count from the block header, computes the
+  decoded-sample checksum with wrapping arithmetic, and fails closed on a
+  count mismatch or checksum mismatch.
+- Extended the generated stereo regression: after decorrelation and joint
+  stereo reconstruction, all 1,764 samples match the retained PCM, the header
+  checksum matches, and a one-bit sample mutation plus a shortened sample
+  vector are rejected. This is one generated 16-bit stereo stream, not complete
+  WavPack decoder or format admission evidence.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 30/30.
+- `sh scripts/offline-gate.sh`: **exit 0** across 17 local crates and 32
+  path-only edges, with no registry/Git crates or third-party system links.
+
+## 2026-10-30 — Add WavPack packed-16-bit single-block decoding
+
+- Added `decode_lossless_block` for one bounded packed-16-bit mono/stereo block.
+  It requires unique mandatory decorrelation, entropy and audio-bitstream
+  metadata; rejects hybrid, extended-integer, float, DSD, unsupported metadata
+  and predictor modes; checks the encoded-block checksum; reconstructs PCM;
+  and validates decoded sample count and header checksum.
+- Added an independent mono PCM golden generated by decoding the synthetic
+  WavPack stream with FFmpeg 9.0.2. Both the mono and stereo fixtures reproduce
+  all 882 frames exactly and pass decoded-header CRC checks. This does not
+  establish a streaming decoder, multiblock support, broad profile coverage or
+  WavPack playback admission. Recorded PCM SHA-256 is
+  `28eae5aa0d1ad7e125c1e428b8a55383d13432446db1721843fb5a7f3b1428a9`; added a
+  fixture-specific `.gitignore` exception so the golden is present in clean
+  checkouts.
+- `cargo test --locked --offline -p rust-music-wavpack`: **exit 0**, 31/31.
+- `sh scripts/offline-gate.sh`: **exit 0** across 17 local crates and 32
+  path-only edges; dependency audit, formatting, warnings-denied Clippy,
+  workspace tests, release build and macOS feature checks passed.
+
+## 2026-10-31 — Recover development history and audit restored application work
+
+- Completed the interrupted merge with semantic resolutions in `AGENTS.md` and
+  `README.md`. Merge commit `bf607d7` has local checkpoint `01c4400` and remote
+  development head `4e3d24a` as parents; `origin/build/native-codecs-g0` is an
+  ancestor of HEAD. Development also contains `origin/main` through the remote
+  development history. Applied `stash@{0}` after the merge without conflicts;
+  retained the stash and `backup/native-codecs-20261031-024820`. Removed only
+  the generated Python bytecode cache. No push or PR merge was performed.
+- Pinned the agent framework to `6989d835c62f9e0858db56252f1ac7ff6ce65414`,
+  the newer Codex-priority revision, because it descends from the verified
+  software-agent hierarchy and includes its roadmap and kickoff additions.
+  Recorded the role mapping and limitations in
+  `docs/AGENT_SKILLS_INTEGRATION.md`; the local Rust Music specialists remain
+  the execution and review roles.
+- Audited the restored WavPack implementation, IPC contract, release-process
+  scripts and macOS app. Added RM-018/RM-019 tracking and recorded the limited
+  local package/app evidence. The standalone UI was manually launched against
+  generated audio: supported WAV inspection, explicit Play/Stop and generated
+  MP3 rejection were observed. Window close stopped audible playback, but
+  independent child-process exit verification was unavailable; RM-019 remains
+  in progress. No hardware fidelity or live Rust_Boy mount is claimed.
+- Replaced a long fixture derived from an uploader-labeled CC0 recording after
+  its rights could not be independently verified. The prior files remain in
+  the preserved stash and outside the repository; the checked-in long test
+  vector is deterministic synthetic PCM. Its Rust WavPack test passes, as do
+  the complete 49 WavPack crate tests. This supersedes the earlier historical
+  work-log reference to that recording as a checked-in fixture.
+- Added `docs/MICRO_LIBRARY_ZERO_ARTWORK.md`, documenting the bounded allowlist,
+  metadata skip behavior, 2 MiB synthetic artwork regression, IPC view and
+  1024-byte panel boundary. Linked it from the README, repository index and
+  G13 metadata ledger. This describes the local catalog boundary and does not
+  claim that source files are scrubbed.
+- Additional observed checks during this recovery: `python3
+  scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`,
+  `python3 -m unittest discover -s tests -p 'test_roadmap_index.py'`,
+  `python3 scripts/test_wave_reference.py`, `python3
+  scripts/test_aiff_reference.py`, `python3 scripts/test_caf_reference.py`,
+  `python3 scripts/test_flac_reference.py --fixtures-only`, and `python3
+  scripts/test_m4a_corpus.py` passed. These report their specific local
+  vectors/corpora and do not certify physical output or broad encoder
+  compatibility. A final full offline gate is required after this log update.

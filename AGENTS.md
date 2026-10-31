@@ -12,6 +12,7 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 
 ## Routing and engineering passes
 
+- Follow the pinned framework reference and Rust Music role mapping in [docs/AGENT_SKILLS_INTEGRATION.md](docs/AGENT_SKILLS_INTEGRATION.md); its skills are guidance, not a permission boundary or release approval.
 - For a roadmap pass read `docs/roadmap-index.json` and choose the highest-priority unblocked `RM-###` task requested. `docs/CODEX_AGENT_MAP.md` maps tasks to project-scoped `.codex/agents/*.toml` specialists. Assign **one writer per overlapping file scope**. Delegate read-only discovery/review in parallel where helpful; shared files require serial integration.
 - Read only task-relevant docs: `docs/ROADMAP.md` for phases, `docs/DEPENDENCY_POLICY.md` for dependency changes, `docs/G10_AUDIOPHILE_FORMATS.md` for format admission, `docs/HOST_CONTRACT.md` for embedding, and G2/G7/G8/G9/G10 evidence ledgers for corresponding tests.
 - Before edits, identify current branch, dirty changes, task ID, exact scope, test expectations and acceptance gate. Respect uncommitted user work; no blind reset/clean/force push or retargeting/merging the draft PR.
@@ -37,33 +38,33 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 
 At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft PR #1. Operator-reported AIFF/AIFF-C native CLI golden PCM parity was 7/7. The operator audit passed for 12 local crates/21 local edges, but the full offline gate stopped at rustfmt. The 14-file rustfmt diff and three audit warnings were subsequently repaired in commits ending `13f8e85975f7b4cae921593df2ab0e7f310b8d30`. The later complete offline-gate result is recorded below and supersedes the gate status in this historical checkpoint.
 
-## Latest verified checkpoint (2026-10-29)
+## Latest verified checkpoint (2026-10-30)
 
-Branch `build/native-codecs-g0`; the latest verified checkpoint includes
-RM-017 M4A ingestion/corpus work, RM-011 bounded local tags, RM-012
-synthetic fixed/variable-block FLAC seek plus 132 real-world seek ranges, RM-013 bounded RF64/ds64 parsing
-with synthetic >4 GiB streaming coverage, and the RM-014 WavPack framing
-foundation (not a decoder). Rust/Cargo
-1.99.1/macOS:
-`sh scripts/offline-gate.sh` exited 0 on 16 local crates and 29 path-only
-edges, with zero registry/Git crates and zero third-party system links. Fmt,
-warnings-denied Clippy, workspace tests, release build and macOS feature check
-passed. The optional `python3 scripts/test_caf_reference.py` exited 0 on five
-FFmpeg-generated exact-PCM vectors (CAF LPCM 16/24/32 and ALAC 16/24); this
-does not make FFmpeg a runtime dependency. `scripts/test_m4a_corpus.py` passes
-six Archive.org ALAC M4As with exact five 16/44.1 and one 24/48 PCM parity,
-confirms five Archive.org music AAC M4As (including mono/48 kHz) and one
-generated AAC fixture are refused, and checks M4A catalog ingestion plus
-byte-identical `.mp4a` and `.mp4` filename aliases. Archive.org license labels
-are uploader-supplied. Bounded FLAC Vorbis and
-AIFF text tags pass deterministic size/UTF-8 tests, and a 2 MiB artwork value
-is skipped without being retained or decoded. Roadmap/literature validators and
-`git diff --check` pass. Generated FLAC/WAVE/AIFF parity and six private FLAC
-reference/native parity remain recorded in their ledgers; private audio stays
-outside Git. Rust Music keeps a distinct MUSIC module boundary. Pip-Boy now has a
-host-wide in-process audio-focus broker and its live RADIO output path holds the
-lease; MUSIC/TV integration, user input, physical panel/output and device
-acceptance remain unverified. Keep PR #1 draft; Pip-Boy integration edits are
-user-authorized while preserving unrelated pre-existing worktree changes. Do not
-push or merge. RM-012 host seek routing, other FLAC encoder compatibility and
-physical audio/panel acceptance remain unverified pending external evidence.
+Branch `build/native-codecs-g0`; preserve the extensive pre-existing dirty
+worktree. Rust/Cargo 1.99.1/macOS:
+`sh scripts/offline-gate.sh` exited 0 on 17 local crates and 32 path-only
+internal edges, with zero registry/Git crates and zero third-party system
+links. Fmt, warnings-denied Clippy, workspace tests, release build, and macOS
+feature checks passed. Roadmap and literature validators plus `git diff
+--check` passed.
+
+RM-014 WavPack remains unregistered and unadmitted. Its crate suite passes
+48/48. Exact PCM parity includes FFmpeg-generated profiles, Tiny Encoder 4.40
+fast-mode packed-16/24 vectors, and two-block default/high-quality 20,000-frame
+packed-16 stereo vectors. The high-mode vector covers terms
+`[18,18,18,-2,2,3,5,-1,17,4]`; only terms -2, -1, 2–5, 17 and 18 are currently
+admitted. Tiny Encoder 4.40 also matches a 1,063,147-frame packed-24 stream
+derived from an uploader-labeled CC0 32-bit recording; parity is against the
+derived 24-bit PCM, not the source FLAC. Real-world native WavPack files, other
+terms/profiles, trailing tags, hybrid correction, and playback admission
+remain open.
+
+RM-018 has a bounded RBPK v1 unit contract and endpoint, spawned-process tests,
+and a local release-binary Hello/Activate/Shutdown smoke. The tested digest is
+not allowlisted by Pip-Boy; live mounting, host-supervised release
+interoperability, shared audio contention, and platform acceptance remain
+unverified. The Pip-Boy reference MUSIC identity is distinct, while MUSIC/TV
+integration, user input, and physical panel/audio tests remain open. Keep PR #1
+draft; preserve sibling work and do not push or merge. RM-005/007/015 require
+operator hardware acceptance; RM-006/018 still need host evidence. Private FLAC
+corpus audio remains outside Git.

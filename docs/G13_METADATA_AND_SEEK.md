@@ -2,6 +2,9 @@
 
 ## RM-011 — bounded local text tags
 
+The dedicated [micro library zero-artwork policy](MICRO_LIBRARY_ZERO_ARTWORK.md)
+documents the allocation boundary and its 2 MiB synthetic picture-field test.
+
 The explicit, offline library scan extracts only allowlisted display fields:
 
 - Native FLAC Vorbis comments: `TITLE`, `ARTIST`, and `ALBUM`.

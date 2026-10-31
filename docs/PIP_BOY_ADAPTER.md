@@ -25,17 +25,24 @@ For the common “replace Radio with Music” operation, install/register both
 trusted packages, then select Music in the one-foreground host. The host
 suspends Radio before activating/resuming Music; selecting Radio later reverses
 the handoff. This is foreground replacement, not destructive uninstall or
-registry replacement. The inspected v1 host can select among already-mounted
-trusted built-ins, but has no dynamic external module loader or general
-`replace()` API. A truly swappable third-party module requires a separately
-reviewed package loader/IPC boundary and is outside this adapter-ready contract.
+registry replacement. A bounded `RBPK` stdio protocol defines the process
+request/reply boundary. Pip-Boy now has a supervised child-runner implementation
+with deadlines, termination/reap handling, and an audio-lease exit callback;
+its protocol ledger records focused tests. The reviewed executable roster is
+still empty and Music is not mounted by live startup, so production package
+acceptance remains open. See Pip-Boy's
+`docs/PACKAGE_PROCESS_PROTOCOL.md` for framing, field limits, deadlines,
+scopes, and the remaining acceptance gate. Rust Music's endpoint-side
+obligations and fixed limits are indexed in [`PACKAGE_PROCESS.md`](PACKAGE_PROCESS.md).
+The two documents describe the same RBPK v1 contract from the host and unit
+sides; packaged-release interoperability and live mount remain unverified.
 
 The current built-in Radio is a passive catalogue and does not expose playback
-intents. A useful Music-for-Radio dock still requires a trusted runtime adapter,
-user-facing Play/Stop/navigation actions, worker scheduling, and a bridge from
-Pip-Boy's shared Radio/TV audio arbitration to `AudioFocus`. Keep the package
-identity and adapter separate so Music can coexist with Radio and the operator
-can switch between them safely.
+intents. A useful Music-for-Radio dock still requires user-facing
+Play/Stop/navigation actions, worker scheduling, and a bridge from Pip-Boy's
+shared Radio/TV audio arbitration to `AudioFocus`. Keep
+the package identity and adapter separate so Music can coexist with Radio and
+the operator can switch between them safely.
 
 ## Keep the product crate independent
 
@@ -104,14 +111,20 @@ Play cannot strand the package as media owner.
   adapter that bridges it to `AudioFocus` and handles failed start/stop paths.
 - `MusicSlot::Poll` requires a worker scheduler; the synchronous adapter trait
   does not by itself provide one.
-- Pip-Boy has a Music reference manifest, but no trusted Music adapter is
-  installed or mounted. No Radio/TV/Music interoperability or physical
-  display/audio test is recorded.
-- The host's current trusted built-in bootstrap is not a universal third-party
-  package loader; module foreground switching is supported conceptually, but
-  dynamic install, unload-and-replace, and external isolation are not.
+- Pip-Boy has a Music reference manifest, but no trusted Music executable is
+  registered or mounted by live startup. No Radio/TV/Music interoperability or
+  physical display/audio test is recorded.
+- The supervised process runner exists in source, but the executable roster is
+  empty and live MUSIC registration/mounting, shell/mobile acceptance, and
+  platform process behavior remain open. Supervision contains faults; it does
+  not sandbox a same-user child.
 
-These gaps require host-side implementation and acceptance. Until that work is
-authorized and complete, Rust Music is **adapter-ready at its public host API**
-but is not installed or production-integrated in Pip-Boy. See the
+Remaining work is host acceptance and a trusted, reviewable package build.
+Pip-Boy integration edits are user-authorized, with the sibling worktree's
+existing changes preserved. Rust Music is **adapter-ready at its public host
+API** and has an independent `rust-music-cli serve` process endpoint, but it is
+not installed or production-integrated in Pip-Boy. Pip-Boy and Rust Music
+remain separate Cargo workspaces: the host must use a reviewed pinned Rust
+Music revision during its build or package a separately built executable; a
+machine-local sibling path dependency is not a release dependency. See the
 [host slot contract](HOST_CONTRACT.md) and [G5 validation ledger](G5_VALIDATION.md).

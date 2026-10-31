@@ -23,7 +23,9 @@ rust-music-cli         scan / inspect / PCM WAVE export / PBM preview / optional
 rust-music-audit       offline dependency and native-link policy checks
 rust-music-library     explicit bounded local directory scan for FLAC/WAVE/AIFF/CAF/MP4 signatures
 rust-music-host        exclusive host audio lease and pop-in control API
+rust-music-ipc         bounded RBPK v1 process frames for Pip-Boy packaging
 rust-music-panel       128x64 1-bit local glyph renderer and button mapping, including CAF/M4A labels
+apps/rust-music-macos  native SwiftUI desktop shell for explicit open/inspect/play/stop
 ```
 
 **State:** `load()` never auto-opens an output device. `play()` must only occur after Rust_Boy grants audio focus; `step()` must execute off the UI thread. Music and Radio/TV must not claim devices simultaneously. The shell has one slot for a Music module; there are no menu sidebars, background scanners, or network requirements.
@@ -73,8 +75,11 @@ Mac AudioQueue and the Linux ALSA **kernel ioctl UAPI** are optional app-owned d
 `rust-music-panel` creates an exact **128x64 / 1024-byte / 1-bit** frame with a
 locally authored 5x7 font. It reads the existing slot snapshot, filename-title,
 codec type, real PCM format and playback state. `PanelAction::OpenSettings`
-requests navigation to the host's existing Settings screen. Rust_Music never
-creates a window, input loop, new mixer, or network client. See
+requests navigation to the host's existing Settings screen. The embedded
+MusicSlot/panel never creates a window, input loop, new mixer, or network
+client. `apps/rust-music-macos` is a separate standalone window that delegates
+decoding and output to the Rust CLI; it does not replace the Pip-Boy host
+adapter or shared focus bridge. See
 [G6 micro panel](G6_MICRO_PANEL.md).
 
 Artist metadata, elapsed duration, seek, progress percentage and pause/resume

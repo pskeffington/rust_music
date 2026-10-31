@@ -49,6 +49,7 @@ version = "0.1.0"
 dependencies = [
  "rust-music",
  "rust-music-host",
+ "rust-music-ipc",
  "rust-music-library",
  "rust-music-panel",
 ]
@@ -76,6 +77,14 @@ name = "rust-music-host"
 version = "0.1.0"
 dependencies = [
  "rust-music",
+ "rust-music-library",
+]
+
+[[package]]
+name = "rust-music-ipc"
+version = "0.1.0"
+dependencies = [
+ "rust-music-core",
  "rust-music-library",
 ]
 

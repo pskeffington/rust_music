@@ -1,9 +1,45 @@
 //! Offline decoder acceptance harness. Native device output is a separate gate.
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+use rust_music::PcmSink;
 use rust_music::{open_file, AudioFormat, Decoder, MusicError, NullSink, Result};
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+use rust_music_host::{AudioFocus, AudioLease, Command, MusicSlot, MUSIC_PACKAGE_ID};
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+use rust_music_ipc::{
+    read_frame, write_frame, AudioContainer, Envelope, ErrorCode, Playback, Reply, Request,
+    TrackView, View, MAX_ERROR_BYTES, MAX_TITLE_BYTES, MAX_TRACKS_PER_VIEW, PROTOCOL_VERSION,
+};
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+use rust_music_library::{scan, AudioContainer as LibraryContainer, Library, ScanLimits};
 use std::{
     env,
     fs::OpenOptions,
     io::{Seek, SeekFrom, Write},
+};
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, RecvTimeoutError, SyncSender},
+        Arc,
+    },
+    thread,
+    time::Duration,
 };
 
 const PCM_GUID: [u8; 16] = [
@@ -225,10 +261,491 @@ fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
     ))
 }
 
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+enum UnitRequest {
+    Message(Envelope<Request>),
+    Eof,
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+struct ProcessFocus {
+    grant: Arc<AtomicBool>,
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+struct ProcessLease(Arc<AtomicBool>);
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl Drop for ProcessLease {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl AudioLease for ProcessLease {}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl AudioFocus for ProcessFocus {
+    fn try_acquire_music(&self) -> Option<Box<dyn AudioLease>> {
+        self.grant
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| Box::new(ProcessLease(Arc::clone(&self.grant))) as Box<dyn AudioLease>)
+    }
+}
+
+#[cfg(all(target_os = "macos", feature = "macos-output"))]
+fn serve(device: Option<&str>) -> Result<()> {
+    if device.is_some() {
+        return Err(MusicError::Invalid(
+            "macOS process unit does not accept a device argument",
+        ));
+    }
+    serve_with_sink(|| Ok(rust_music::MacAudioQueueSink::default()))
+}
+
+#[cfg(all(target_os = "linux", feature = "alsa-output"))]
+fn serve(device: Option<&str>) -> Result<()> {
+    let device = device.ok_or(MusicError::Invalid(
+        "Linux package process requires explicit hw:CARD,DEVICE",
+    ))?;
+    if !device.starts_with("hw:") {
+        return Err(MusicError::Invalid(
+            "Linux package process requires hw:CARD,DEVICE",
+        ));
+    }
+    let device = device.to_owned();
+    serve_with_sink(move || rust_music::AlsaSink::new(&device, true))
+}
+
+#[cfg(not(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+)))]
+fn serve(_device: Option<&str>) -> Result<()> {
+    Err(MusicError::Unsupported(
+        "package process playback needs macos-output or alsa-output",
+    ))
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn serve_with_sink<S, F>(make_sink: F) -> Result<()>
+where
+    S: PcmSink + 'static,
+    F: FnOnce() -> Result<S> + Send + 'static,
+{
+    let input = std::io::stdin();
+    let output = std::io::stdout();
+    serve_stream(make_sink, input.lock(), output.lock())
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn serve_stream<S, F, I, O>(make_sink: F, mut input: I, mut output: O) -> Result<()>
+where
+    S: PcmSink + 'static,
+    F: FnOnce() -> Result<S> + Send + 'static,
+    I: std::io::Read,
+    O: Write,
+{
+    let (request_tx, request_rx) = mpsc::sync_channel::<UnitRequest>(1);
+    let (reply_tx, reply_rx) = mpsc::sync_channel(1);
+    let worker = thread::spawn(move || process_worker(make_sink, request_rx, reply_tx));
+    let mut negotiated = false;
+    let mut last_request_id = 0u64;
+
+    let protocol_result = (|| {
+        while let Some(payload) = read_frame(&mut input)
+            .map_err(|_| MusicError::Invalid("invalid package process frame"))?
+        {
+            let request = Envelope::<Request>::decode(&payload)
+                .map_err(|_| MusicError::Invalid("invalid package process request"))?;
+            if request.package_id != MUSIC_PACKAGE_ID {
+                return Err(MusicError::Invalid("package process identity mismatch"));
+            }
+            if !negotiated {
+                let Request::Hello {
+                    min_version,
+                    max_version,
+                } = request.body
+                else {
+                    return Err(MusicError::Invalid("package process handshake required"));
+                };
+                if request.request_id != 1
+                    || min_version > PROTOCOL_VERSION
+                    || max_version < PROTOCOL_VERSION
+                {
+                    return Err(MusicError::Unsupported("package protocol version mismatch"));
+                }
+                let reply = Envelope {
+                    package_id: MUSIC_PACKAGE_ID.into(),
+                    request_id: request.request_id,
+                    body: Reply::Hello {
+                        selected_version: PROTOCOL_VERSION,
+                    },
+                };
+                let bytes = reply
+                    .encode()
+                    .map_err(|_| MusicError::Invalid("cannot encode package reply"))?;
+                write_frame(&mut output, &bytes)
+                    .map_err(|_| MusicError::Output("package process write failed".into()))?;
+                negotiated = true;
+                last_request_id = 1;
+                continue;
+            }
+            if last_request_id.checked_add(1) != Some(request.request_id) {
+                return Err(MusicError::Invalid("package request sequence mismatch"));
+            }
+            last_request_id = request.request_id;
+            let shutdown = request.body == Request::Shutdown;
+            request_tx
+                .send(UnitRequest::Message(request.clone()))
+                .map_err(|_| MusicError::Output("package playback worker unavailable".into()))?;
+            let reply = reply_rx
+                .recv()
+                .map_err(|_| MusicError::Output("package playback worker stopped".into()))?
+                .map_err(|_| MusicError::Output("package playback worker failed".into()))?;
+            let reply = Envelope {
+                package_id: MUSIC_PACKAGE_ID.into(),
+                request_id: request.request_id,
+                body: reply,
+            };
+            let bytes = reply
+                .encode()
+                .map_err(|_| MusicError::Invalid("cannot encode package reply"))?;
+            write_frame(&mut output, &bytes)
+                .map_err(|_| MusicError::Output("package process write failed".into()))?;
+            if shutdown {
+                break;
+            }
+        }
+        Ok(())
+    })();
+
+    let _ = request_tx.send(UnitRequest::Eof);
+    let worker_result = worker
+        .join()
+        .map_err(|_| MusicError::Output("package playback worker panicked".into()))?;
+    protocol_result?;
+    worker_result
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn process_worker<S, F>(
+    make_sink: F,
+    requests: mpsc::Receiver<UnitRequest>,
+    replies: SyncSender<std::result::Result<Reply, rust_music_ipc::ProtocolError>>,
+) -> Result<()>
+where
+    S: PcmSink,
+    F: FnOnce() -> Result<S>,
+{
+    let focus = ProcessFocus {
+        grant: Arc::new(AtomicBool::new(false)),
+    };
+    let mut slot = MusicSlot::new(LazySink::new(make_sink), Library::empty());
+    loop {
+        match requests.recv_timeout(Duration::from_millis(10)) {
+            Ok(UnitRequest::Eof) | Err(RecvTimeoutError::Disconnected) => {
+                focus.grant.store(false, Ordering::Release);
+                let _ = slot.handle(Command::Stop, &focus);
+                return Ok(());
+            }
+            Ok(UnitRequest::Message(request)) => {
+                let is_shutdown = request.body == Request::Shutdown;
+                let reply = handle_unit_request(&mut slot, &focus, request);
+                let _ = replies.send(Ok(reply));
+                if is_shutdown {
+                    focus.grant.store(false, Ordering::Release);
+                    let _ = slot.handle(Command::Stop, &focus);
+                    return Ok(());
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if slot.status().playback.state == rust_music::PlaybackState::Playing
+                    && slot.handle(Command::Poll, &focus).is_err()
+                {
+                    focus.grant.store(false, Ordering::Release);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn handle_unit_request<S: PcmSink>(
+    slot: &mut MusicSlot<S>,
+    focus: &ProcessFocus,
+    request: Envelope<Request>,
+) -> Reply {
+    let page = match &request.body {
+        Request::Snapshot { page } => *page,
+        _ => 0,
+    };
+    let result = match request.body {
+        Request::Hello { .. } => {
+            return process_error(ErrorCode::InvalidRequest, "handshake already completed")
+        }
+        Request::Activate { width, height } | Request::Resume { width, height } => {
+            if !valid_viewport(width, height) {
+                return process_error(ErrorCode::InvalidRequest, "unsupported module viewport");
+            }
+            Ok(())
+        }
+        Request::Resize { width, height } => {
+            if !valid_viewport(width, height) {
+                return process_error(ErrorCode::InvalidRequest, "unsupported module viewport");
+            }
+            Ok(())
+        }
+        Request::Suspend | Request::Stop => {
+            focus.grant.store(false, Ordering::Release);
+            slot.handle(Command::Stop, focus).map(|_| ())
+        }
+        Request::ScanLibrary { root } => {
+            let root = std::path::Path::new(&root);
+            if !root.is_absolute() {
+                return process_error(ErrorCode::InvalidRequest, "library root must be absolute");
+            }
+            scan(root, ScanLimits::default())
+                .and_then(|library| slot.replace_library(library).map(|_| ()))
+        }
+        Request::Select { index } => slot
+            .handle(Command::Select(usize::from(index)), focus)
+            .map(|_| ()),
+        Request::Previous => slot.handle(Command::Previous, focus).map(|_| ()),
+        Request::Next => slot.handle(Command::Next, focus).map(|_| ()),
+        Request::Play => {
+            focus.grant.store(true, Ordering::Release);
+            let result = slot.handle(Command::Play, focus).map(|_| ());
+            if result.is_err() {
+                focus.grant.store(false, Ordering::Release);
+            }
+            result
+        }
+        Request::Snapshot { .. } => Ok(()),
+        Request::Shutdown => {
+            focus.grant.store(false, Ordering::Release);
+            let _ = slot.handle(Command::Stop, focus);
+            return Reply::Ack;
+        }
+    };
+    match result {
+        Ok(()) => Reply::View(make_view(slot, page)),
+        Err(error) => error_reply(error),
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn valid_viewport(width: u16, height: u16) -> bool {
+    (320..=4096).contains(&width) && (240..=4096).contains(&height)
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+struct LazySink<S, F> {
+    sink: Option<S>,
+    make_sink: Option<F>,
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl<S, F> LazySink<S, F> {
+    fn new(make_sink: F) -> Self {
+        Self {
+            sink: None,
+            make_sink: Some(make_sink),
+        }
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl<S: PcmSink, F: FnOnce() -> Result<S>> PcmSink for LazySink<S, F> {
+    fn open(&mut self, format: AudioFormat) -> Result<()> {
+        if self.sink.is_none() {
+            let make_sink = self.make_sink.take().ok_or(MusicError::Output(
+                "audio sink factory already consumed".into(),
+            ))?;
+            self.sink = Some(make_sink()?);
+        }
+        self.sink.as_mut().unwrap().open(format)
+    }
+
+    fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+        self.sink
+            .as_mut()
+            .ok_or(MusicError::Output("audio sink is not open".into()))?
+            .write(block)
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        match self.sink.as_mut() {
+            Some(sink) => sink.finish(),
+            None => Ok(()),
+        }
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn process_error(code: ErrorCode, message: &str) -> Reply {
+    Reply::Error {
+        code,
+        message: message
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(MAX_ERROR_BYTES)
+            .collect(),
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn error_reply(error: MusicError) -> Reply {
+    match error {
+        MusicError::Unsupported(_) => process_error(
+            ErrorCode::Unsupported,
+            "lossless format or device profile is unsupported",
+        ),
+        MusicError::Invalid(_) => process_error(
+            ErrorCode::InvalidRequest,
+            "invalid music command or media state",
+        ),
+        MusicError::Limit(_) => process_error(
+            ErrorCode::InvalidRequest,
+            "music request exceeded a resource bound",
+        ),
+        MusicError::Io(_) => {
+            process_error(ErrorCode::Decoder, "local music file could not be read")
+        }
+        MusicError::Output(_) => {
+            process_error(ErrorCode::Output, "audio output could not start or stop")
+        }
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn make_view<S: PcmSink>(slot: &MusicSlot<S>, page: u16) -> View {
+    let status = slot.status();
+    let library = slot.library();
+    let total = library.len().min(u16::MAX as usize);
+    let offset = usize::from(page)
+        .saturating_mul(MAX_TRACKS_PER_VIEW)
+        .min(total);
+    let tracks = library
+        .tracks()
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(MAX_TRACKS_PER_VIEW)
+        .map(|(index, track)| TrackView {
+            index: index as u16,
+            title: bounded_title(track.display_title()),
+            container: match track.container {
+                LibraryContainer::Flac => AudioContainer::Flac,
+                LibraryContainer::Wave => AudioContainer::Wave,
+                LibraryContainer::Aiff => AudioContainer::Aiff,
+                LibraryContainer::Caf => AudioContainer::Caf,
+                LibraryContainer::Mp4 => AudioContainer::Mp4,
+            },
+        })
+        .collect();
+    let playback = match status.playback.state {
+        rust_music::PlaybackState::Empty => Playback::Empty,
+        rust_music::PlaybackState::Ready => Playback::Ready,
+        rust_music::PlaybackState::Playing => Playback::Playing,
+        rust_music::PlaybackState::Stopped => Playback::Stopped,
+        rust_music::PlaybackState::Finished => Playback::Finished,
+        rust_music::PlaybackState::Failed => Playback::Failed,
+    };
+    View {
+        playback,
+        selected: status.selection.and_then(|index| u16::try_from(index).ok()),
+        track_count: total as u16,
+        page_offset: offset as u16,
+        tracks,
+        format: status.playback.format,
+        frames_delivered: status.playback.frames_delivered,
+        total_frames: status.playback.total_frames,
+        audio_claimed: status.has_audio_focus,
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn bounded_title(value: &str) -> String {
+    let mut result = String::new();
+    for ch in value.chars() {
+        if ch.is_control() {
+            continue;
+        }
+        if result.len() + ch.len_utf8() > MAX_TITLE_BYTES {
+            break;
+        }
+        result.push(ch);
+    }
+    result
+}
+
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
+    if action == "serve" {
+        let device = args.next();
+        if args.next().is_some() {
+            return Err(MusicError::Invalid("too many package process arguments"));
+        }
+        return serve(device.as_deref());
+    }
     let path = args
         .next()
         .ok_or(MusicError::Invalid("missing input filename"))?;
@@ -292,7 +809,7 @@ fn run() -> Result<()> {
             }
             export_wav_range(open_file(path)?, start, count, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE]")),
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | serve [ALSA_DEVICE]")),
     }
 }
 fn main() {
@@ -305,6 +822,11 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    use rust_music_ipc::{read_frame, write_frame, Envelope, Reply, Request, PROTOCOL_VERSION};
 
     fn header(format: AudioFormat, data_bytes: u32) -> Vec<u8> {
         let mut out = Vec::new();
@@ -473,5 +995,173 @@ mod tests {
         assert_eq!(u32::from_le_bytes(h[40..44].try_into().unwrap()), 0);
         assert_eq!(&h[44..60], PCM_GUID.as_slice());
         assert_eq!(&h[60..64], b"data");
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_stream_handshakes_activates_without_io_and_shuts_down() {
+        let id = rust_music_host::MUSIC_PACKAGE_ID;
+        let requests = [
+            Envelope {
+                package_id: id.into(),
+                request_id: 1,
+                body: Request::Hello {
+                    min_version: PROTOCOL_VERSION,
+                    max_version: PROTOCOL_VERSION,
+                },
+            },
+            Envelope {
+                package_id: id.into(),
+                request_id: 2,
+                body: Request::Activate {
+                    width: 480,
+                    height: 320,
+                },
+            },
+            Envelope {
+                package_id: id.into(),
+                request_id: 3,
+                body: Request::Shutdown,
+            },
+        ];
+        let mut input = Vec::new();
+        for request in requests {
+            write_frame(&mut input, &request.encode().unwrap()).unwrap();
+        }
+        let mut output = Vec::new();
+        let sink_created = Arc::new(AtomicBool::new(false));
+        let sink_created_in_worker = Arc::clone(&sink_created);
+        serve_stream::<NullSink, _, _, _>(
+            move || {
+                sink_created_in_worker.store(true, Ordering::Release);
+                Ok(NullSink::default())
+            },
+            std::io::Cursor::new(input),
+            &mut output,
+        )
+        .unwrap();
+        assert!(!sink_created.load(Ordering::Acquire));
+        let mut replies = output.as_slice();
+        let hello = Envelope::<Reply>::decode(&read_frame(&mut replies).unwrap().unwrap()).unwrap();
+        assert_eq!(hello.request_id, 1);
+        assert_eq!(
+            hello.body,
+            Reply::Hello {
+                selected_version: PROTOCOL_VERSION
+            }
+        );
+        let activate =
+            Envelope::<Reply>::decode(&read_frame(&mut replies).unwrap().unwrap()).unwrap();
+        assert_eq!(activate.request_id, 2);
+        let Reply::View(view) = activate.body else {
+            panic!("activation returns view");
+        };
+        assert_eq!(view.playback, rust_music_ipc::Playback::Empty);
+        assert_eq!(view.track_count, 0);
+        assert!(!view.audio_claimed);
+        let shutdown =
+            Envelope::<Reply>::decode(&read_frame(&mut replies).unwrap().unwrap()).unwrap();
+        assert_eq!(shutdown.request_id, 3);
+        assert_eq!(shutdown.body, Reply::Ack);
+        assert_eq!(read_frame(&mut replies).unwrap(), None);
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_stream_rejects_skipped_request_ids() {
+        let id = rust_music_host::MUSIC_PACKAGE_ID;
+        let hello = Envelope {
+            package_id: id.into(),
+            request_id: 1,
+            body: Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+        };
+        let skipped = Envelope {
+            package_id: id.into(),
+            request_id: 3,
+            body: Request::Shutdown,
+        };
+        let mut input = Vec::new();
+        write_frame(&mut input, &hello.encode().unwrap()).unwrap();
+        write_frame(&mut input, &skipped.encode().unwrap()).unwrap();
+        let mut output = Vec::new();
+        assert!(serve_stream::<NullSink, _, _, _>(
+            || Ok(NullSink::default()),
+            std::io::Cursor::new(input),
+            &mut output,
+        )
+        .is_err());
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_stream_rejects_wrong_identity_before_dispatch() {
+        let request = Envelope {
+            package_id: "org.rustboy.radio".into(),
+            request_id: 1,
+            body: Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+        };
+        let mut input = Vec::new();
+        write_frame(&mut input, &request.encode().unwrap()).unwrap();
+        let mut output = Vec::new();
+        let sink_created = Arc::new(AtomicBool::new(false));
+        let sink_created_in_worker = Arc::clone(&sink_created);
+        assert!(serve_stream::<NullSink, _, _, _>(
+            move || {
+                sink_created_in_worker.store(true, Ordering::Release);
+                Ok(NullSink::default())
+            },
+            std::io::Cursor::new(input),
+            &mut output,
+        )
+        .is_err());
+        assert!(output.is_empty());
+        assert!(!sink_created.load(Ordering::Acquire));
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_stream_rejects_activation_before_handshake() {
+        let request = Envelope {
+            package_id: rust_music_host::MUSIC_PACKAGE_ID.into(),
+            request_id: 1,
+            body: Request::Activate {
+                width: 480,
+                height: 320,
+            },
+        };
+        let mut input = Vec::new();
+        write_frame(&mut input, &request.encode().unwrap()).unwrap();
+        let mut output = Vec::new();
+        let sink_created = Arc::new(AtomicBool::new(false));
+        let sink_created_in_worker = Arc::clone(&sink_created);
+        assert!(serve_stream::<NullSink, _, _, _>(
+            move || {
+                sink_created_in_worker.store(true, Ordering::Release);
+                Ok(NullSink::default())
+            },
+            std::io::Cursor::new(input),
+            &mut output,
+        )
+        .is_err());
+        assert!(output.is_empty());
+        assert!(!sink_created.load(Ordering::Acquire));
     }
 }

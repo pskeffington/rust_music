@@ -2,6 +2,8 @@
 
 Codex reads [AGENTS.md](../AGENTS.md) as root project instructions. Actual **project-scoped subagent definitions** live in `.codex/agents/*.toml` and are recognized by Codex versions supporting custom agents. [Codex project config](../.codex/config.toml) allows up to **three** concurrent spawned agents and intentionally pins no model, cloud provider, server or dependencies. These are development assistants, not part of the offline player. Custom-agent instructions do not create separate sandbox permissions.
 
+The separately pinned workflow reference and mapping from its orchestrator/reviewer roles to these Rust Music specialists is documented in [AGENT_SKILLS_INTEGRATION.md](AGENT_SKILLS_INTEGRATION.md). It is guidance only; repository instructions, task dependencies and actual Codex permissions remain controlling.
+
 The single source of machine-routing facts is [roadmap-index.json](roadmap-index.json); human gate progress is in [ROADMAP.md](ROADMAP.md).
 
 ## Role / file ownership
@@ -11,7 +13,7 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 | `gate_verifier` | `.codex/agents/gate-verifier.toml` | read only | read-only | Offline gate and sample-parity evidence; no edits |
 | `codec_engineer` | `.codex/agents/codec-engineer.toml` | write scoped | `crates/rust-music-flac/`, `crates/rust-music-wave/`, `crates/rust-music-aiff/`, `crates/rust-music-alac/`, approved future codec crates | Own independent codec/container decoding and rigorous PCM tests |
 | `audio_backend` | `.codex/agents/audio-backend.toml` | write scoped | `crates/rust-music-native/` | OS PCM adapters and hardware-format acceptance |
-| `host_integrator` | `.codex/agents/host-integrator.toml` | write scoped | `crates/rust-music-host/`, `crates/rust-music-library/`, `crates/rust-music-panel/` | Rust_Boy audio lease, bounded library and 1KiB interface |
+| `host_integrator` | `.codex/agents/host-integrator.toml` | write scoped | `crates/rust-music-host/`, `crates/rust-music-library/`, `crates/rust-music-panel/`, `apps/rust-music-macos/`, package smoke/build scripts | Rust_Boy audio lease, bounded library, 1KiB interface and standalone UI lifecycle |
 | `index_curator` | `.codex/agents/index-curator.toml` | write scoped | `docs/ROADMAP.md`, `docs/CODEX_AGENT_MAP.md`, `docs/REPOSITORY_INDEX.md`, `docs/roadmap-index.json`, `scripts/check_roadmap_index.py` | Stable roadmap IDs, evidence routing, docs and JSON index |
 | `safety_reviewer` | `.codex/agents/safety-reviewer.toml` | read only | read-only | Lossless policy and adversarial code/security review; no edits |
 
