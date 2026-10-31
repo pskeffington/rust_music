@@ -283,7 +283,7 @@
       ],
       "create_paths": [],
       "acceptance": "sh scripts/offline-gate.sh returns exit 0; record rustfmt, Clippy, all tests, release build and native macOS check",
-      "blocker": "None for local RM-001 acceptance: sh scripts/offline-gate.sh exited 0 on Rust 1.99.1/macOS; physical device acceptance is tracked separately"
+      "blocker": "None for local RM-001 acceptance: sh scripts/offline-gate.sh exited 0 on Rust 1.99.1/macOS; physical device acceptance is tracked separately Exact-HEAD refresh 2026-10-31 at 728eb754d983ec44d99951c7e4b3637c5ce8ba28: sh scripts/offline-gate.sh exited 0; 17 local crates, 32 path-only edges, 28 Rust sources, zero registry/Git crates, zero third-party system links, one OS framework link, 17/17 simulated AudioQueue tests. Formatting, warnings-denied Clippy, workspace tests, release build, and macOS feature checks passed. No private codec parity corpus was rerun. Physical output/device recovery, live host focus, DAC/panel, signing, and distribution acceptance remain separate."
     },
     {
       "id": "RM-002",

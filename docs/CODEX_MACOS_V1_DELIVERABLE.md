@@ -1718,3 +1718,14 @@ the LAN, but the service names do not identify them conclusively as the
 UniFi or iHome units. None appeared in the macOS Sound Output list at the
 time, and no route was selected or changed. This is discovery evidence only,
 not Rust Music output, disconnect/recovery, or device-identity acceptance.
+
+### 2026-10-31 exact-HEAD offline gate refresh
+
+At local HEAD `728eb754d983ec44d99951c7e4b3637c5ce8ba28`,
+`sh scripts/offline-gate.sh` exited **0**. The gate audited 17 local crates,
+32 path-only internal edges, 28 Rust sources, zero registry/Git crates, zero
+third-party system links, and one OS framework link. Formatting, warnings-
+denied Clippy, workspace tests, release build, macOS feature checks, and all
+17 simulated AudioQueue tests passed. No private codec parity corpus was
+rerun; this exact-HEAD offline result does not replace physical device,
+shared-focus, DAC/panel, signing, or distribution acceptance.

@@ -522,3 +522,12 @@ commands were stopped with SIGINT after each bounded browse (exit -2). The
 names do not prove which are UniFi or iHome hardware, and no candidate was
 available in the Sound Output list. No output route was changed or played.
 Physical AirPlay output and device-recovery acceptance remain open.
+
+**RM-001 exact-HEAD offline gate refresh (2026-10-31):** at
+`728eb754d983ec44d99951c7e4b3637c5ce8ba28`, `sh scripts/offline-gate.sh`
+exited **0**: 17 local crates, 32 path-only internal edges, 28 Rust sources,
+zero registry/Git crates, zero third-party system links, one OS framework
+link, and 17/17 simulated AudioQueue tests. Formatting, Clippy, workspace
+tests, release build, and macOS feature checks passed. Private codec parity
+corpora were not rerun. Physical output/device recovery, live host focus,
+DAC/panel, signing, and distribution gates remain separate.
