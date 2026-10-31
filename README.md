@@ -66,6 +66,10 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 
 Start with the pinned [agent_skills-first production directive](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and preserve all unfinished local checkout work before integrating remotely. Then follow the [zero-artwork micro-library specification](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). This is a tasking order, not a completed release.
 
+## Winamp-like library import and EQ engineering
+
+The active product tasking is [Codex library-load/autoplay/EQ gates](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md). Autoplay is **optional, default off**, and may start only after a user explicitly loads a library and audio focus is granted. The native EQ is bypassable; enabled EQ intentionally processes PCM. The zero-artwork policy remains absolute. This is a specification, not a verified implementation.
+
 ## Media library design: no artwork
 
 The text-first library, search, playlist and queue roadmap is specified in [the zero-artwork micro-library directive](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). No cover art or image decoding, extraction, caching, or display is permitted; the fixed monochrome 128x64 screen remains a text/control surface only. These planned features are not a claim of implementation.
