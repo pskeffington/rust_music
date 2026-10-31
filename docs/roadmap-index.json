@@ -700,7 +700,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "RM-021"
       ],
@@ -712,7 +712,7 @@
       ],
       "create_paths": [],
       "acceptance": "Define bounded portable catalog, stable IDs, canonical paths, sorted views and golden malformed-input tests; zero third-party runtime dependencies.",
-      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+      "blocker": "Source provides bounded RMSYNC01 serialization/decoding, canonical entry ordering, corruption/truncation/path rejection, and 20,000-entry bounds/tests. Remaining gaps: independent source/encoder vectors; playlists and full metadata; internally computed/trusted digests and lossless codec admission; complete cross-platform Unicode/path policy."
     },
     {
       "id": "RM-023",
@@ -721,7 +721,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "RM-022"
       ],
@@ -733,7 +733,7 @@
       ],
       "create_paths": [],
       "acceptance": "Implement deterministic complete package and incremental delta plan; reject traversal and corruption; verify atomic recovery, cancellation and source media untouched.",
-      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+      "blocker": "Source provides deterministic pure delta planning with bounded 20,000-entry snapshots, Windows reserved-path defenses, and a maximum-size planner test. It does not implement a package writer/importer, source hashing, no-follow filesystem access, atomic publication, cancellation/recovery, destination validation, or source-media immutability acceptance."
     },
     {
       "id": "RM-024",
