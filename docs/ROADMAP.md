@@ -126,6 +126,16 @@ settled at 43 MB. A separate idle sample held at 37 MB. The scan interval did
 not isolate retained catalog memory, so no incremental delta is claimed and
 the memory gate remains open.
 
+**Refined same-process memory sample (2026-10-31):** separate five-second
+footprint series after the folder picker closed measured 2,000 generated
+12-byte WAV signatures at +6–7 MB in two fresh app processes. A third run in
+byte mode measured `phys_footprint` 28,296,080 bytes idle and 34,046,864 bytes
+after scanning (increase **5,750,784 bytes / 5.48 MiB**); five post-scan samples
+were identical. These are synthetic 2k app-process results, not a 20k or real
+tagged-library memory pass. An explicit 20k app load was rejected with the
+configured 2,048-track budget error. The app-wide 20k, cold-start and real
+library memory gates remain open.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

@@ -94,7 +94,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model, versioned `.rmp` persistence, CLI CRUD, and standalone text UI for create/rename/delete/add/queue; host workflow and import/export remain |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, CLI/UI queue editing, queue navigation, repeat and seeded shuffle; explicit queue selection is non-autoplay; standalone process focus does not prove Rust Boy shared focus |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | partial: explicit folder selection, cancellable bounded catalog load, text search/list, queue and named-playlist controls, Play/Pause/Resume/Stop/Next/Previous and software volume; fixed panel is implemented, physical input/display and host workflow remain |
-| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: build/search profiled at 0/1/100/2k/20k; 20k process RSS delta below 8 MiB at no/10%/all-tagged mixes; full-app RSS, cold system startup and real-library qualification remain |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: library process profiled at 0/1/100/2k/20k; two fresh app runs measured rounded +6–7 MB for a 2k signature-only catalog and one exact-byte run measured +5.48 MiB `phys_footprint`; the app rejects 20k at its 2,048-track default limit. Full-app 20k, cold startup, and real-library qualification remain |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
 engineering target: under 8 MiB additional idle catalog memory for a defined
@@ -357,3 +357,22 @@ absent and no `rust-music-cli serve` child remained. Fixtures stayed under
 `/private/tmp`. Repeatable cold-start/catalog-memory profiles, transition
 latency, device disconnect/recovery, physical DAC and Rust Boy focus remain
 open.
+
+### App-level footprint repeat and 20k scan bound (2026-10-31)
+
+The standalone app explicitly loaded generated 2,000-entry directories made
+of 12-byte RIFF/WAVE signatures. No fixture had PCM payload, and playback
+remained stopped. Two fresh-process settled pairs, sampled after the picker
+closed, showed +7 MB and +6 MB using `/usr/bin/footprint`'s rounded `Footprint`
+display. A third fresh process was sampled in exact-byte mode: the last two
+idle `phys_footprint` samples were 28,296,080 bytes; five post-scan samples were
+34,046,864 bytes, a **5,750,784-byte (5.48 MiB)** increase. The corresponding
+`Footprint` column delta was **5,881,880 bytes (5.61 MiB)**. This is useful
+repeatable app-level evidence for the 2k generated case, but not exact catalog
+heap accounting or a pass for 20k/real tagged libraries.
+
+An explicit 20,000-entry app load returned the bounded error
+`RUST_MUSIC: AUDIO RESOURCE LIMIT: MUSIC LIBRARY TRACK BUDGET EXCEEDED`; source
+defaults cap the app scan at 2,048 tracks. Therefore the independent 20k Rust
+library example does not establish app behavior at that scale. No private
+media was loaded, and all generated fixtures were removed after the tests.

@@ -13,7 +13,7 @@ release approval.
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. Synthetic silent short-track UI checks verified Repeat One continues and Repeat All loops; Repeat Off finishes at the final item instead of replaying it. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
 | MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / NORMAL AND FORCED ACTIVE-PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. On 2026-10-31 at source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`, the app loaded only two generated 16-bit/44.1 kHz silent WAVs and showed Playing through AudioQueue. Activity Monitor showed CLI child PID 22787; after selecting Quit Rust Music, the child inspector reported Terminated and 0 bytes memory, and the refreshed `Rust` filter showed no app or CLI process. Earlier normal Cmd-Q and forced active-playback SIGKILL checks also observed app/child exit. The absolute bundle launches through host LaunchServices with `open -n` exit 0. Separate process tests verify playback-error cleanup and repeated serve launch/exit cycles. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
-| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links; injected AudioQueue failure/teardown tests passed 15/15. Focused macOS CLI subprocess tests passed 7/7. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc code-sign validation exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Independent code/security review found no blocking issue; the public pre-v1 `Track.tags` API changed and is documented below. Synthetic catalog profiling remains OS-observed rather than exact heap accounting; actual-app incremental memory, device recovery, physical DAC/panel, transition latency and distribution acceptance remain open. |
+| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links; injected AudioQueue failure/teardown tests passed 15/15. Focused macOS CLI subprocess tests passed 7/7. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc code-sign validation exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Independent code/security review found no blocking issue; the public pre-v1 `Track.tags` API changed and is documented below. A same-process app `phys_footprint` profile measured a 5,750,784-byte (5.48 MiB) increase for a 2,000-entry generated WAV-signature catalog; two rounded fresh-process repeats showed +6 to +7 MB. The 20,000-entry UI load was rejected at the app's 2,048-track scan limit. The 2k profile is not a 20k app-memory or real-library acceptance. Device recovery, physical DAC/panel, transition latency and distribution acceptance remain open. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | Live GitHub fetch on 2026-10-31 reports PR #1 open, draft and unmerged (`mergeable=true`), remote head `2947e6737622c3c668003130006823df0bdde3e0`, base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. At local HEAD `e5bb801c43f975576736f23dc2615ee5ef43659f`, the PR head is an ancestor; `git rev-list --left-right --count 2947e6737622c3c668003130006823df0bdde3e0...HEAD` reports `0 51`. Mergeability is not release acceptance. No push or merge; preserve backup branches and stash through post-merge verification.
 
 ### 2026-10-31 candidate verification at `c1ce494`
@@ -658,3 +658,29 @@ five-second idle series before opening the picker held at 37 MB, further
 showing that this short method was not repeatable enough to qualify the app.
 After selecting Quit Rust Music, Activity Monitor's refreshed process filter
 showed no app or CLI row; generated fixtures were removed.
+
+### 2026-10-31 repeated app-level catalog footprint at byte resolution
+
+The app's `ScanLimits::default()` admits at most 2,048 tracks; the 20,000-file
+UI probe returned `RUST_MUSIC: AUDIO RESOURCE LIMIT: MUSIC LIBRARY TRACK
+BUDGET EXCEEDED` and did not begin playback. Thus the UI cannot load the 20k
+profile size through its default scan path.
+
+For a 2,000-entry generated catalog of 12-byte RIFF/WAVE-signature files, a
+fresh app process (PID 23814) was sampled for five seconds before and after
+the picker closed and the scan completed. The last two settled idle
+`phys_footprint` observations were 28,296,080 bytes; five post-scan observations
+were 34,046,864 bytes each. The paired difference is **5,750,784 bytes
+(5.48 MiB)**. The tool's `Footprint` column changed from 28,132,216 to
+34,014,096 bytes (**5,881,880 bytes; 5.61 MiB**). Two additional fresh-process
+paired scans showed rounded settled increases of 7 MB and 6 MB. These runs
+loaded the generated tracks in the UI and kept playback stopped; no audio was
+played. Fixtures had no PCM payload or real metadata. This provides repeatable
+2k synthetic app-footprint evidence below 8 MiB, but does not qualify a 20k
+app catalog, real tagged libraries, cold startup, exact live heap, or DAC and
+device behavior; app-scale memory acceptance remains partial.
+
+The same 20k folder is above the UI's configured 2,048-track default, so the
+standalone app's 20k memory/search behavior remains unmeasured. The separate
+Rust library example still profiles 20k entries; that is not a substitute for
+an app-level scan.
