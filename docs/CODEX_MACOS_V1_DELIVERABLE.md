@@ -1680,3 +1680,28 @@ exact heap measurement, or overall app-memory acceptance. After the final
 run, CUA reported the app stopped and the process sampler returned “No such
 process” for its PID. The temporary fixture directory and C helper were
 removed. No private or user media was used.
+
+### 2026-10-31 current-bundle 20k tagged catalog profile
+
+The exact current app bundle loaded a generated 20,000-entry FLAC metadata
+catalog. Each 175-byte file had bounded TITLE/ARTIST/ALBUM comments and
+STREAMINFO but no audio frames. The app displayed `LOADED 20000 TRACKS` and
+remained stopped. A repeated UI load completed in 3.185 seconds from the
+Load-button action through accessibility readback; this includes CUA/AX
+overhead and is not a direct scan timer. Searching for the final generated
+path returned exactly one track in 3.692 seconds from field update through
+accessibility readback, also including CUA/AX overhead.
+
+Two fresh-process `proc_pid_rusage(RUSAGE_INFO_V4)` footprint pairs were not
+stable: the first changed from 30,524,304 B idle to a settled post-load median
+of 48,317,328 B (**+17,793,024 B / 16.969 MiB**); the second changed from a
+33,358,736 B idle median to 42,632,080 B after five further seconds
+(**+9,273,344 B / 8.844 MiB**). In the second run, immediate post-scan samples
+varied from 45.9 MB to 53.0 MB before settling. The host reported roughly
+14.3–14.4 GB of 16 GB in use and 9.5–9.7 GB swap. These results show that the
+full-app tagged 20k profile costs more than the 2k profile, but are too
+pressure-sensitive for a repeatable memory acceptance result or a threshold
+claim. Representative-library measurement and full-app memory acceptance
+remain open. After each run the app exited; the process sampler returned “No
+such process” for the final PID. The generated fixture and helper were
+removed. No private media was used.

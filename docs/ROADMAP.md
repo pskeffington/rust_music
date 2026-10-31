@@ -500,3 +500,16 @@ use and 9.4 GB swap. This supports a bounded 2k synthetic profile only; a
 representative library and 20k app profile remain unmeasured, so app-wide
 memory acceptance stays open. The app exited and its final PID no longer
 existed; temporary fixtures and helper were removed.
+
+**RM-020 current-bundle 20k tagged catalog profile (2026-10-31):** two fresh
+app processes explicitly loaded 20,000 generated 175-byte FLAC metadata
+signatures with bounded TITLE/ARTIST/ALBUM comments, no frames, and playback
+stopped. Settled `proc_pid_rusage` physical-footprint deltas were +16.969 MiB
+and +8.844 MiB. The second run's immediate post-scan samples ranged from 45.9
+to 53.0 MB before settling at 42.6 MB; the host had about 14.3–14.4 GB of 16
+GB in use and 9.5–9.7 GB swap. A repeated UI load took 3.185 seconds from Load
+action through AX readback. A path search for the last item returned one
+result in 3.692 seconds including CUA/AX overhead. Treat these as synthetic
+observations only: host pressure and divergent app-memory deltas leave
+repeatable full-app memory acceptance open. The app and final PID exited and
+temporary files were removed.
