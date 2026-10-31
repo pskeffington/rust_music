@@ -907,6 +907,48 @@ fn run_parent_guard_test() -> Result<()> {
     Ok(())
 }
 
+#[cfg(all(
+    debug_assertions,
+    feature = "test-support",
+    any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    )
+))]
+struct TestPacedNullSink(NullSink);
+
+#[cfg(all(
+    debug_assertions,
+    feature = "test-support",
+    any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    )
+))]
+impl PcmSink for TestPacedNullSink {
+    fn open(&mut self, format: AudioFormat) -> Result<()> {
+        self.0.open(format)
+    }
+
+    fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+        self.0.write(block)?;
+        thread::sleep(Duration::from_millis(2));
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        self.0.pause()
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.0.resume()
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        self.0.finish()
+    }
+}
+
 #[cfg(any(
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
@@ -1434,6 +1476,22 @@ fn run() -> Result<()> {
             ));
         }
         return run_parent_guard_test();
+    }
+    #[cfg(all(
+        debug_assertions,
+        feature = "test-support",
+        any(
+            all(target_os = "macos", feature = "macos-output"),
+            all(target_os = "linux", feature = "alsa-output")
+        )
+    ))]
+    if action == "__test-serve-paced-null" {
+        if args.next().is_some() {
+            return Err(MusicError::Invalid(
+                "unexpected paced-null server test arguments",
+            ));
+        }
+        return serve_with_sink(|| Ok(TestPacedNullSink(NullSink::default())));
     }
     if action == "serve" {
         let device = args.next();

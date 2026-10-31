@@ -3,6 +3,13 @@
 use rust_music_ipc::{
     read_frame, write_frame, Envelope, Playback, Reply, Request, PROTOCOL_VERSION,
 };
+#[cfg(all(debug_assertions, feature = "test-support"))]
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use std::{
     io::Read,
     process::{Child, ChildStdin, Command, Stdio},
@@ -73,8 +80,62 @@ fn wait_for_exit(child: &mut Child) -> std::process::ExitStatus {
     }
 }
 
+#[cfg(all(debug_assertions, feature = "test-support"))]
+struct TempLibrary(PathBuf);
+
+#[cfg(all(debug_assertions, feature = "test-support"))]
+impl TempLibrary {
+    fn new() -> Self {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "rust-music-active-shutdown-{}-{stamp}",
+            std::process::id()
+        ));
+        fs::create_dir(&path).expect("create temporary library");
+        Self(path)
+    }
+}
+
+#[cfg(all(debug_assertions, feature = "test-support"))]
+impl Drop for TempLibrary {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn write_sparse_silent_wav(path: &std::path::Path) {
+    // Five minutes is long enough that a fast mock sink cannot consume the
+    // track before the parent observes Playing and closes its connection.
+    let sample_rate = 44_100u32;
+    let duration_seconds = 5u32 * 60;
+    let channels = 2u16;
+    let bits_per_sample = 16u16;
+    let data_bytes = sample_rate * duration_seconds * u32::from(channels) * 2;
+    let byte_rate = sample_rate * u32::from(channels) * 2;
+    let block_align = channels * (bits_per_sample / 8);
+    let mut file = File::create(path).expect("create silent WAV");
+    file.write_all(b"RIFF").unwrap();
+    file.write_all(&(36 + data_bytes).to_le_bytes()).unwrap();
+    file.write_all(b"WAVEfmt ").unwrap();
+    file.write_all(&16u32.to_le_bytes()).unwrap();
+    file.write_all(&1u16.to_le_bytes()).unwrap(); // integer PCM
+    file.write_all(&channels.to_le_bytes()).unwrap();
+    file.write_all(&sample_rate.to_le_bytes()).unwrap();
+    file.write_all(&byte_rate.to_le_bytes()).unwrap();
+    file.write_all(&block_align.to_le_bytes()).unwrap();
+    file.write_all(&bits_per_sample.to_le_bytes()).unwrap();
+    file.write_all(b"data").unwrap();
+    file.write_all(&data_bytes.to_le_bytes()).unwrap();
+    file.set_len(44 + u64::from(data_bytes))
+        .expect("extend silent WAV sparsely");
+}
+
 #[test]
-#[cfg(feature = "test-support")]
+#[cfg(all(debug_assertions, feature = "test-support"))]
 fn managed_playback_process_exits_when_parent_pipe_closes_repeatedly() {
     for _ in 0..3 {
         let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
@@ -191,6 +252,97 @@ fn spawned_cli_unit_handshakes_activates_inertly_and_shuts_down() {
         thread::sleep(Duration::from_millis(10));
     };
     assert!(status.success(), "child exited with {status}");
+    assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
+    reply_reader.join().expect("join child reply reader");
+}
+
+#[test]
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
+    let library = TempLibrary::new();
+    write_sparse_silent_wav(&library.0.join("long-silence.wav"));
+
+    let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
+        .arg("__test-serve-paced-null")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn mock-output package process");
+    let child_pid = child.id();
+    assert_ne!(child_pid, 0, "spawned package has a real OS process ID");
+    let mut child = ChildGuard(child);
+    let mut stdin = child.0.stdin.take().expect("child stdin");
+    let stdout = child.0.stdout.take().expect("child stdout");
+    let (replies, reply_reader) = start_reply_reader(stdout);
+
+    send_request(
+        &mut stdin,
+        1,
+        Request::Hello {
+            min_version: PROTOCOL_VERSION,
+            max_version: PROTOCOL_VERSION,
+        },
+    );
+    assert_eq!(
+        receive_reply(&replies).body,
+        Reply::Hello {
+            selected_version: PROTOCOL_VERSION
+        }
+    );
+    send_request(
+        &mut stdin,
+        2,
+        Request::Activate {
+            width: 480,
+            height: 320,
+        },
+    );
+    assert!(matches!(receive_reply(&replies).body, Reply::View(_)));
+    send_request(
+        &mut stdin,
+        3,
+        Request::ScanLibrary {
+            root: library.0.to_string_lossy().into_owned(),
+        },
+    );
+    let scanned = receive_reply(&replies);
+    let Reply::View(scanned) = scanned.body else {
+        panic!("scan should return a view");
+    };
+    assert_eq!(scanned.track_count, 1);
+    assert!(!scanned.audio_claimed);
+
+    send_request(&mut stdin, 4, Request::Play);
+    let playing = receive_reply(&replies);
+    let Reply::View(playing) = playing.body else {
+        panic!("Play should return the active view");
+    };
+    assert_eq!(playing.playback, Playback::Playing);
+    assert!(playing.audio_claimed);
+
+    // Observe the state again after the worker has had time to poll output.
+    thread::sleep(Duration::from_millis(30));
+    send_request(&mut stdin, 5, Request::Snapshot { page: 0 });
+    let active = receive_reply(&replies);
+    let Reply::View(active) = active.body else {
+        panic!("Snapshot should return the active view");
+    };
+    assert_eq!(active.playback, Playback::Playing);
+    assert!(active.audio_claimed);
+    assert!(
+        active.frames_delivered > 0,
+        "paced mock output must receive decoded frames before shutdown"
+    );
+
+    // Closing the parent's IPC stream exercises the EOF cleanup path. The
+    // direct Child handle then verifies this exact subprocess exits on time.
+    drop(stdin);
+    let status = wait_for_exit(&mut child.0);
+    assert!(
+        status.success(),
+        "active package child exited with {status}"
+    );
     assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
     reply_reader.join().expect("join child reply reader");
 }

@@ -262,8 +262,24 @@ builds took 519/636 ms and search p95 was 734/802 µs. An attempted
 unmeasured. The exact two-run table is recorded in
 [`MICRO_LIBRARY_ZERO_ARTWORK.md`](MICRO_LIBRARY_ZERO_ARTWORK.md).
 
-RM-019 is now **done for local bundle/idle-child shutdown acceptance**. Active
-playback close, native-device disconnect/recovery, live Rust Boy focus,
+## 2026-10-31 active-playback shutdown evidence
+
+The current macOS app was loaded with only the generated `silent-60s.wav`
+fixture and displayed `PLAYING … THROUGH RUST MUSIC AND MACOS AUDIOQUEUE`.
+Activity Monitor showed Rust Music PID 11612 and `rust-music-cli` PID 11664.
+Cmd-Q was sent with Rust Music foreground; after refreshing the `rust` process
+filter, neither process remained, and `cua.listApps()` reported the app
+`isRunning=false`. This is observed app/child exit during active silent
+playback; it is not audible-content or DAC acceptance.
+
+The test-only paced-null subprocess regression independently observed a
+`Playing` view with `audio_claimed=true` and nonzero delivered frames, then
+closed the IPC parent. The real child exited with status 0 and stdout reached
+EOF. The package-process suite passed 6/6, the release-mode targeted filter
+exited 0 with no debug-only test selected, and the full offline gate exited 0.
+
+RM-019 is now **done for local bundle idle and active synthetic-playback
+shutdown acceptance**. Native-device disconnect/recovery, live Rust Boy focus,
 physical panel/DAC and distribution approval remain open. The overall release
 decision is unchanged: local branch is unpushed, PR #1 stays draft, and mainline
 integration remains blocked.

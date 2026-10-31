@@ -12,7 +12,7 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / IDLE CHILD CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The current bundle built at code HEAD `b03c592` includes the navigation/shutdown change from `31cb4cb`. With the app open and its CLI child listed in Activity Monitor (app PID 95299, child PID 95500; playback was already finished), Cmd-Q closed the app. Rebinding through CUA launched a fresh empty instance; Activity Monitor then showed the new Rust Music PID 9117 and no `rust-music-cli` row. A later Quit produced `cua.listApps()` `isRunning=false` and a fresh Activity Monitor filter with no Rust Music or CLI process. Reopening the bundle showed the expected Ready/No Track state, disabled transport, and no CLI child (new app PID 9188), so startup did not autoplay or rescan. This confirms current idle-child cleanup, not forced-close during active audio. AudioQueue injected failure/teardown tests pass 15/15. Real device disconnect/recovery, active-playback close, DAC measurement and Developer ID/notarization remain open. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / IDLE + ACTIVE SILENT-PLAYBACK CHILD CLOSE VERIFIED; DEVICE RECOVERY OPEN** | At app code HEAD `b03c592`, idle child shutdown was observed with Activity Monitor and a clean no-child relaunch. On 2026-10-31, the current app loaded only the generated `silent-60s.wav` fixture and displayed `PLAYING … THROUGH RUST MUSIC AND MACOS AUDIOQUEUE`. Before Cmd-Q, Activity Monitor showed Rust Music PID 11612 and `rust-music-cli` PID 11664. Cmd-Q was sent with Rust Music foreground; after refreshing Activity Monitor, neither PID/process row remained, and `cua.listApps()` reported `isRunning=false`. This is GUI quit during active silent playback with no orphan child observed; it does not establish audible-content or physical-output behavior. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`, `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 local path edges, zero registry/Git crates); macOS AudioQueue failure/teardown tests passed 15/15. A generated nonzero 440 Hz 16-bit/44.1 kHz WAV played through the bundled CLI with exit 0; `system_profiler` listed MacBook Air Speakers as the 48 kHz default output. In the UI, loading 2,000 generated catalog entries returned in <1 s and searching `track-01999` returned one result. Same-process RSS rose 103,312→104,880 KiB (+1,568 KiB); this is one fixture sample, not a threshold pass. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Cold-launch distribution, broader incremental-memory profiles and latency measurements remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. At preceding checkpoint `fa6c192ca0822f685e908531af7fdd5d3d85ca08`, the local branch was 25 commits ahead of its local `origin/build/native-codecs-g0` tracking ref. The subsequent evidence commits are local documentation updates; the tracking ref was not refreshed and nothing was pushed. PR #1 remains draft. Preserve backup branches and stash through post-merge verification. |
 
@@ -20,17 +20,19 @@ release approval.
 
 At checkout `c8e17f13557ad281813e92a52b2d5c908b39cab8`,
 `cargo test --locked --offline -p rust-music-cli --features
-macos-output,test-support --test package_process -- --test-threads=1`
-exited **0** (5 passed, including managed playback-error cleanup, repeated
-parent-pipe-close cleanup and explicit shutdown). `sh scripts/offline-gate.sh`
-also exited **0**: all 17 local crates built and tested offline, dependency
-audit found 32 path-only internal edges, zero registry/Git crates and zero
-third-party system links (one OS framework link). The 15 injected AudioQueue
-failure/teardown tests passed. These automated results do not prove that the
-active GUI playback child exits on Cmd-Q: the desktop was locked during this
-pass, so no new runtime process-exit evidence was captured. Active-playback
-close and device disconnect/recovery remain open; no private corpus was
-rerun.
+macos-output,test-support --test package_process` exited **0** (6/6 passed,
+including managed playback-error cleanup, repeated parent-pipe-close cleanup,
+and the paced-null active-playback parent-close regression). The active case
+observes `Playing`, `audio_claimed`, and nonzero delivered frames before closing
+the IPC parent; the child exits with status 0 and stdout reaches EOF. Its
+test-only sink does not prove AudioQueue output. The equivalent release-mode
+test filter exited **0** with zero matching tests, keeping the debug-only hook
+out of release builds. `sh scripts/offline-gate.sh` also exited **0**: all 17
+local crates built and tested offline, dependency audit found 32 path-only
+internal edges, zero registry/Git crates and zero third-party system links
+(one OS framework link). The 15 injected AudioQueue failure/teardown tests
+passed. Separately, the live GUI test above observed app and child exit during
+active synthetic silent AudioQueue playback. No private corpus was rerun.
 
 ## Component matrix
 
