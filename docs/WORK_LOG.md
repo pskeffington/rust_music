@@ -1665,3 +1665,25 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   baseline and is not incremental catalog memory. SIGTERM followed by `ps -p`
   exit status 1 confirmed validation PIDs 89533 and 88443 exited. No playback
   child was started; this is launch/exit evidence, not audible output.
+
+## 2026-10-31 — Fresh audio, offline gate and 2k UI profile
+
+- Revalidated source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba` with
+  `sh scripts/offline-gate.sh` (exit 0): 17 local crates, 32 path-only edges,
+  zero registry/Git crates; workspace tests, Clippy, release build and macOS
+  feature checks passed, including AudioQueue injected failure/teardown 15/15.
+- The app-bundled CLI played a generated nonzero stereo 440 Hz, 16-bit/44.1
+  kHz WAV through the native output path (exit 0). Unsandboxed
+  `system_profiler SPAudioDataType -detailLevel mini` listed MacBook Air
+  Speakers as the 48 kHz default output. No DAC loopback/capture was made and
+  private FLAC parity was not rerun.
+- The existing app loaded 2,000 generated 12-byte WAV-named catalog entries;
+  UI state returned all 2,000 rows in under one second. Searching
+  `track-01999` showed one match (3.3 seconds including UI automation). The
+  same app PID RSS rose 103,312→104,880 KiB (+1,568 KiB), a single observation
+  rather than a performance threshold. Normal Cmd-Q removed app PID 93393;
+  the subsequent process query found no `rust-music-cli serve` child.
+- Recorded this evidence in the macOS v1 matrix, G15/RM-020 roadmap entries,
+  and the zero-artwork library ledger. Device loss/recovery, measured DAC,
+  Rust Boy shared focus, repeatable startup/memory/latency measurements and
+  final release review remain.

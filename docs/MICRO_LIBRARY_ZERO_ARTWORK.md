@@ -247,3 +247,24 @@ disconnect/recovery, DAC loopback, Rust Boy shared focus, cold startup and
 incremental catalog memory remain unverified. Autoplay and native EQ remain
 follow-on gates. This work adds no artwork or image functionality and does not
 rerun private codec parity.
+
+### Fresh full gate and in-app catalog sample (2026-10-31)
+
+At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`,
+`sh scripts/offline-gate.sh` exited 0 across 17 local crates, 32 path-only
+edges and zero registry/Git crates. The 15-case macOS AudioQueue injected
+failure/teardown suite passed. A generated nonzero 440 Hz, stereo, 16-bit/
+44.1 kHz WAV played through the app-bundled CLI with exit 0. Unsandboxed
+`system_profiler` listed MacBook Air Speakers as the 48 kHz default output;
+this was not a DAC capture. No private parity corpus was rerun.
+
+The app loaded 2,000 generated 12-byte WAV-named catalog entries; its
+accessibility tree showed 2,000 catalog rows in under one second. Searching
+`track-01999` showed exactly one row, with the 3.3-second observation including
+the UI automation round-trip. For the same PID, `ps` RSS changed from 103,312
+to 104,880 KiB (+1,568 KiB). This is a single observation, not a repeatable
+incremental-memory benchmark or acceptance threshold. After Cmd-Q, the PID was
+absent and no `rust-music-cli serve` child remained. Fixtures stayed under
+`/private/tmp`. Repeatable cold-start/catalog-memory profiles, transition
+latency, device disconnect/recovery, physical DAC and Rust Boy focus remain
+open.

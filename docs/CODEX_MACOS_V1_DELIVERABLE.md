@@ -13,7 +13,7 @@ release approval.
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
 | MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / DEVICE RECOVERY OPEN** | Unsandboxed `open -n` exited 0; LaunchServices recorded bundle check-in in 0.065434 s. `system_profiler` listed MacBook Air Speakers as the 48 kHz default output and an ASUS VG32V HDMI output. Before Cmd-Q the app PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q neither PID remained and LaunchServices showed the app stopped. AudioQueue injected failure/teardown tests pass 15/15. Physical disconnect/recovery and DAC measurement remain open; Developer ID/notarization remains a distribution gate. |
-| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | `sh scripts/offline-gate.sh` exited 0 on source with 17 local crates, 32 local path edges and no registry/Git crates; app build/signature verification and roadmap/literature validators exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. A prior 94,432 KiB RSS sample exists, but cold-launch distribution and incremental library memory remain unmeasured. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
+| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`, `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 local path edges, zero registry/Git crates); macOS AudioQueue failure/teardown tests passed 15/15. A generated nonzero 440 Hz 16-bit/44.1 kHz WAV played through the bundled CLI with exit 0; `system_profiler` listed MacBook Air Speakers as the 48 kHz default output. In the UI, loading 2,000 generated catalog entries returned in <1 s and searching `track-01999` returned one result. Same-process RSS rose 103,312→104,880 KiB (+1,568 KiB); this is one fixture sample, not a threshold pass. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Cold-launch distribution, broader incremental-memory profiles and latency measurements remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. Local transport/app and evidence commits remain preserved; the development branch is nine commits ahead of the refreshed remote. No push was made because other acceptance gates remain open. PR #1 remains draft. Preserve backup branch and stash through post-merge verification. |
 
 ## Component matrix
@@ -29,7 +29,7 @@ release approval.
 | Volume | User-visible functional native volume | Implemented as bounded software attenuation (0–100), with strict 100% integer-sample bypass. It is not hardware gain or bit-perfect processing. The app slider changed 100→95→100 during the two-tone output smoke. |
 | Application | Valid bundle, LaunchServices and shutdown | Local bundle build/plist/ad-hoc code-sign validation and LaunchServices launch evidence are in PR readiness ledger. Revalidate after binary/UI changes; distribution signature/notarization remains open. |
 | Security | Bounded parsers, safe paths, no network/artwork | Workspace-local Cargo edges and fail-closed bounded inputs are enforced by offline gate. Maintain no image/artwork/visualizer functionality and never modify source audio during library operations. |
-| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. Cold startup, incremental catalog memory, transition latency, and attenuation processing cost are not measured. |
+| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Cold-start distribution, repeatable incremental catalog memory, transition latency, and attenuation processing cost remain unmeasured. |
 | Release | Reproducible build and independent acceptance | Local offline/app build evidence exists at recorded commits. Require fresh build evidence at candidate SHA, independent code/security review, operator hardware record, clean mainline build and app launch before declaring v1.0 ready. |
 
 ## Operating constraints
@@ -149,6 +149,31 @@ PR #1 historically includes Rust Boy integration work; **scoping the first Mac d
 ## Codex implementation behavior
 
 Do not stop with a planning document. Continue focused code/test/commit passes for the first unblocked Mac v1.0 task. Work on supported local checkout; do not assume a remote API write can update Codex's live checkout. No third-party crates, artwork, or unrequested playback. Avoid unrelated codec/platform feature expansion until basic Mac player delivers.
+
+## Fresh offline, output and catalog responsiveness check — 2026-10-31
+
+At checkout `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`,
+`sh scripts/offline-gate.sh` exited 0: 17 local crates, 32 path-only internal
+edges, zero registry/Git crates; all workspace tests, warnings-denied Clippy,
+release build, macOS feature checks and the 15/15 injected AudioQueue
+failure/teardown tests passed. The built app's bundled `rust-music-cli play`
+played a generated nonzero 440 Hz, stereo, 16-bit/44.1 kHz WAV and exited 0.
+An unsandboxed `system_profiler SPAudioDataType -detailLevel mini` listed
+MacBook Air Speakers as the 48 kHz default output, plus HDMI and headphone
+outputs. This confirms the native output path; audible confirmation was
+previously supplied by the operator, while no acoustic loopback or DAC capture
+was made in this check.
+
+The already-open app loaded 2,000 generated 12-byte WAV-named catalog entries;
+the accessibility tree returned the 2,000-row result in under one second.
+Searching `track-01999` produced exactly one visible result in 3.3 seconds
+including UI automation round-trip. App PID 93393 RSS was 103,312 KiB before
+scan and 104,880 KiB after scan (+1,568 KiB). This is one incremental sample
+on one process, not a repeatable profile or performance threshold. Cmd-Q
+closed PID 93393; the follow-up process query found it absent and no
+`rust-music-cli serve` child. Fixtures remained under `/private/tmp` and were
+not added to Git. Device disconnect/recovery, physical DAC measurement and
+Rust Boy shared focus remain open.
 
 ## Required handoff
 
