@@ -13,7 +13,7 @@ bundle construction, and valid strict ad-hoc signature. This is a fresh local
 verification; it does not clear hardware, host-focus, distribution, review,
 or mainline acceptance.
 
-## Current local candidate and remote PR recheck — 2026-10-31
+## Historical local candidate and remote PR snapshot — 2026-10-31
 
 Local HEAD is `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` on
 `build/native-codecs-g0`, clean and 92 commits ahead of the local tracking ref
@@ -46,7 +46,35 @@ fidelity remain untested.
 Five synthetic catalog-core runs are recorded in the MAC v1.0 ledger; they do
 not close app-wide performance acceptance. Existing private parity evidence
 was not rerun. Keep PR #1 draft and unpushed while host focus, hardware and
-remaining performance/release gates are open.
+remaining performance/release gates are open. The newer local candidate is
+recorded below.
+
+## Current local candidate refresh — 2026-10-31
+
+At pre-recording local HEAD `5d1a91218947a8ea11a5cb739f7759be81c4cf5b`,
+the worktree is clean on `build/native-codecs-g0`. The branch contains remote
+PR head `2947e6737622c3c668003130006823df0bdde3e0` and local `origin/main`
+`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf` (both ancestor checks exited 0).
+It is 97 commits ahead and 0 behind the local tracking ref. GitHub read on the
+same date reports PR #1 open, draft, unmerged, and `mergeable=true`, with
+remote head and base unchanged. The local-only commits are retained; no push
+or merge is authorized while required release evidence remains incomplete.
+
+Product source has not changed since `a1e15e056104902cdce53abdcbd92c79ab4a0d6f`;
+five subsequent commits record evidence only. At source-equivalent commit
+`0dd8f3104c0a62393632c75e9821a9f1b656cd15`, the full offline gate exited 0
+(17 local crates, 32 path-only edges, zero registry/Git crates, zero
+third-party system links; native AudioQueue tests 17/17), and the macOS app
+build exited 0 with 18/18 path guards and valid strict ad-hoc signature. The
+current bundle's declared arm64 executable and strict signature were
+rechecked. Sandboxed `open -n` returned `kLSNoExecutableErr` (-10827); a host
+context retry exited 0 and showed Ready / No Track without scan or autoplay.
+The latest physical route observation remains macOS switching from Shure
+headphones to built-in speakers and back during active playback; it does not
+prove acoustic continuity or device-error recovery. The fresh Pip-Boy
+supervised-child test passed 1/1 at host commit `bfbb9c76d147911feb6d359ba0f2342a8a0cd97e`,
+proving MUSIC/RADIO broker lifecycle handoff without audio output or TV
+contention.
 
 The bundle built from product code at `5da9393` (no app/Rust source changes
 through current HEAD) was exercised with two generated 60-second WAV fixtures:
