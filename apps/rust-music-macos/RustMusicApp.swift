@@ -15,6 +15,15 @@ struct RustMusicFailure: Error {
     let message: String
 }
 
+struct CatalogTrack: Identifiable, Equatable {
+    let id: Int
+    let container: String
+    let title: String
+    let artist: String
+    let album: String
+    let relativePath: String
+}
+
 @main
 struct RustMusicApp: App {
     var body: some Scene {
@@ -31,11 +40,15 @@ struct RustMusicApp: App {
 
 @MainActor
 final class PlayerModel: ObservableObject {
-    @Published var selectedFile: URL?
-    @Published var audioInfo = "Choose one local audio file to inspect it."
-    @Published var status = "Ready — playback is stopped."
+    @Published var libraryRoot: URL?
+    @Published var tracks: [CatalogTrack] = []
+    @Published var selectedIndex: Int?
+    @Published var searchText = ""
+    @Published var status = "Choose a local library folder."
     @Published var isPlaying = false
+    @Published var isScanning = false
 
+    private var scanProcess: Process?
     private var playProcess: Process?
     private var parentGuardPipe: Pipe?
     private var escalationScheduledFor: Int32?
@@ -45,42 +58,93 @@ final class PlayerModel: ObservableObject {
         Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/rust-music-cli")
     }
 
-    func chooseFile() {
-        let picker = NSOpenPanel()
-        picker.title = "Choose Lossless Audio"
-        picker.prompt = "Inspect"
-        picker.canChooseFiles = true
-        picker.canChooseDirectories = false
-        picker.allowsMultipleSelection = false
-        picker.allowedContentTypes = [.audio]
-        guard picker.runModal() == .OK, let url = picker.url else { return }
-        selectedFile = url
-        inspect(url)
+    var visibleTracks: [CatalogTrack] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return tracks }
+        return tracks.filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.artist.localizedCaseInsensitiveContains(query)
+                || $0.album.localizedCaseInsensitiveContains(query)
+                || $0.relativePath.localizedCaseInsensitiveContains(query)
+        }
     }
 
-    func inspect(_ url: URL) {
-        status = "Validating with the Rust Music decoder…"
-        Task.detached(priority: .userInitiated) { [decoderURL] in
-            let result = Self.run(decoder: decoderURL, arguments: ["inspect", url.path])
-            await MainActor.run {
-                guard self.selectedFile == url else { return }
-                switch result {
-                case .success(let value):
-                    self.audioInfo = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.status = "Ready — no audio has started."
-                case .failure(let failure):
-                    self.audioInfo = "This file is not admitted for playback."
-                    self.status = failure.message
-                }
+    var selectedTrack: CatalogTrack? {
+        guard let selectedIndex else { return nil }
+        return tracks.first(where: { $0.id == selectedIndex })
+    }
+
+    func chooseLibrary() {
+        let picker = NSOpenPanel()
+        picker.title = "Choose a Music Library Folder"
+        picker.prompt = "Load Library"
+        picker.canChooseFiles = false
+        picker.canChooseDirectories = true
+        picker.allowsMultipleSelection = false
+        guard picker.runModal() == .OK, let url = picker.url else { return }
+        loadLibrary(at: url)
+    }
+
+    func cancelScan() {
+        guard let scanProcess, scanProcess.isRunning else { return }
+        scanProcess.terminate()
+        status = "Canceling library scan… the previous catalog is preserved."
+    }
+
+    private func loadLibrary(at root: URL) {
+        guard !isScanning else { return }
+        stop()
+        let process = Process()
+        process.executableURL = decoderURL
+        process.arguments = ["catalog", root.path]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        do {
+            try process.run()
+        } catch {
+            status = "Could not start the Rust Music catalog: \(error.localizedDescription)"
+            return
+        }
+        scanProcess = process
+        isScanning = true
+        status = "Scanning the selected folder… playback will not start."
+        Task { [weak self] in
+            let (bytes, exitStatus) = await Task.detached(priority: .userInitiated) {
+                let bytes = output.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                return (bytes, process.terminationStatus)
+            }.value
+            guard let self, self.scanProcess === process else { return }
+            let result: Result<[CatalogTrack], RustMusicFailure>
+            if exitStatus == 0 {
+                result = Self.parseCatalog(bytes)
+            } else {
+                let message = String(data: bytes, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                result = .failure(RustMusicFailure(
+                    message: message?.isEmpty == false ? message ?? "" : "The catalog scan failed."
+                ))
+            }
+            self.scanProcess = nil
+            self.isScanning = false
+            switch result {
+            case .success(let tracks):
+                self.libraryRoot = root
+                self.tracks = tracks
+                self.selectedIndex = tracks.first?.id
+                self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
+            case .failure(let failure):
+                self.status = failure.message
             }
         }
     }
 
     func play() {
-        guard let selectedFile, playProcess == nil else { return }
+        guard let libraryRoot, let selectedTrack, playProcess == nil, !isScanning else { return }
         let process = Process()
         process.executableURL = decoderURL
-        process.arguments = ["play-managed", selectedFile.path]
+        process.arguments = ["play-managed-root", libraryRoot.path, selectedTrack.relativePath]
         let parentGuard = Pipe()
         process.standardInput = parentGuard.fileHandleForReading
         let errors = Pipe()
@@ -144,32 +208,86 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    nonisolated private static func run(decoder: URL, arguments: [String]) -> Result<String, RustMusicFailure> {
-        let process = Process()
-        process.executableURL = decoder
-        process.arguments = arguments
-        let output = Pipe()
-        let errors = Pipe()
-        process.standardOutput = output
-        process.standardError = errors
-        do {
-            try process.run()
-            let outputData = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errors.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                return .success(String(data: outputData, encoding: .utf8) ?? "")
+    func next() {
+        moveSelection(forward: true)
+    }
+
+    func previous() {
+        moveSelection(forward: false)
+    }
+
+    func selectionChanged() {
+        if isPlaying { stop() }
+    }
+
+    private func moveSelection(forward: Bool) {
+        guard !tracks.isEmpty else { return }
+        let current = selectedIndex.flatMap { id in tracks.firstIndex(where: { $0.id == id }) }
+        let next: Int
+        if forward {
+            next = min((current ?? -1) + 1, tracks.count - 1)
+        } else {
+            next = max((current ?? tracks.count) - 1, 0)
+        }
+        selectedIndex = tracks[next].id
+        status = "Selected \(tracks[next].title). Press Play to start output."
+    }
+
+    nonisolated private static func parseCatalog(_ data: Data) -> Result<[CatalogTrack], RustMusicFailure> {
+        guard let output = String(data: data, encoding: .utf8) else {
+            return .failure(RustMusicFailure(message: "Rust Music returned invalid catalog text."))
+        }
+        var tracks: [CatalogTrack] = []
+        var reportedCount: Int?
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            if fields.first == "summary" {
+                guard fields.count == 4,
+                      let count = Int(fields[1]), count >= 0,
+                      Int(fields[2]) != nil, Int(fields[3]) != nil,
+                      reportedCount == nil else {
+                    return .failure(RustMusicFailure(message: "Rust Music returned a malformed catalog summary."))
+                }
+                reportedCount = count
+                continue
             }
-            let message = String(data: errorData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return .failure(RustMusicFailure(
-                message: message?.isEmpty == false ? message ?? "" : "Rust Music rejected the file."
-            ))
-        } catch {
-            return .failure(RustMusicFailure(
-                message: "Could not run Rust Music: \(error.localizedDescription)"
+            guard fields.first == "track", fields.count == 7,
+                  let index = Int(fields[1]), index >= 0,
+                  !tracks.contains(where: { $0.id == index }),
+                  let title = decodeHex(fields[3]),
+                  let artist = decodeHex(fields[4]),
+                  let album = decodeHex(fields[5]),
+                  let relativePath = decodeHex(fields[6]),
+                  !relativePath.isEmpty else {
+                return .failure(RustMusicFailure(message: "Rust Music returned a malformed catalog row."))
+            }
+            tracks.append(CatalogTrack(
+                id: index,
+                container: String(fields[2]),
+                title: title,
+                artist: artist,
+                album: album,
+                relativePath: relativePath
             ))
         }
+        guard reportedCount == tracks.count else {
+            return .failure(RustMusicFailure(message: "Rust Music catalog count did not match its rows."))
+        }
+        return .success(tracks)
+    }
+
+    nonisolated private static func decodeHex(_ value: Substring) -> String? {
+        guard value.count.isMultiple(of: 2) else { return nil }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(value.count / 2)
+        var index = value.startIndex
+        while index < value.endIndex {
+            let next = value.index(index, offsetBy: 2)
+            guard let byte = UInt8(value[index..<next], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = next
+        }
+        return String(data: Data(bytes), encoding: .utf8)
     }
 }
 
@@ -177,7 +295,7 @@ struct PlayerView: View {
     @StateObject private var model = PlayerModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
                 Text("RM")
                     .font(.system(size: 28, weight: .medium))
@@ -187,36 +305,54 @@ struct PlayerView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Rust Music")
                         .font(.largeTitle.weight(.semibold))
-                    Text("Private, offline playback for lossless audio")
+                    Text("Text-only, offline library for lossless audio")
                         .foregroundStyle(RustMusicPalette.muted)
                 }
                 Spacer()
-                Button("Choose File…") {
-                    model.chooseFile()
+                Button("Load Library…") {
+                    model.chooseLibrary()
                 }
+                .disabled(model.isScanning)
                 .keyboardShortcut("o", modifiers: .command)
             }
 
-            GroupBox("Selected Track") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(model.selectedFile?.lastPathComponent ?? "No file selected")
-                        .font(.headline)
-                        .lineLimit(2)
-                        .textSelection(.enabled)
-                    Text(model.audioInfo)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(RustMusicPalette.phosphor)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            HStack(spacing: 10) {
+                TextField("Search title, artist, album or path", text: $model.searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(model.tracks.isEmpty)
+                if model.isScanning {
+                    Button("Cancel Scan") { model.cancelScan() }
                 }
-                .padding(.vertical, 4)
-                .padding(.horizontal, 2)
+            }
+
+            GroupBox("Library Tracks (\(model.visibleTracks.count))") {
+                List(selection: $model.selectedIndex) {
+                    ForEach(model.visibleTracks) { track in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(track.title).font(.headline).lineLimit(1)
+                            Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(RustMusicPalette.muted)
+                                .lineLimit(1)
+                            Text("\(track.container) · \(track.relativePath)")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(RustMusicPalette.muted)
+                                .lineLimit(1)
+                        }
+                        .tag(track.id)
+                    }
+                }
+                .frame(minHeight: 170)
             }
             .groupBoxStyle(RustMusicGroupBoxStyle())
 
             HStack(spacing: 12) {
+                Button("Previous") { model.previous() }
+                    .disabled(model.tracks.isEmpty || model.isScanning)
+                Button("Next") { model.next() }
+                    .disabled(model.tracks.isEmpty || model.isScanning)
                 Button("Play") { model.play() }
-                    .disabled(model.selectedFile == nil || model.isPlaying)
+                    .disabled(model.selectedTrack == nil || model.isPlaying || model.isScanning)
                     .keyboardShortcut(.space, modifiers: [])
                 Button("Stop") { model.stop() }
                     .disabled(!model.isPlaying)
@@ -228,13 +364,14 @@ struct PlayerView: View {
             }
 
             Divider()
-            Text("No background scan or autoplay. Lossy and unsupported files are rejected by Rust Music.")
+            Text("Scanning starts only when you load a folder. No autoplay or artwork; unsupported files are rejected.")
                 .font(.callout)
                 .foregroundStyle(RustMusicPalette.muted)
         }
         .padding(24)
         .foregroundStyle(RustMusicPalette.phosphor)
-        .onDisappear { model.stop() }
+        .onChange(of: model.selectedIndex) { _ in model.selectionChanged() }
+        .onDisappear { model.cancelScan(); model.stop() }
     }
 }
 
