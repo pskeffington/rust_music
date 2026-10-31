@@ -910,3 +910,18 @@ includes playback-error cleanup, repeated parent-pipe closure during active
 playback, active-playback parent closure, and acknowledged shutdown/child
 exit. These subprocess regressions complement, but do not replace, the GUI
 close observation above.
+
+### 2026-10-31 repeated rebuilt-app launch and idle-memory sample
+
+The bundle built from source candidate `d46599c` was opened and quit three
+times through the native UI. Time from `cua.getApp("RustMusic")` to the
+accessible Ready / No Track state was 1,120.5 ms, 801.6 ms and 794.6 ms
+(median 801.6 ms, range 794.6–1,120.5 ms). Every run remained stopped with no
+library scan or autoplay, and the app inventory reported `isRunning=false`
+after Quit. Activity Monitor initially showed PID 34617 at 34.2 MB in its
+`anonymousMemory` column and the related ThemeWidgetControlViewService at
+10.1 MB. After Quit and process-list refresh, neither row remained; no
+`rust-music-cli` row was present. The host was under memory pressure (16 GB
+physical memory, 8.52 GB swap), so the single anonymous-memory value is
+context only, not a full-app memory qualification. The launch timings include
+CUA/Accessibility overhead and are not system-boot cold-start measurements.
