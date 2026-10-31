@@ -16,6 +16,22 @@ release approval.
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`, `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 local path edges, zero registry/Git crates); macOS AudioQueue failure/teardown tests passed 15/15. A generated nonzero 440 Hz 16-bit/44.1 kHz WAV played through the bundled CLI with exit 0; `system_profiler` listed MacBook Air Speakers as the 48 kHz default output. In the UI, loading 2,000 generated catalog entries returned in <1 s and searching `track-01999` returned one result. Same-process RSS rose 103,312→104,880 KiB (+1,568 KiB); this is one fixture sample, not a threshold pass. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Cold-launch distribution, broader incremental-memory profiles and latency measurements remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. At preceding checkpoint `fa6c192ca0822f685e908531af7fdd5d3d85ca08`, the local branch was 25 commits ahead of its local `origin/build/native-codecs-g0` tracking ref. The subsequent evidence commits are local documentation updates; the tracking ref was not refreshed and nothing was pushed. PR #1 remains draft. Preserve backup branches and stash through post-merge verification. |
 
+### 2026-10-31 automated gate refresh
+
+At checkout `c8e17f13557ad281813e92a52b2d5c908b39cab8`,
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process -- --test-threads=1`
+exited **0** (5 passed, including managed playback-error cleanup, repeated
+parent-pipe-close cleanup and explicit shutdown). `sh scripts/offline-gate.sh`
+also exited **0**: all 17 local crates built and tested offline, dependency
+audit found 32 path-only internal edges, zero registry/Git crates and zero
+third-party system links (one OS framework link). The 15 injected AudioQueue
+failure/teardown tests passed. These automated results do not prove that the
+active GUI playback child exits on Cmd-Q: the desktop was locked during this
+pass, so no new runtime process-exit evidence was captured. Active-playback
+close and device disconnect/recovery remain open; no private corpus was
+rerun.
+
 ## Component matrix
 
 | System | Requirement | State / next acceptance |
