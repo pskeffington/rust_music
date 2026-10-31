@@ -62,6 +62,10 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/
 
 All **12 workspace crates** are locally authored and have zero third-party Cargo dependencies. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host provides an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Source is implemented; Rust compilation and physical playback are not yet verified here.
 
+## Codex production continuation
+
+Start with the pinned [agent_skills-first production directive](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and preserve all unfinished local checkout work before integrating remotely. Then follow the [zero-artwork micro-library specification](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). This is a tasking order, not a completed release.
+
 ## Media library design: no artwork
 
 The text-first library, search, playlist and queue roadmap is specified in [the zero-artwork micro-library directive](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). No cover art or image decoding, extraction, caching, or display is permitted; the fixed monochrome 128x64 screen remains a text/control surface only. These planned features are not a claim of implementation.
