@@ -1158,6 +1158,31 @@ Private FLAC/WAV/AIFF decoder parity was not rerun. This refreshed automated
 gate does not satisfy live Rust Boy focus, physical DAC/panel, real device
 error/recovery, or the open app-memory/direct-latency acceptance criteria.
 
+### 2026-10-31 Swift catalog-index construction microbenchmark
+
+The optimized app build harness now times the production `CatalogTrack`
+constructor (including its cached searchable UTF-8 payload) for 20,000
+synthetic in-memory rows across nine runs. The observed p50/p95 were **121.094
+/ 123.805 ms**. A control that copies the same six source fields into an
+unindexed value measured **0.294 / 0.392 ms**. This comparison indicates the
+approximate construction cost attributable to indexing for this fixed fixture;
+it is not filesystem scan latency, allocator/retained-memory measurement, or a
+representative media-library result. The cached payload is **1,300,000 bytes**
+(65 bytes per row). In the same optimized harness, 101 production last-item
+searches measured **5.839 / 6.127 ms p50/p95**.
+
+`sh scripts/build-macos-app.sh` exited **0**, including this harness, UI/catalog
+state harnesses, bundle creation, and strict local signature validation. An
+attempted same-process app-memory comparison was invalid: under host memory
+pressure, the measured process physical footprint fell from 41,304,976 bytes
+before a 2,000-entry load to a settled median of 34,276,240 bytes afterward.
+This is recorded as confounded evidence and does not establish incremental
+memory. The 2,000 generated signature-only WAV fixtures were explicitly
+loaded with playback stopped and then removed; the app was left at Ready / No
+Track. Repeatable app memory, a production filesystem-scan benchmark, real
+library search responsiveness, and accepted performance thresholds remain
+open.
+
 ### 2026-10-31 Shure reconnect, low-level output, and normal quit
 
 After operator reconnection, System Settings visibly selected **External
