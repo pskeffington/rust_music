@@ -100,6 +100,26 @@ startup, or an app-wide acceptance threshold. Playback was never started;
 Cmd-Q returned the app to `isRunning=false`, and both fixture and probe were
 removed.
 
+### 2026-10-31 tagged-FLAC full-app footprint profiles
+
+The fresh app explicitly loaded synthetic FLAC metadata signatures with
+STREAMINFO and bounded TITLE, ARTIST, and ALBUM comments; each file was 129
+bytes and contained no audio frames. The UI displayed the parsed first-track
+metadata and confirmed the full count, while playback stayed stopped.
+
+For 20,000 tracks, five idle physical-footprint reads were stable at
+31,146,896 B and five post-scan reads at 40,911,760 B: a same-process delta
+of **9,764,864 B (9.313 MiB)**, above the 8 MiB engineering target. For 2,000
+tracks, two fresh-process runs produced stable five-read deltas of 3,768,344 B
+(3.594 MiB) and 2,260,992 B (2.156 MiB), median **3,014,668 B (2.875 MiB)**.
+These are OS-observed app physical-footprint deltas from
+`proc_pid_rusage(RUSAGE_INFO_V4)`, not heap measurements. The 2k samples vary
+by about 1.44 MiB across fresh processes; the 20k stress result shows catalog
+scale and metadata mix affect the memory cost. The 2k synthetic profile is
+below the 8 MiB engineering budget, but one metadata shape does not define
+all typical libraries or close repeatability/threshold acceptance. No track
+was played; app and temporary fixtures were removed.
+
 ### 2026-10-31 package-process device-error recovery regression
 
 The feature-gated debug `package_process` suite now includes
