@@ -1446,3 +1446,27 @@ test signal was acoustically captured. It does not demonstrate invalid-device
 AudioQueue recovery; Shure unplug/reconnect remains route-transition evidence
 only, and the physical DAC/panel and live Rust Boy audio-focus gates remain
 open.
+
+### 2026-10-31 current-bundle LaunchServices launch
+
+The bundle's `CFBundleExecutable` is `RustMusic`, its identifier is
+`dev.rustmusic.standalone`, and the executable is arm64 Mach-O. The executable
+and bundled CLI SHA-256 values are respectively
+`453454a9333816a421960547cded25444fb7c410f547f06e1493b837c74e8a12` and
+`14fe5c2cdd3a611b715a2a2fad626c4342bdc2a303da3005ec62e1c7b19dcaff`.
+`plutil -lint` and `codesign --verify --deep --strict --verbose=2` both exited
+0. Sandboxed `/usr/bin/open -n` exited 1 with `kLSNoExecutableErr` (-10827),
+while the same command in host execution context exited 0. The launched window
+showed `READY NO TRACK`, Play disabled, and no scan or child process. After
+Cmd-Q, a refreshed Activity Monitor listing and app inventory showed Rust
+Music and `rust-music-cli` absent and `isRunning=false`. The launch error is
+specific to the sandboxed invocation; it does not reproduce in host
+LaunchServices context.
+
+GitHub read-only PR #1 inspection reports it open, draft, unmerged, and
+`mergeable=true`; remote head `2947e6737622c3c668003130006823df0bdde3e0`,
+base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. Local HEAD
+`4d09c77a8c914f8a8c84c0362eea98be3b614c7b` contains that remote head as an
+ancestor and is 135 commits ahead of it. No remote update or merge was made;
+MAC-02 device recovery, DAC/panel, live host-focus, and distribution gates
+remain open.
