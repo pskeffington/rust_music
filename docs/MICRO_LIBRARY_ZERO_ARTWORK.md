@@ -234,11 +234,16 @@ the first write. `sh scripts/offline-gate.sh` and `sh scripts/build-macos-app.sh
 exited 0; the app bundle passed local strict ad-hoc signature verification.
 Roadmap/literature checks and the no-image-API search passed. Independent
 review caught and fixed a Next/Previous while-paused selection mismatch; the
-follow-up review confirmed the fix. The exact app UI also passed a synthetic
-silent-WAV smoke for explicit load/search, queue and playlist persistence
-across restart, Play/Pause/Resume/active Next/Previous/Stop, and volume changes.
-This does not prove audible output: `system_profiler SPAudioDataType` listed no
-devices. Physical device recovery, Rust Boy shared focus, cold startup, and
+follow-up review confirmed the fix. The app UI first passed a silent-WAV smoke
+for explicit load/search, queue and playlist persistence across restart,
+transport and volume. A later unsandboxed run played generated nonzero 440 Hz
+and 660 Hz 16-bit/44.1 kHz WAVs through the exact app UI: active Next/Previous
+changed the selected queue title, Pause/Resume and Stop worked, and volume
+changed 100%→95%→100%. The bundled CLI's AudioQueue tone playback exited 0; the
+user confirmed audible output. `system_profiler` outside the restricted shell
+listed MacBook Air Speakers as the 48 kHz default output. App PID 93068 and its
+`rust-music-cli serve` child PID 93107 both exited after Cmd-Q. Device
+disconnect/recovery, DAC loopback, Rust Boy shared focus, cold startup and
 incremental catalog memory remain unverified. Autoplay and native EQ remain
-follow-on features for the standalone v1.0 scope. This work adds no artwork or
-image functionality and does not rerun private codec parity.
+follow-on gates. This work adds no artwork or image functionality and does not
+rerun private codec parity.

@@ -156,12 +156,12 @@ for Next/Previous while paused with an empty queue. Independent security
 review found no actionable finding in bounded IPC, process cleanup, paths,
 privacy, dependencies or image/network constraints.
 
-This does not close MAC-02 or authorize merge. Audible target-device output,
-device loss/recovery, Rust Boy shared focus with Radio/TV, panel/DAC, cold
-startup/incremental memory, and Developer ID/notarization remain unverified.
-`system_profiler SPAudioDataType` listed no devices during this pass. Existing
-private FLAC 6/6, WAVE 6/6 and AIFF/AIFF-C 7/7 evidence is retained and was not
-rerun. Keep PR #1 draft and `main` unchanged until policy gates and independent
+This does not authorize merge. At the time of this silent-fixture smoke,
+audible output was not tested. Existing private FLAC 6/6, WAVE 6/6 and
+AIFF/AIFF-C 7/7 evidence is retained and was not rerun. See the later native
+output smoke below. Device-loss/recovery, Rust Boy shared focus with Radio/TV,
+panel/DAC, cold startup/incremental memory, and Developer ID/notarization remain
+open. Keep PR #1 draft and `main` unchanged until policy gates and independent
 approval are satisfied.
 
 ## 2026-10-31 rebuilt-app UI smoke
@@ -175,5 +175,27 @@ expected UI states. The volume slider changed 100%→99% while stopped and
 99%→98% during playback. After Stop and Cmd-Q, `pgrep` showed no Rust Music
 application or CLI child. This proves the app control and persistence paths on
 silent PCM. It does **not** establish audible output: no OS audio device was
-listed by `system_profiler SPAudioDataType`, and no hardware loopback was
-captured.
+listed by the sandboxed `system_profiler` invocation, and no hardware loopback
+was captured in that test.
+
+## 2026-10-31 unsandboxed native-output and lifecycle smoke
+
+The local bundle passed `open -n` with exit 0 when launched outside the
+restricted shell. LaunchServices recorded bundle `dev.rustmusic.standalone`,
+arm64 executable `/Users/null/GitHub/rust_music/target/macos/RustMusic.app`,
+PID 92963, and 0.065434 s launch-to-check-in. The unsandboxed full audio-device
+inventory listed MacBook Air Speakers as the 48 kHz default output, an ASUS
+VG32V HDMI output, and built-in headphones. The bundled CLI played a generated
+nonzero 440 Hz, 16-bit/44.1 kHz WAV through AudioQueue and exited 0. The user
+reports the tone was audible; this is not acoustic loopback or DAC
+bit-perfect evidence.
+
+The exact app UI explicitly loaded a separate two-track library of generated
+10-second, nonzero 440 Hz and 660 Hz WAVs. Play entered Playing; Previous and
+Next changed the selected queue title while playback remained active; Pause
+and Resume returned to their expected states; volume changed 100%→95%→100%;
+Stop returned to Stopped. Before Cmd-Q, the app was PID 93068 and its real
+`rust-music-cli serve` child PID 93107. After Cmd-Q, `ps` returned no matching
+app or CLI processes, and LaunchServices reported the app stopped. Device
+disconnect/recovery, DAC capture, Rust Boy Radio/TV focus, and notarized
+distribution remain unverified.
