@@ -44,7 +44,10 @@ for path in \
   "$CONTENTS/PkgInfo" \
   "$MACOS/rust-music-cli" \
   "$MACOS/RustMusic" \
-  "$ROOT/target/macos/PlaybackUIStateTests"
+  "$ROOT/target/macos/PlaybackUIStateTests" \
+  "$ROOT/target/.rustc_info.json" \
+  "$ROOT/target/CACHEDIR.TAG" \
+  "$ROOT/target/.future-incompat-report.json"
 do
   if [ -L "$path" ]; then
     echo "Refusing symlinked macOS app build output: $path" >&2

@@ -19,7 +19,10 @@ for relative in \
   target/macos/RustMusic.app/Contents/PkgInfo \
   target/macos/RustMusic.app/Contents/MacOS/rust-music-cli \
   target/macos/RustMusic.app/Contents/MacOS/RustMusic \
-  target/macos/PlaybackUIStateTests
+  target/macos/PlaybackUIStateTests \
+  target/.rustc_info.json \
+  target/CACHEDIR.TAG \
+  target/.future-incompat-report.json
 do
   TEST_ROOT="$TEMP_ROOT/case"
   rm -rf "$TEST_ROOT"
@@ -73,4 +76,4 @@ do
   fi
 done
 
-echo "PASS: 15 symlinked macOS app build paths refused without changing the external sentinel"
+echo "PASS: 18 symlinked macOS app build paths refused without changing the external sentinel"

@@ -781,3 +781,24 @@ initial Activity Monitor list was stale). Temporary fixtures and copied app
 bundle were removed. These silent fixtures verify transport and process
 cleanup, not audible output, device disconnect/recovery, or physical DAC
 behavior. The volume slider was not qualified in this run.
+
+### 2026-10-31 macOS build-path containment follow-up
+
+At source parent `c2dff01015a06189317da01fd844786aa11af8eb`, the app builder
+pins `CARGO_TARGET_DIR` to the repository's guarded `target` directory even
+when its caller supplies an external override. The preflight refuses symlinked
+Cargo metadata outputs (`.rustc_info.json`, `CACHEDIR.TAG`, and
+`.future-incompat-report.json`) and checks for nested symlinks below release,
+app-output, and Swift module-cache trees. The adversarial path test passed
+18/18 cases with an external sentinel unchanged. The independent read-only
+security follow-up found no additional path-containment finding in this scope;
+it does not cover concurrent path replacement or broader app security.
+
+`CARGO_TARGET_DIR=/private/tmp/rust-music-external-target sh
+scripts/build-macos-app.sh` exited **0**, including the Swift playback-state
+regression and strict ad-hoc signature verification. `sh
+scripts/offline-gate.sh` exited **0** across 17 local crates and 32 path-only
+edges, with zero registry/Git crates and zero third-party system links.
+Roadmap-index and literature validators and `git diff --check` also exited
+**0**. These checks do not change the open physical-device, host-focus,
+distribution-signing, or app-wide performance acceptance states.
