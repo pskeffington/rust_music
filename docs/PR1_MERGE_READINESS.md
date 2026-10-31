@@ -2,6 +2,29 @@
 
 **Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+## Current local candidate and remote PR recheck — 2026-10-31
+
+Local HEAD is `e934fb6efe87b1060bdeb01d12f65c20b8d14838` on
+`build/native-codecs-g0`, clean and 84 commits ahead of the local tracking ref
+`2947e6737622c3c668003130006823df0bdde3e0` (`git rev-list --left-right --count
+origin/build/native-codecs-g0...HEAD` returned `0 84`). Local `origin/main`
+`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf` is an ancestor (exit 0). A live
+GitHub read reports PR #1 open, draft, unmerged, `mergeable=true`, with that
+same remote head and base. No push or merge was made.
+
+The current code candidate `ab829b3` passed `sh scripts/offline-gate.sh`
+(exit 0), the macOS app bundle build with an external
+`CARGO_TARGET_DIR` override (exit 0), strict ad-hoc signature verification,
+and the 18-case symlink path guard. A focused review found no further
+path-containment finding. At unchanged app/CLI code, the feature-gated
+`package_process` suite passed 7/7. A host-level, low-amplitude synthetic WAV
+through the app-bundled CLI exited 0 against the default output route;
+physical disconnect/recovery and acoustic/DAC fidelity remain untested.
+Five synthetic catalog-core runs are recorded in the MAC v1.0 ledger; they do
+not close app-wide performance acceptance. Existing private parity evidence
+was not rerun. Keep PR #1 draft and unpushed while host focus, hardware and
+remaining performance/release gates are open.
+
 ## 2026-10-31 standalone text-library workflow
 
 At implementation commit `2546cae`, the Rust CLI provides root-scoped
