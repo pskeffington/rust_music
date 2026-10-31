@@ -828,8 +828,10 @@ final class PlayerModel: ObservableObject {
     ) {
         switch response {
         case .view(let state):
-            isPlaying = state == 2
-            isPaused = state == 6
+            let flags = PlaybackUIState.flags(for: state)
+            isPlaying = flags.playing
+            isPaused = flags.paused
+            if state != 2 { snapshotPollScheduled = false }
             switch state {
             case 2: status = "Playing through Rust Music and macOS AudioQueue."
             case 6: status = "Paused. Audio focus is released until Resume is requested."
@@ -838,10 +840,21 @@ final class PlayerModel: ObservableObject {
             case 5: status = "Playback failed."
             default: status = fallback
             }
+            // A failed native output must release the UI's transport lockout
+            // so the user can explicitly retry after restoring the device.
+            if state == 5 {
+                isPlaying = false
+                isPaused = false
+                snapshotPollScheduled = false
+            }
             if isPlaying { scheduleSnapshotPoll() }
         case .failure(let message):
+            let shouldReconcileState = isPlaying || isPaused
             status = message
-            if retryStateAfterError && (isPlaying || isPaused) {
+            isPlaying = false
+            isPaused = false
+            snapshotPollScheduled = false
+            if retryStateAfterError && shouldReconcileState {
                 runPackageCommands([.snapshot(0)], label: "") { [weak self] response in
                     self?.applyPlaybackResponse(response, fallback: "Playback state checked.", retryStateAfterError: false)
                 }

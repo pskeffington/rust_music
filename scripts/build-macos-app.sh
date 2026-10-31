@@ -41,7 +41,7 @@ case "$SWIFT_ARCH" in
   *) echo "Unsupported macOS build architecture: $SWIFT_ARCH" >&2; exit 2 ;;
 esac
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
-  apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
+  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 printf 'Built native app: %s\n' "$APP"
