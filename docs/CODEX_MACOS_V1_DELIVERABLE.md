@@ -885,3 +885,20 @@ appeared as PID 33445 with no CLI child. After closing that idle instance,
 refreshed Rust filter contained neither Rust Music nor `rust-music-cli`. This
 verifies current GUI child cleanup during generated playback; it is not device
 disconnect/recovery, acoustic capture, or DAC fidelity evidence.
+
+### 2026-10-31 current-HEAD offline and bundle gate refresh
+
+At clean local HEAD `d46599ccea84ddb5739d7098a750d809b67bc624`,
+`sh scripts/offline-gate.sh` exited **0**. It audited 17 workspace crates,
+32 path-only internal dependency edges, zero registry/Git crates and zero
+third-party system links; all workspace tests, Clippy, formatting and release
+build stages completed. `sh scripts/build-macos-app.sh` exited **0**, including
+18/18 symlink-path refusal cases, the Swift playback-state regression and
+strict ad-hoc bundle signature verification. `python3
+scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and
+`git diff --check` passed. The rebuilt app opened to Ready / No Track without
+scanning or playback. This refresh adds no native device-disconnect/recovery,
+physical DAC, live Rust Boy focus, Developer ID signing or notarization
+evidence. A shell process query was denied by the execution sandbox, so this
+pass makes no new process-exit claim; retain the separate Activity Monitor/CUA
+active-playback close evidence above.
