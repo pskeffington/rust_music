@@ -152,12 +152,28 @@ Next/Previous/software-volume controls. At this source snapshot,
 literature checks, and `git diff --check` all exited 0. AudioQueue injected
 failure/teardown tests passed 15/15, and the package-stream transport E2E
 regression passed. Independent Swift review identified and confirmed the fix
-for Next/Previous while paused with an empty queue; a separate final security
-review is pending.
+for Next/Previous while paused with an empty queue. Independent security
+review found no actionable finding in bounded IPC, process cleanup, paths,
+privacy, dependencies or image/network constraints.
 
-This does not close MAC-02 or authorize merge. Exact-window UI interaction,
-audible target-device output, device loss/recovery, Rust Boy shared focus with
-Radio/TV, panel/DAC, cold startup/incremental memory, and Developer ID /
-notarization remain unverified. Existing private FLAC 6/6, WAVE 6/6 and
-AIFF/AIFF-C 7/7 evidence is retained and was not rerun. Keep PR #1 draft and
-`main` unchanged until policy gates and independent approval are satisfied.
+This does not close MAC-02 or authorize merge. Audible target-device output,
+device loss/recovery, Rust Boy shared focus with Radio/TV, panel/DAC, cold
+startup/incremental memory, and Developer ID/notarization remain unverified.
+`system_profiler SPAudioDataType` listed no devices during this pass. Existing
+private FLAC 6/6, WAVE 6/6 and AIFF/AIFF-C 7/7 evidence is retained and was not
+rerun. Keep PR #1 draft and `main` unchanged until policy gates and independent
+approval are satisfied.
+
+## 2026-10-31 rebuilt-app UI smoke
+
+On the exact rebuilt app, the explicit folder picker loaded a two-track
+16-bit/44.1 kHz synthetic silent WAV library. Text search, queue insertion,
+and named-playlist creation worked. After Cmd-Q/relaunch and explicit folder
+reload, the queue and playlist were restored and playback remained stopped.
+Play, Pause, Resume, active queue Next/Previous, and Stop reached their
+expected UI states. The volume slider changed 100%→99% while stopped and
+99%→98% during playback. After Stop and Cmd-Q, `pgrep` showed no Rust Music
+application or CLI child. This proves the app control and persistence paths on
+silent PCM. It does **not** establish audible output: no OS audio device was
+listed by `system_profiler SPAudioDataType`, and no hardware loopback was
+captured.

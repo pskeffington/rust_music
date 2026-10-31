@@ -11,8 +11,8 @@ release approval.
 
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
-| MAC-01 | Complete usable library-to-playback workflow | **IMPLEMENTED / UI ACCEPTANCE OPEN** | The app connects explicit bounded/cancellable library load, text search, named playlists, persistent queue/repeat/shuffle, Play/Pause/Resume/Stop/Next/Previous, and volume through the RBPK child process. Queue selection does not autoplay. The offline Rust gate and macOS app bundle build pass on this integration; simulated package-stream E2E is covered. Window interaction with this exact rebuilt app remains to be observed. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / OPERATOR** | Prior LaunchServices startup, ad-hoc bundle signing, and generated-WAV Play/Stop/window-close child-exit evidence are recorded in `docs/PR1_MERGE_READINESS.md`. AudioQueue fault/teardown tests pass 15/15, including pause-before-first-buffer. This pass did not test audible output or real device disconnect/recovery. Developer ID/notarization remains a distribution gate. |
+| MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / AUDIBLE OUTPUT OPEN** | Exact rebuilt-app UI smoke loaded and searched a synthetic two-track silent WAV library, added tracks to the persistent queue, created a named playlist, and restored queue/playlist after app restart plus explicit reload while remaining stopped. Play/Pause/Resume/Next/Previous/Stop reached expected UI states; volume changed 100→99 stopped and 99→98 while playing. This proves UI/control wiring over silent PCM, not audible output. `system_profiler SPAudioDataType` listed no devices in this environment. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / OPERATOR** | Prior LaunchServices startup and generated-WAV child-exit evidence remain in `docs/PR1_MERGE_READINESS.md`. The rebuilt app launched, AudioQueue reported Playing/Pause/Resume/Stop transitions on all-zero PCM, and the app plus idle serve child exited after Cmd-Q (`pgrep` showed only its own shell). AudioQueue fault/teardown tests pass 15/15, including pause-before-first-buffer. No OS audio device was enumerated; audible playback, device disconnect/recovery and DAC evidence remain unverified. Developer ID/notarization remains a distribution gate. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | `sh scripts/offline-gate.sh` exited 0 on source through `0b1263c` (17 local crates, 32 local path edges, no registry/Git crates); app build/signature verification and roadmap/literature validators exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. One LaunchServices sample and 94,432 KiB RSS sample were recorded, but cold-launch distribution and incremental library memory remain unmeasured. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. All fetched remote development commits and local transport/app commits are preserved in local non-force merge `6d17cce`. Five commits remain local relative to refreshed origin; no push was made because acceptance gates remain open. PR #1 remains draft. Preserve backup branch and stash through post-merge verification. |
 
@@ -63,12 +63,25 @@ and the local ad-hoc app signature passed strict verification. Roadmap and
 literature validators and `git diff --check` exited 0. Source review found no
 image APIs or visualizer subsystem. No private parity corpus was rerun.
 
-Still unverified: interaction with this exact rebuilt app window, audible
-output and device loss/recovery, physical DAC and panel, Rust Boy shared
-Radio/TV focus, cold startup/incremental RSS, and Developer ID/notarization.
-Independent Swift and security reviews found no actionable finding after the
-paused-navigation fix. These operator and performance gaps block release
-integration under current policy.
+Still unverified: audible output (no audio device was listed by
+`system_profiler SPAudioDataType`), device loss/recovery, physical DAC and
+panel, Rust Boy shared Radio/TV focus, cold startup/incremental RSS, and
+Developer ID/notarization. Independent Swift and security reviews found no
+actionable finding after the paused-navigation fix. These operator and
+performance gaps block release integration under current policy.
+
+### Rebuilt-app UI transport and persistence smoke
+
+In the exact rebuilt app, an 8-second, 16-bit/44.1 kHz two-track silent WAV
+fixture under `/private/tmp` was explicitly loaded. Search, queue insertion and
+named-playlist creation succeeded. After Cmd-Q and relaunch, reselecting the
+same folder restored both queue entries and the playlist while playback
+remained stopped. Explicit Play produced Playing; Pause, Resume, queue Next,
+queue Previous and Stop returned the expected visible states. The volume
+slider's accessibility decrement changed the displayed value 100%→99% while
+stopped and 99%→98% during playback. The process list after Cmd-Q contained no
+Rust Music app or `rust-music-cli` process. This validates UI and process
+control paths on silent PCM, not audible output or physical-device behavior.
 
 ### Launch and memory sample for the rebuilt bundle
 
