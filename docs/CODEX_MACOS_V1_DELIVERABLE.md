@@ -2,18 +2,19 @@
 
 **Baseline:** shared source `820582c3602df2cc63a1b76fbda88b5b58bbc396`; Rust
 transport commits `fc47a19` and `7ae312b`; Swift/CLI integration commit
-`0b1263c`; launch evidence commit `a4d6fc9` (2026-10-31). A local
-non-force reconciliation with remote documentation commits is in progress.
-This is an evidence ledger, not release approval.
+`0b1263c`; launch evidence commit `a4d6fc9`; local non-force history
+reconciliation commit `6d17cce` (2026-10-31). The remote development history
+is now an ancestor locally; no push was made. This is an evidence ledger, not
+release approval.
 
 ## Acceptance gates
 
-| Gate | Production requirement | Status at baseline | Evidence / remaining acceptance |
+| Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **IMPLEMENTED / UI ACCEPTANCE OPEN** | The app connects explicit bounded/cancellable library load, text search, named playlists, persistent queue/repeat/shuffle, Play/Pause/Resume/Stop/Next/Previous, and volume through the RBPK child process. Queue selection does not autoplay. The offline Rust gate and macOS app bundle build pass on this integration; simulated package-stream E2E is covered. Window interaction with this exact rebuilt app remains to be observed. |
 | MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / OPERATOR** | Prior LaunchServices startup, ad-hoc bundle signing, and generated-WAV Play/Stop/window-close child-exit evidence are recorded in `docs/PR1_MERGE_READINESS.md`. AudioQueue fault/teardown tests pass 15/15, including pause-before-first-buffer. This pass did not test audible output or real device disconnect/recovery. Developer ID/notarization remains a distribution gate. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | `sh scripts/offline-gate.sh` exited 0 on source through `0b1263c` (17 local crates, 32 local path edges, no registry/Git crates); app build/signature verification and roadmap/literature validators exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. One LaunchServices sample and 94,432 KiB RSS sample were recorded, but cold-launch distribution and incremental library memory remain unmeasured. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
-| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. Remote development advanced by three documentation-only commits; local transport and app commits are being reconciled non-force. PR #1 remains draft under existing policy. Do not push or merge until applicable MAC gates and release approval are satisfied. Preserve backup branch and stash through post-merge verification. |
+| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. All fetched remote development commits and local transport/app commits are preserved in local non-force merge `6d17cce`. Five commits remain local relative to refreshed origin; no push was made because acceptance gates remain open. PR #1 remains draft. Preserve backup branch and stash through post-merge verification. |
 
 ## Component matrix
 
