@@ -117,14 +117,16 @@ remain open. No private corpus was rerun.
 verified. With two generated silent 16-bit/44.1 kHz WAVs, the UI reached active
 AudioQueue playback; settled Next/Previous states, Pause, Resume, and Stop all
 matched the requested transitions. Cmd-Q followed by refreshed Activity
-Monitor showed no app or `rust-music-cli` process. In this sandboxed shell,
-`open -n` still returned 1 (`kLSNoExecutableErr`); `lsregister -f` returned
--10822, and direct executable launch aborted in AppKit registration. The same
-bundle launched through CUA. The launch discrepancy is therefore unresolved
-for shell/LaunchServices and cannot be counted as release launch acceptance.
-Silent transport is not audible-output or device-recovery evidence; DAC/panel,
-device disconnect/recovery, Rust Boy shared focus, and app-scale memory remain
-open.
+Monitor showed no app or `rust-music-cli` process. Sandboxed shell
+`open -n` returned 1 (`kLSNoExecutableErr`); `lsregister -f` returned -10822,
+and direct executable launch aborted in AppKit registration. The same bundle
+launched through CUA. An approved outside-sandbox `/usr/bin/open -n` retry
+exited 0; the UI showed Ready / No Track with disabled transport, and Activity
+Monitor showed the app with no CLI child. Host LaunchServices launch is
+verified; sandbox service access is unavailable in that shell, and
+Developer ID/notarized distribution remains unverified. Silent transport is
+not audible-output or device-recovery evidence; DAC/panel, device
+disconnect/recovery, Rust Boy shared focus, and app-scale memory remain open.
 
 **Synthetic app-memory observation (2026-10-31):** one same-process Activity
 Monitor sample rose from 84.1 MB to 87.3 MB `anonymousMemory` while the app held

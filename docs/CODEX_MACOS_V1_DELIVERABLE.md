@@ -714,6 +714,13 @@ failure to the shell/sandbox LaunchServices path but does not prove its root
 cause or close distribution launch acceptance. An earlier unsandboxed local
 `open -n` success is recorded above and remains valid for that environment.
 
+An approved outside-sandbox retry of the same absolute-path `/usr/bin/open -n`
+exited **0**. The app showed Ready / No Track, with transport controls disabled;
+Activity Monitor showed the Rust Music app and no `rust-music-cli` child. This
+confirms the bundle's LaunchServices launch in the unsandboxed host. The
+sandbox-specific `open` and `lsregister` failures are not package launch
+failures; Developer ID signing and notarized distribution remain unverified.
+
 Using only two generated sparse, all-zero 16-bit/44.1 kHz, 10-minute WAVs, the
 UI explicitly loaded two tracks and showed active macOS AudioQueue playback.
 Settled accessibility states confirmed Next to track 002 and Previous to
