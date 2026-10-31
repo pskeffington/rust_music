@@ -24,6 +24,29 @@ the basic functional path. It is not instrumented acoustic capture, a DAC
 fidelity measurement, invalid-device AudioQueue recovery, or a substitute for
 the separate host, panel, performance and distribution gates below.
 
+### 2026-10-31 tagged-catalog app footprint and headphone reconnection
+
+The exact locally built Rust Music bundle was run in three fresh processes
+against the same generated 2,000-file, 175-byte FLAC metadata-only profile
+(TITLE/ARTIST/ALBUM tags; no audio frames and no playback). Each run showed
+`LOADED 2000 TRACKS. PLAYBACK IS STOPPED.` A local C probe built with
+`clang -Wall -Wextra -Werror -O2` sampled macOS physical footprint five times
+before and after the explicit load. The observed settled deltas were
+2,260,992 bytes (2.156 MiB), 2,555,904 bytes (2.438 MiB), and 1,392,640 bytes
+(1.328 MiB). These three runs show a 1.328–2.438 MiB range for this narrow
+synthetic fixture; they do not measure heap allocation, real audio metadata,
+scan latency, search responsiveness, startup, or establish a production
+threshold. The third run's transient first post-load sample was excluded;
+the next four matched. Each app exited via Cmd-Q, and the app inventory and
+refreshed Activity Monitor no longer showed Rust Music or a playback child.
+The generated metadata and probe were removed.
+
+After the operator reconnected the Shure headphones, System Settings showed
+`External Headphones` selected. This confirms the macOS route returned after
+the unplug/reconnect exercise. No AudioQueue device-loss error, reopen, or
+recovery transition was captured, so MAC-02's real invalid-device recovery
+gate remains open.
+
 ### 2026-10-31 current-candidate offline and app-bundle refresh
 
 At documentation candidate commit `0dd8f3104c0a62393632c75e9821a9f1b656cd15`
