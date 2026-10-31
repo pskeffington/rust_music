@@ -431,6 +431,7 @@ fn state_queue_command(
     let queue_path = state_file_path(root, base, "rmq")?;
     let mut queue = load_queue_state(&queue_path)?;
     let mut changed = false;
+    let mut candidate_available = None;
     match operation {
         "list" if arguments.is_empty() => {}
         "add" if arguments.len() == 1 => {
@@ -449,11 +450,14 @@ fn state_queue_command(
             changed = true;
         }
         "next" if arguments.is_empty() => {
-            queue.next_candidate();
+            // Selection remains at the current entry when Repeat Off reaches
+            // the boundary, so report whether a candidate really advanced.
+            // The app uses this to avoid replaying the boundary track.
+            candidate_available = Some(queue.next_candidate().is_some());
             changed = true;
         }
         "previous" if arguments.is_empty() => {
-            queue.previous_candidate();
+            candidate_available = Some(queue.previous_candidate().is_some());
             changed = true;
         }
         "repeat" if arguments.len() == 1 => {
@@ -504,7 +508,22 @@ fn state_queue_command(
         ensure_state_base(base)?;
         queue.save_atomic(&queue_path)?;
     }
-    queue_listing(&queue)
+    let mut listing = queue_listing(&queue)?;
+    if let Some(available) = candidate_available {
+        use std::fmt::Write as _;
+        writeln!(
+            listing,
+            "meta\tcandidate-available\t{}",
+            if available { "yes" } else { "no" }
+        )
+        .expect("writing to String cannot fail");
+        if listing.len() > MAX_STATE_TSV_BYTES {
+            return Err(MusicError::Limit(
+                "music state listing exceeds its size bound",
+            ));
+        }
+    }
+    Ok(listing)
 }
 
 fn state_playlist_command(
@@ -1762,10 +1781,9 @@ mod tests {
             .any(|line| line.starts_with("entry\t0\t1\t")));
         assert!(!selected.contains(root.to_str().unwrap()));
 
-        assert_eq!(
-            state_call(&base, "queue", &root, "list", &[]).unwrap(),
-            selected
-        );
+        let listed = state_call(&base, "queue", &root, "list", &[]).unwrap();
+        assert!(selected.starts_with(&listed));
+        assert!(!listed.contains("candidate-available"));
         assert_eq!(
             state_call(&base, "playlist", &root, "list", &[]).unwrap(),
             playlist
@@ -1779,6 +1797,77 @@ mod tests {
         assert!(state_call(&base, "playlist", &root, "delete", &["renamed"]).is_ok());
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(base.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn queue_navigation_reports_repeat_boundaries_and_seeded_order() {
+        let root = temp_root("queue-automatic-advance-root");
+        let base = temp_root("queue-automatic-advance-base");
+        for path in ["one.flac", "two.wav", "three.aiff"] {
+            state_call(&base, "queue", &root, "add", &[path]).unwrap();
+        }
+
+        // At Repeat Off's end there is no new candidate. Keep the current
+        // entry selected for display and report no automatic restart.
+        state_call(&base, "queue", &root, "repeat", &["off"]).unwrap();
+        state_call(&base, "queue", &root, "select", &["2"]).unwrap();
+        let ended = state_call(&base, "queue", &root, "next", &[]).unwrap();
+        assert!(ended.contains("meta\tcandidate-available\tno\n"));
+        assert!(ended.contains("meta\tcurrent\t2\n"));
+        assert!(ended.lines().any(|line| line.starts_with("entry\t2\t1\t")));
+
+        // Repeat Off's first-item Previous boundary is also a no-op rather
+        // than a request to restart the already playing selection.
+        state_call(&base, "queue", &root, "select", &["0"]).unwrap();
+        let previous_boundary = state_call(&base, "queue", &root, "previous", &[]).unwrap();
+        assert!(previous_boundary.contains("meta\tcandidate-available\tno\n"));
+        assert!(previous_boundary.contains("meta\tcurrent\t0\n"));
+        state_call(&base, "queue", &root, "select", &["2"]).unwrap();
+
+        // Repeat One does produce a candidate, but it is the same item.
+        state_call(&base, "queue", &root, "repeat", &["one"]).unwrap();
+        let repeated_one = state_call(&base, "queue", &root, "next", &[]).unwrap();
+        assert!(repeated_one.contains("meta\tcandidate-available\tyes\n"));
+        assert!(repeated_one.contains("meta\tcurrent\t2\n"));
+
+        // Repeat All wraps to the first item.
+        state_call(&base, "queue", &root, "repeat", &["all"]).unwrap();
+        let repeated_all = state_call(&base, "queue", &root, "next", &[]).unwrap();
+        assert!(repeated_all.contains("meta\tcandidate-available\tyes\n"));
+        assert!(repeated_all.contains("meta\tcurrent\t0\n"));
+
+        // A fixed shuffle seed produces an explicit order; advancing from its
+        // final entry wraps to the first item in that saved order.
+        let shuffled = state_call(&base, "queue", &root, "shuffle", &["12345"]).unwrap();
+        let paths = shuffled
+            .lines()
+            .filter_map(|line| {
+                let mut fields = line.split('\t');
+                if fields.next() != Some("entry") {
+                    return None;
+                }
+                let index = fields.next()?.parse::<usize>().ok()?;
+                let _selected = fields.next()?;
+                let path = fields.next()?;
+                Some((index, path.to_owned()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(paths.len(), 3);
+        let final_index = paths.len() - 1;
+        state_call(&base, "queue", &root, "select", &[&final_index.to_string()]).unwrap();
+        let shuffled_next = state_call(&base, "queue", &root, "next", &[]).unwrap();
+        assert!(shuffled_next.contains("meta\tcandidate-available\tyes\n"));
+        assert!(shuffled_next.contains("meta\tcurrent\t0\n"));
+        assert!(shuffled_next.lines().any(|line| {
+            let mut fields = line.split('\t');
+            fields.next() == Some("entry")
+                && fields.next() == Some("0")
+                && fields.next() == Some("1")
+                && fields.next() == Some(paths[0].1.as_str())
+        }));
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

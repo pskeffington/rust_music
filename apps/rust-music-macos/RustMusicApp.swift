@@ -44,6 +44,7 @@ struct ParsedQueue {
     let repeatMode: String
     let shuffleSeed: String?
     let current: Int?
+    let candidateAvailable: Bool?
 }
 
 private enum PackageRequest {
@@ -594,7 +595,11 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    private func applyQueueResult(_ result: Result<Data, RustMusicFailure>, continuePlayback: Bool = false) {
+    private func applyQueueResult(
+        _ result: Result<Data, RustMusicFailure>,
+        continuePlayback: Bool = false,
+        finishedAtEnd: Bool = false
+    ) {
         switch result {
         case .success(let bytes):
             guard let queue = Self.parseQueue(bytes) else {
@@ -606,6 +611,18 @@ final class PlayerModel: ObservableObject {
             selectedQueueIndex = queue.current
             repeatMode = queue.repeatMode
             shuffleSeed = queue.shuffleSeed
+            if continuePlayback, queue.candidateAvailable == false {
+                // At Repeat Off's boundary the current entry remains selected,
+                // but no candidate exists in the requested direction.
+                if finishedAtEnd {
+                    isPlaying = false
+                    isPaused = false
+                    status = "Playback finished."
+                } else {
+                    status = "No track in that direction. Current selection is unchanged."
+                }
+                return
+            }
             if let current = queue.current,
                let entry = queue.entries.first(where: { $0.index == current }),
                let track = tracks.first(where: { $0.relativePath == entry.relativePath }) {
@@ -884,7 +901,7 @@ final class PlayerModel: ObservableObject {
             return
         }
         runStateCommand(["queue", libraryRoot.path, "next"]) { [weak self] result in
-            self?.applyQueueResult(result, continuePlayback: true)
+            self?.applyQueueResult(result, continuePlayback: true, finishedAtEnd: true)
         }
     }
 
@@ -968,6 +985,7 @@ final class PlayerModel: ObservableObject {
         var shuffleSeen = false
         var current: Int?
         var currentSeen = false
+        var candidateAvailable: Bool?
         var entries: [QueueEntry] = []
         var selectedEntry: Int?
         for line in text.split(whereSeparator: \.isNewline) {
@@ -992,6 +1010,13 @@ final class PlayerModel: ObservableObject {
                         guard let value = Int(fields[2]), value >= 0 else { return nil }
                         current = value
                     }
+                case "candidate-available":
+                    guard candidateAvailable == nil else { return nil }
+                    switch fields[2] {
+                    case "yes": candidateAvailable = true
+                    case "no": candidateAvailable = false
+                    default: return nil
+                    }
                 default: return nil
                 }
                 continue
@@ -1010,7 +1035,13 @@ final class PlayerModel: ObservableObject {
         guard let repeatMode, shuffleSeen, currentSeen,
               current.map({ $0 < entries.count }) ?? true,
               current == selectedEntry else { return nil }
-        return ParsedQueue(entries: entries, repeatMode: repeatMode, shuffleSeed: shuffleSeed, current: current)
+        return ParsedQueue(
+            entries: entries,
+            repeatMode: repeatMode,
+            shuffleSeed: shuffleSeed,
+            current: current,
+            candidateAvailable: candidateAvailable
+        )
     }
 
     nonisolated private static func parsePlaylists(_ data: Data) -> [UserPlaylist]? {
