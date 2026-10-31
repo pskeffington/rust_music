@@ -855,8 +855,10 @@ final class PlayerModel: ObservableObject {
     func shutdownPackage() {
         cancelScan(); cancelStateOperation()
         isTransportBusy = true
-        packageQueue.async { [weak self] in
-            guard let self else { return }
+        // Retain the model through the serialized cleanup. A weak capture here
+        // can drop the Shutdown/Stop request if SwiftUI releases the view model
+        // immediately after the window closes.
+        packageQueue.async { [self] in
             self.packageClient?.shutdown()
             self.packageClient = nil
             self.packageRootPath = nil
@@ -1053,8 +1055,26 @@ final class PlayerModel: ObservableObject {
     }
 }
 
+private enum PlayerSection: String, CaseIterable, Identifiable {
+    case nowPlaying
+    case library
+    case queue
+    case playlists
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .nowPlaying: return "PLAYER"
+        case .library: return "LIBRARY"
+        case .queue: return "QUEUE"
+        case .playlists: return "PLAYLISTS"
+        }
+    }
+}
+
 struct PlayerView: View {
     @StateObject private var model = PlayerModel()
+    @State private var activeSection: PlayerSection = .nowPlaying
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1062,20 +1082,14 @@ struct PlayerView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     header
                     HStack(alignment: .top, spacing: 12) {
-                        nowPlayingPanel
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        queuePanel
-                            .frame(width: 270)
-                    }
-                    HStack(alignment: .top, spacing: 12) {
-                        libraryPanel
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        playlistPanel
-                            .frame(width: 320)
+                        navigationRail
+                            .frame(width: 112)
+                        sectionContent
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
-                .padding(16)
-                .frame(minWidth: 720, alignment: .leading)
+                .padding(12)
+                .frame(minWidth: 600, alignment: .leading)
             }
             .scrollIndicators(.visible)
 
@@ -1087,6 +1101,50 @@ struct PlayerView: View {
         .tint(RustMusicPalette.phosphor)
         .onChange(of: model.searchText) { _ in model.boundSearchText() }
         .onDisappear { model.shutdownPackage() }
+    }
+
+    private var navigationRail: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(PlayerSection.allCases) { section in
+                Button {
+                    activeSection = section
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(section == activeSection ? "▶" : " ")
+                            .frame(width: 10)
+                        Text(section.title)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(RustMusicButtonStyle(prominent: section == activeSection))
+                .accessibilityIdentifier("navigation-\(section.rawValue)")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(RustMusicPalette.line, lineWidth: 1)
+        }
+        .accessibilityIdentifier("navigation-rail")
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch activeSection {
+        case .nowPlaying:
+            nowPlayingPanel
+        case .library:
+            libraryPanel
+        case .queue:
+            queuePanel
+        case .playlists:
+            playlistPanel
+        }
     }
 
     private var header: some View {
@@ -1186,7 +1244,7 @@ struct PlayerView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(RustMusicPalette.display)
-                .frame(height: 86)
+                .frame(height: activeSection == .queue ? 220 : 86)
                 .disabled(model.isTransportBusy || model.isStateBusy)
 
                 HStack(spacing: 6) {
@@ -1281,7 +1339,7 @@ struct PlayerView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(RustMusicPalette.display)
-                .frame(height: 112)
+                .frame(height: activeSection == .playlists ? 220 : 112)
                 .disabled(model.isTransportBusy || model.isStateBusy)
 
                 HStack(spacing: 6) {

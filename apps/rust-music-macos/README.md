@@ -8,11 +8,11 @@ host-provided shared audio-focus lease.
 
 The interface uses a compact, text-only phosphor-green player panel. It is
 designed to sit inside Pip-Boy's outer wrapper, so the app does not draw a
-second chassis, hardware bezel, mascot, or visualizer. The main status and queue
-panels sit above the searchable library and playlists; transport and volume
-stay in a dedicated bottom bar. It remains Rust Music's own window and module
-identity; the host owns module switching, shared audio focus, and Settings when
-embedded.
+second chassis, hardware bezel, mascot, or visualizer. A narrow navigation rail
+switches between Player, Library, Queue, and Playlists; transport and volume
+stay visible in a dedicated bottom bar. It remains Rust Music's own window and
+module identity; the host owns module switching, shared audio focus, and
+Settings when embedded.
 
 The app lets the operator select a local library folder, runs a bounded
 cancellable catalog scan only on that request, and supports text search,

@@ -199,6 +199,26 @@ generated two-track WAV folder loaded; the queue remained stopped, and playlist
 create/delete both worked. The user independently confirmed audio output and
 library loading. This is a UI/build check, not DAC or device-recovery evidence.
 
+### Four-section wrapper layout — 2026-10-31
+
+The SwiftUI surface now uses a compact left navigation rail for Player, Library,
+Queue, and Playlists, with the transport and volume controls remaining fixed
+below the selected section. The root `PlayerModel` remains a single state object
+across navigation, so switching sections does not recreate the playback client.
+The interior minimum width is 600 points to match the app scene and fit within
+the outer Pip-Boy wrapper. `shutdownPackage()` now strongly retains the model
+until its serialized Stop/Shutdown/reap operation completes, avoiding a weak
+capture that could drop cleanup if SwiftUI released the view model immediately
+after window close.
+
+In a working-tree pass based on `8116a077`, Swift compilation to a temporary
+arm64 macOS 13 executable exited 0, `git diff --check` passed, and a source scan
+found no image/artwork/visualizer APIs. The generated `.app` was not rebuilt or
+launched in this pass; runtime layout at 600×390 and 974×620, navigation
+interaction, and the updated close-path observation remain pending. The
+compile and source checks do not replace the full offline gate or app bundle
+acceptance.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
