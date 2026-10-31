@@ -801,6 +801,56 @@ mod tests {
     }
 
     #[test]
+    fn scan_rejects_missing_and_non_directory_roots() {
+        let t = Temp::new();
+        let missing = t.0.join("removed-library");
+        assert!(matches!(
+            scan(&missing, ScanLimits::default()),
+            Err(MusicError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound
+        ));
+
+        let file_root = t.0.join("not-a-directory");
+        fs::write(&file_root, b"not a directory").unwrap();
+        assert!(matches!(
+            scan(&file_root, ScanLimits::default()),
+            Err(MusicError::Invalid(
+                "music library root must be a real directory"
+            ))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_rejects_a_symbolic_link_as_the_library_root() {
+        use std::os::unix::fs::symlink;
+
+        let t = Temp::new();
+        let actual_root = t.0.join("actual-library");
+        fs::create_dir(&actual_root).unwrap();
+        let linked_root = t.0.join("linked-library");
+        symlink(&actual_root, &linked_root).unwrap();
+
+        assert!(matches!(
+            scan(&linked_root, ScanLimits::default()),
+            Err(MusicError::Invalid(
+                "music library root must be a real directory"
+            ))
+        ));
+    }
+
+    #[test]
+    fn removed_library_root_invalidates_previously_cataloged_paths() {
+        let t = Temp::new();
+        fs::write(t.0.join("track.wav"), wave_file()).unwrap();
+        let library = scan(&t.0, ScanLimits::default()).unwrap();
+        assert_eq!(library.len(), 1);
+        assert!(library.checked_path(0).is_ok());
+
+        fs::remove_dir_all(&t.0).unwrap();
+        assert!(library.checked_path(0).is_err());
+    }
+
+    #[test]
     fn text_query_is_unicode_case_insensitive_and_paginates_deterministically() {
         let t = Temp::new();
         fs::write(t.0.join("Café.wav"), wave_file()).unwrap();
