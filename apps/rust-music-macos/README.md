@@ -6,9 +6,13 @@ decoding, and AudioQueue output. This keeps the decoder and PCM output adapter
 in Rust and lets the embedded Pip-Boy module continue using `MusicSlot` and its
 host-provided shared audio-focus lease.
 
-The interface uses a restrained phosphor-green palette aligned with Pip-Boy's
-existing handheld shell. It remains Rust Music's own window and module identity;
-the host owns module switching, shared audio focus, and Settings when embedded.
+The interface uses a compact, text-only phosphor-green player panel. It is
+designed to sit inside Pip-Boy's outer wrapper, so the app does not draw a
+second chassis, hardware bezel, mascot, or visualizer. The main status and queue
+panels sit above the searchable library and playlists; transport and volume
+stay in a dedicated bottom bar. It remains Rust Music's own window and module
+identity; the host owns module switching, shared audio focus, and Settings when
+embedded.
 
 The app lets the operator select a local library folder, runs a bounded
 cancellable catalog scan only on that request, and supports text search,
@@ -25,8 +29,9 @@ sh scripts/build-macos-app.sh
 
 The app bundle is created under `target/macos/RustMusic.app`; Cargo and Swift
 use only the installed local toolchains and Apple frameworks. No music files
-are bundled. The UI contains text only; it has no artwork or image subsystem.
-Digital volume attenuation is not hardware gain or bit-perfect output.
+are bundled. The UI contains text and native vector rules only; it has no
+artwork, image, waveform, or equalizer visualization subsystem. Digital volume
+attenuation is not hardware gain or bit-perfect output.
 
 The local build script removes a stale generated code-resource seal, compiles
 for the declared macOS 13.0 minimum, ad-hoc signs the completed bundle, and

@@ -4,11 +4,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 private enum RustMusicPalette {
-    static let background = Color(red: 0.025, green: 0.055, blue: 0.035)
-    static let surface = Color(red: 0.055, green: 0.105, blue: 0.060)
-    static let phosphor = Color(red: 0.55, green: 0.96, blue: 0.48)
-    static let muted = Color(red: 0.54, green: 0.68, blue: 0.49)
-    static let line = Color(red: 0.20, green: 0.36, blue: 0.22)
+    static let background = Color(red: 0.018, green: 0.030, blue: 0.021)
+    static let surface = Color(red: 0.035, green: 0.074, blue: 0.043)
+    static let display = Color(red: 0.012, green: 0.043, blue: 0.024)
+    static let phosphor = Color(red: 0.63, green: 0.98, blue: 0.47)
+    static let muted = Color(red: 0.48, green: 0.70, blue: 0.48)
+    static let line = Color(red: 0.18, green: 0.36, blue: 0.21)
 }
 
 struct RustMusicFailure: LocalizedError {
@@ -1056,146 +1057,273 @@ struct PlayerView: View {
     @StateObject private var model = PlayerModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                Text("RM")
-                    .font(.system(size: 28, weight: .medium))
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    HStack(alignment: .top, spacing: 12) {
+                        nowPlayingPanel
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        queuePanel
+                            .frame(width: 270)
+                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        libraryPanel
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        playlistPanel
+                            .frame(width: 320)
+                    }
+                }
+                .padding(16)
+                .frame(minWidth: 720, alignment: .leading)
+            }
+            .scrollIndicators(.visible)
+
+            transportBar
+        }
+        .background(RustMusicPalette.background.ignoresSafeArea())
+        .foregroundStyle(RustMusicPalette.phosphor)
+        .preferredColorScheme(.dark)
+        .tint(RustMusicPalette.phosphor)
+        .onChange(of: model.searchText) { _ in model.boundSearchText() }
+        .onDisappear { model.shutdownPackage() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                    Text("RUST MUSIC / AUDIO")
+                    .font(.system(size: 19, weight: .bold, design: .monospaced))
+                    .tracking(1.1)
                     .foregroundStyle(RustMusicPalette.phosphor)
-                    .frame(width: 48, height: 48)
-                    .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Rust Music")
-                        .font(.largeTitle.weight(.semibold))
-                    Text("Text-only, offline library for lossless audio")
+                Text("LOCAL LOSSLESS LIBRARY")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundStyle(RustMusicPalette.muted)
+            }
+            Spacer(minLength: 12)
+            Button(model.isScanning ? "CANCEL SCAN" : "LOAD LIBRARY") {
+                if model.isScanning { model.cancelScan() } else { model.chooseLibrary() }
+            }
+            .buttonStyle(RustMusicButtonStyle(prominent: true))
+            .disabled(model.isScanning ? false : (model.isStateBusy || model.isTransportBusy))
+            .keyboardShortcut("o", modifiers: .command)
+        }
+        .padding(.bottom, 8)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(RustMusicPalette.line).frame(height: 1)
+        }
+    }
+
+    private var nowPlayingPanel: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(model.isPlaying ? "PLAYING" : model.isPaused ? "PAUSED" : "READY")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(1.3)
+                        .foregroundStyle(model.isPlaying ? RustMusicPalette.phosphor : RustMusicPalette.muted)
+                    Spacer()
+                    Text(model.selectedTrack.map { String(format: "TRACK %03d", $0.id + 1) } ?? "NO TRACK")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                 }
-                Spacer()
-                Button("Load Library…") {
-                    model.chooseLibrary()
-                }
-                .disabled(model.isScanning || model.isStateBusy || model.isTransportBusy)
-                .keyboardShortcut("o", modifiers: .command)
+                Text(model.selectedTrack?.title ?? "Choose a track from your library")
+                    .font(.system(size: 23, weight: .semibold, design: .monospaced))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+                    .foregroundStyle(RustMusicPalette.phosphor)
+                Text(nowPlayingDetail)
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .lineLimit(1)
+                    .foregroundStyle(RustMusicPalette.muted)
+                Spacer(minLength: 0)
+                Text(model.status.uppercased())
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .lineLimit(2)
+                    .foregroundStyle(RustMusicPalette.muted)
+                    .accessibilityIdentifier("playback-status")
             }
+                    .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .padding(12)
+            .background(RustMusicPalette.display, in: RoundedRectangle(cornerRadius: 5))
+        } label: {
+            Text("NOW PLAYING")
+        }
+        .groupBoxStyle(RustMusicGroupBoxStyle())
+        .accessibilityIdentifier("now-playing-panel")
+    }
 
-            HStack(spacing: 10) {
-                TextField("Search title, artist, album or path", text: $model.searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
-                if model.isScanning {
-                    Button("Cancel Scan") { model.cancelScan() }
+    private var nowPlayingDetail: String {
+        guard let track = model.selectedTrack else {
+            return "Playback starts only after you press Play."
+        }
+        let creator = [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · ")
+        return creator.isEmpty ? "\(track.container.uppercased()) · \(track.relativePath)" : creator
+    }
+
+    private var queuePanel: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 7) {
+                List {
+                    ForEach(model.queueEntries) { entry in
+                        Button {
+                            model.selectQueueEntry(entry.index)
+                        } label: {
+                            let track = model.tracks.first(where: { $0.relativePath == entry.relativePath })
+                            HStack(spacing: 6) {
+                                Text(entry.isSelected ? "▶" : " ")
+                                    .foregroundStyle(RustMusicPalette.phosphor)
+                                Text(track?.title ?? URL(fileURLWithPath: entry.relativePath).lastPathComponent)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(RustMusicPalette.display)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(RustMusicPalette.display)
+                .frame(height: 86)
+                .disabled(model.isTransportBusy || model.isStateBusy)
+
+                HStack(spacing: 6) {
+                    Button("ADD") { model.addSelectionToQueue() }
+                        .disabled(model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
+                    Button("REMOVE") { model.removeQueueSelection() }
+                        .disabled(model.selectedQueueIndex == nil || model.isStateBusy || model.isTransportBusy)
+                }
+                HStack(spacing: 6) {
+                    Button("REPEAT: \(model.repeatMode.uppercased())") { model.cycleRepeatMode() }
+                        .disabled(model.isStateBusy || model.isTransportBusy)
+                    Button(model.shuffleSeed == nil ? "SHUFFLE: OFF" : "SHUFFLE: ON") { model.toggleShuffle() }
+                        .disabled(model.isStateBusy || model.isTransportBusy)
                 }
             }
+        } label: {
+            Text("PLAY QUEUE · \(model.queueEntries.count)")
+        }
+        .groupBoxStyle(RustMusicGroupBoxStyle())
+    }
 
-            GroupBox("Library Tracks (\(model.visibleTracks.count))") {
+    private var libraryPanel: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
+                        .modifier(RustMusicTextFieldStyle())
+                        .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
+                    Text("\(model.visibleTracks.count) TRACKS")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize()
+                }
+
                 List(selection: Binding(
                     get: { model.selectedIndex },
                     set: { model.selectTrackManually($0) }
                 )) {
                     ForEach(model.visibleTracks) { track in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(track.title).font(.headline).lineLimit(1)
-                            Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption)
-                                .foregroundStyle(RustMusicPalette.muted)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(track.title)
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
                                 .lineLimit(1)
-                            Text("\(track.container) · \(track.relativePath)")
-                                .font(.system(.caption2, design: .monospaced))
+                            Text([track.artist, track.album, track.container.uppercased()]
+                                .filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.system(size: 10, weight: .regular, design: .monospaced))
                                 .foregroundStyle(RustMusicPalette.muted)
                                 .lineLimit(1)
                         }
+                        .padding(.vertical, 2)
                         .tag(track.id)
+                        .listRowBackground(RustMusicPalette.display)
                     }
                 }
-                .frame(minHeight: 130, maxHeight: 180)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(RustMusicPalette.display)
+                .frame(minHeight: 170, maxHeight: 230)
                 .disabled(model.isTransportBusy || model.isStateBusy)
             }
-            .groupBoxStyle(RustMusicGroupBoxStyle())
+        } label: {
+            Text("LIBRARY")
+        }
+        .groupBoxStyle(RustMusicGroupBoxStyle())
+    }
 
-            HStack(alignment: .top, spacing: 12) {
-                GroupBox("Persistent Queue (\(model.queueEntries.count))") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        List {
-                            ForEach(model.queueEntries) { entry in
-                                Button {
-                                    model.selectQueueEntry(entry.index)
-                                } label: {
-                                    let track = model.tracks.first(where: { $0.relativePath == entry.relativePath })
-                                    Text("\(entry.isSelected ? "Selected: " : "")\(track?.title ?? URL(fileURLWithPath: entry.relativePath).lastPathComponent)")
-                                        .lineLimit(1)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .buttonStyle(.plain)
+    private var playlistPanel: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 7) {
+                TextField("NEW PLAYLIST NAME", text: $model.newPlaylistName)
+                    .modifier(RustMusicTextFieldStyle())
+
+                List {
+                    ForEach(model.playlists) { playlist in
+                        Button {
+                            model.selectedPlaylist = playlist.name
+                        } label: {
+                            HStack {
+                                Text(model.selectedPlaylist == playlist.name ? "▶" : " ")
+                                    .foregroundStyle(RustMusicPalette.phosphor)
+                                Text(playlist.name).lineLimit(1)
+                                Spacer()
+                                Text("\(playlist.paths.count)")
+                                    .foregroundStyle(RustMusicPalette.muted)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(height: 88)
-                        .disabled(model.isTransportBusy || model.isStateBusy)
-                        HStack(spacing: 6) {
-                            Button("Add Selected") { model.addSelectionToQueue() }
-                                .disabled(model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
-                            Button("Remove") { model.removeQueueSelection() }
-                                .disabled(model.selectedQueueIndex == nil || model.isStateBusy || model.isTransportBusy)
-                        }
-                        HStack(spacing: 6) {
-                            Button("Repeat: \(model.repeatMode)") { model.cycleRepeatMode() }
-                                .disabled(model.isStateBusy || model.isTransportBusy)
-                            Button(model.shuffleSeed == nil ? "Shuffle" : "Shuffle: on") { model.toggleShuffle() }
-                                .disabled(model.isStateBusy || model.isTransportBusy)
-                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(RustMusicPalette.display)
                     }
                 }
-                .groupBoxStyle(RustMusicGroupBoxStyle())
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(RustMusicPalette.display)
+                .frame(height: 112)
+                .disabled(model.isTransportBusy || model.isStateBusy)
 
-                GroupBox("Named Playlists (\(model.playlists.count))") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        TextField("New playlist name", text: $model.newPlaylistName)
-                            .textFieldStyle(.roundedBorder)
-                        List {
-                            ForEach(model.playlists) { playlist in
-                                Button {
-                                    model.selectedPlaylist = playlist.name
-                                } label: {
-                                    Text("\(model.selectedPlaylist == playlist.name ? "Selected: " : "")\(playlist.name) · \(playlist.paths.count)")
-                                        .lineLimit(1)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .frame(height: 62)
-                        .disabled(model.isTransportBusy || model.isStateBusy)
-                        HStack(spacing: 6) {
-                            Button("Create") { model.createPlaylist() }
-                                .disabled(model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
-                            Button("Rename") { model.renameSelectedPlaylist() }
-                                .disabled(model.selectedPlaylist == nil || model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
-                            Button("Add Track") { model.addSelectionToPlaylist() }
-                                .disabled(model.selectedPlaylist == nil || model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
-                        }
-                        HStack(spacing: 6) {
-                            Button("Queue Playlist") { model.addSelectedPlaylistToQueue() }
-                                .disabled(model.selectedPlaylist == nil || model.isStateBusy || model.isTransportBusy)
-                            Button("Delete") { model.deleteSelectedPlaylist() }
-                                .disabled(model.selectedPlaylist == nil || model.isStateBusy || model.isTransportBusy)
-                        }
-                    }
+                HStack(spacing: 6) {
+                    Button("CREATE") { model.createPlaylist() }
+                        .disabled(model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
+                    Button("RENAME") { model.renameSelectedPlaylist() }
+                        .disabled(model.selectedPlaylist == nil || model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
+                    Button("ADD TRACK") { model.addSelectionToPlaylist() }
+                        .disabled(model.selectedPlaylist == nil || model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
                 }
-                .groupBoxStyle(RustMusicGroupBoxStyle())
+                HStack(spacing: 6) {
+                    Button("QUEUE PLAYLIST") { model.addSelectedPlaylistToQueue() }
+                        .disabled(model.selectedPlaylist == nil || model.isStateBusy || model.isTransportBusy)
+                    Button("DELETE") { model.deleteSelectedPlaylist() }
+                        .disabled(model.selectedPlaylist == nil || model.isStateBusy || model.isTransportBusy)
+                }
             }
+        } label: {
+            Text("PLAYLISTS · \(model.playlists.count)")
+        }
+        .groupBoxStyle(RustMusicGroupBoxStyle())
+    }
 
-            HStack(spacing: 12) {
-                Button("Previous") { model.previous() }
+    private var transportBar: some View {
+        VStack(spacing: 8) {
+            Rectangle().fill(RustMusicPalette.line).frame(height: 1)
+            HStack(spacing: 7) {
+                Button("PREVIOUS") { model.previous() }
                     .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                Button("Next") { model.next() }
-                    .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                Button("Play") { model.play() }
+                Button("PLAY") { model.play() }
+                    .buttonStyle(RustMusicButtonStyle(prominent: true))
                     .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     .keyboardShortcut(.space, modifiers: [])
-                Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
+                Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
                     .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
-                Button("Stop") { model.stop() }
+                Button("STOP") { model.stop() }
                     .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
-                Text("Volume \(model.volumePercent)%")
-                    .font(.caption)
+                Button("NEXT") { model.next() }
+                    .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                Spacer(minLength: 14)
+                Text("VOLUME \(model.volumePercent)%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(RustMusicPalette.muted)
                 Slider(
                     value: Binding(
@@ -1208,24 +1336,53 @@ struct PlayerView: View {
                         if !editing { model.commitVolume(model.volumePercent) }
                     }
                 )
-                .frame(width: 90)
+                .frame(width: 120)
                 .disabled(model.libraryRoot == nil || model.isTransportBusy || model.isStateBusy)
-                Spacer()
-                Text(model.status)
-                    .font(.callout)
-                    .foregroundStyle(RustMusicPalette.muted)
-                    .lineLimit(2)
             }
-
-            Divider()
-            Text("Scanning starts only when you load a folder. No autoplay or artwork; unsupported files are rejected.")
-                .font(.callout)
-                .foregroundStyle(RustMusicPalette.muted)
+            .buttonStyle(RustMusicButtonStyle())
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
         }
-        .padding(24)
-        .foregroundStyle(RustMusicPalette.phosphor)
-        .onChange(of: model.searchText) { _ in model.boundSearchText() }
-        .onDisappear { model.shutdownPackage() }
+        .background(RustMusicPalette.surface)
+        .accessibilityIdentifier("transport-bar")
+    }
+}
+
+private struct RustMusicTextFieldStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .font(.system(size: 11, weight: .regular, design: .monospaced))
+            .foregroundStyle(RustMusicPalette.phosphor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(RustMusicPalette.display, in: RoundedRectangle(cornerRadius: 4))
+            .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(RustMusicPalette.line, lineWidth: 1)
+            }
+    }
+}
+
+private struct RustMusicButtonStyle: ButtonStyle {
+    var prominent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .tracking(0.35)
+            .foregroundStyle(prominent ? RustMusicPalette.background : RustMusicPalette.phosphor)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(
+                prominent ? RustMusicPalette.phosphor : RustMusicPalette.surface,
+                in: RoundedRectangle(cornerRadius: 4)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(prominent ? RustMusicPalette.phosphor : RustMusicPalette.line, lineWidth: 1)
+            }
+            .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
 
@@ -1233,14 +1390,15 @@ private struct RustMusicGroupBoxStyle: GroupBoxStyle {
     func makeBody(configuration: Configuration) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             configuration.label
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(RustMusicPalette.muted)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .tracking(1.15)
+                .foregroundStyle(RustMusicPalette.phosphor)
             configuration.content
         }
-        .padding(14)
-        .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+        .padding(10)
+        .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 6))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 6)
                 .stroke(RustMusicPalette.line, lineWidth: 1)
         }
     }
