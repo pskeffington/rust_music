@@ -556,3 +556,26 @@ audio-reactive visualization, or dependency. The review did not run tests or
 recheck runtime state; empty-state screenshot coverage does not qualify
 active-playback close, physical output, device recovery, DAC, or panel
 acceptance.
+
+### 2026-10-31 synthetic app scan and RSS trace
+
+The built app explicitly scanned a temporary catalog of 2,000 generated
+12-byte RIFF/WAVE-signature files. CUA reported `LOADED 2000 TRACKS. PLAYBACK
+IS STOPPED.` The Library view showed `2000 TRACKS`. In a preceding run with
+the same fixture shape, searching `synthetic-01999` returned one row; a single
+set-value/accessibility round trip took 1,334 ms, including CUA and
+accessibility observation overhead. This is not an isolated search-latency
+result or a p95 measurement. No fixture was played, and both generated
+directories were removed afterward.
+
+For process PID 22043, five idle `ps` RSS samples before loading were 96,368,
+96,400, 96,400, 96,384 and 96,384 KiB (median 96,384 KiB). After the catalog
+was held live, the immediate sample was 84,656 KiB; five samples over the next
+five seconds were 69,472, 69,440, 69,440, 69,392 and 69,360 KiB (median
+69,440 KiB). RSS fell by 26,944 KiB from the pre-scan median while the 2,000
+tracks remained visible. The process reclaimed other resident pages during
+the sample, so this is **not a valid incremental catalog-memory delta** and
+does not pass the app-wide memory gate. Cold-start/app RSS qualification still
+needs a measurement method that separates transient page reclamation from
+catalog allocation. Playback was not started; Cmd-Q removed the tested app
+process, and the synthetic fixture directory was deleted.
