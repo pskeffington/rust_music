@@ -30,6 +30,8 @@ The supplied screenshot is a **functional reference**, not a requirement for alb
 - M3U/M3U8 import/export safely resolves relative paths, refuses malicious traversal and out-of-root references; playlist files are distinct from queue state.
 - Seek bar only when sample-accurate seek is truly supported; otherwise noninteractive read-only progress.
 
+Machine-readable pass order: [mac07-pass-index.json](mac07-pass-index.json). Evidence ledger: [MAC07_PASS_RESULTS.md](evidence/MAC07_PASS_RESULTS.md). Registry task groups RM-028/029/030 must not be marked done until all mapped passes have independent evidence.
+
 ## Engineering passes (sequential release gates)
 
 | Pass | Owner | Changes | Required evidence |
