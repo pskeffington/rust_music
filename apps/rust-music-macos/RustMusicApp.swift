@@ -1315,13 +1315,14 @@ struct PlayerView: View {
     }
 
     private var libraryPanel: some View {
-        GroupBox {
+        let visibleTracks = model.visibleTracks
+        return GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
                         .modifier(RustMusicTextFieldStyle())
                         .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
-                    Text("\(model.visibleTracks.count) TRACKS")
+                    Text("\(visibleTracks.count) TRACKS")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize()
@@ -1331,7 +1332,7 @@ struct PlayerView: View {
                     get: { model.selectedIndex },
                     set: { model.selectTrackManually($0) }
                 )) {
-                    ForEach(model.visibleTracks) { track in
+                    ForEach(visibleTracks) { track in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(track.title)
                                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
