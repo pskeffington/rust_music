@@ -64,7 +64,15 @@ def validate_registry(data: dict, root: Path = ROOT, check_files: bool = True) -
     require(data.get("repository") == "pskeffington/rust_music", "wrong repository")
     require(data.get("active_development_branch") == "build/native-codecs-g0",
             "branch changed: review mapping before updating this field")
-    require(data.get("draft_pr") == 1, "unexpected draft PR reference")
+    require(data.get("integrated_branch") == "main",
+            "unexpected integrated branch")
+    require(data.get("verified_main_head") ==
+            "e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b",
+            "verified main head changed: refresh the integration record")
+    require(data.get("merged_pr") == 1, "unexpected merged PR reference")
+    require(data.get("pr_merge_commit") ==
+            "f8052f28cf187143b54aa15e80779ff3b8db841f",
+            "PR merge commit changed: refresh the integration record")
 
     policy = data.get("policy")
     require(isinstance(policy, dict), "policy missing")

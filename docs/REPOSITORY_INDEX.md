@@ -9,11 +9,18 @@ index whenever a crate, document, script, test or workflow is added or removed.
 
 ## Current product and agent entrypoints (2026-10-31)
 
+PR #1 is merged. Remote `main` was verified at `e8e5ff8`, descendant of PR
+merge commit `f8052f2`; see the current [README status](../README.md#current-status--2026-10-31),
+[merge evidence](PR1_MERGE_READINESS.md), and [macOS acceptance ledger](CODEX_MACOS_V1_DELIVERABLE.md).
+The merge and compileable app do not constitute production acceptance; use
+the evidence registry below to distinguish automated, operator, and hardware
+gates.
+
 - **Top-level product direction:** [README](../README.md), [primary UI direction](design/PRIMARY_UI_DIRECTION.md).
 - **Shared macOS/Pip-Boy surface:** [portable socket schema](design/PIPBOY_SOCKET_SCHEMA.md), existing [host contract](HOST_CONTRACT.md), [package process](PACKAGE_PROCESS.md).
 - **Desktop-managed offline music:** [portable library deployment](design/PORTABLE_LIBRARY_DEPLOYMENT.md), with future macOS/Linux/Windows package interchange.
 - **Task routing and verification:** [roadmap index](roadmap-index.json) RM-020–RM-027, [roadmap](ROADMAP.md), [agent ownership](CODEX_AGENT_MAP.md) and root [AGENTS.md](../AGENTS.md).
-- **Immediate release priority:** [macOS v1.0](CODEX_MACOS_V1_DELIVERABLE.md), currently distinct from Linux/Windows and physical Pip-Boy release certification.
+- **Immediate release priority:** close the remaining [macOS v1.0 gates](CODEX_MACOS_V1_DELIVERABLE.md), distinct from Linux/Windows and physical Pip-Boy release certification.
 
 All portable export, delta sync and cross-platform GUI functions in the new design documents are **planned**, not verified as implemented. Preserve the zero-artwork macOS v1.0 release policy and single host audio-focus contract.
 

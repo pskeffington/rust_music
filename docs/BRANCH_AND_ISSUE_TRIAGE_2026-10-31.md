@@ -1,4 +1,8 @@
-# Branch and issue reconciliation — 2026-10-31
+# Historical branch and issue reconciliation — 2026-10-31
+
+This records the pre-merge audit only. It is superseded for current Git/PR
+state by [PR #1 merge readiness](PR1_MERGE_READINESS.md): PR #1 has merged at
+`f8052f2`, and remote `main` was verified at descendant commit `e8e5ff8`.
 
 ## Verified remote snapshot
 

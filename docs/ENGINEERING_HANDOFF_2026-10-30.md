@@ -1,10 +1,10 @@
 # Engineering handoff and Codex continuation — 2026-10-30
 
-> Scope: active draft PR #1 on `build/native-codecs-g0`. This is a planning/evidence document, **not a release certificate**. Canonical task states and dependencies remain in [roadmap-index.json](roadmap-index.json).
+> Historical handoff, superseded for branch/PR state by the 2026-10-31 integration record in [PR #1 merge readiness](PR1_MERGE_READINESS.md). PR #1 has merged and `main` contains the compileable macOS app update. This document remains useful for task history, but is not the current checkout or release certificate. Canonical task states and dependencies remain in [roadmap-index.json](roadmap-index.json).
 
-## Repository inspection
+## Historical repository inspection (2026-10-30)
 
-- `main` currently contains only `README.md` and `LICENSE`. The product sources, agent configuration, test harnesses, and engineering docs reside on the active PR branch. Always check out the PR branch before running Codex; do not bootstrap a second incompatible implementation from `main`.
+- At the time of inspection, `main` contained only `README.md` and `LICENSE`. This has been superseded: PR #1 merged at `f8052f2`, and `main` was later verified at `e8e5ff8` with the product and app sources.
 - The branch indexes 12 local Rust crates: `rust-music`, `rust-music-core`, `rust-music-flac`, `rust-music-wave`, `rust-music-aiff`, `rust-music-engine`, `rust-music-native`, `rust-music-host`, `rust-music-library`, `rust-music-panel`, `rust-music-cli`, `rust-music-audit`.
 - Project instructions: [AGENTS.md](../AGENTS.md), [agent roles](CODEX_AGENT_MAP.md), [production playbook](CODEX_PRODUCTION_PLAYBOOK.md), [roadmap](ROADMAP.md), and [navigation index](REPOSITORY_INDEX.md).
 - Operational note: PR #1 was still draft at inspection. Its metadata reported `mergeable=false`, which alone is not enough to diagnose merge conflicts; inspect GitHub's actual mergeability/CI diagnostics before attributing a cause.
@@ -65,7 +65,7 @@ PR STATUS (keep draft unless explicitly authorized):
 
 ## Release rule
 
-Keep draft PR #1 open and unmerged. No production support, bit-perfect hardware claim or automatic rollout follows from a formatter fix, reference fixture success, or source commit. Follow [production playbook](CODEX_PRODUCTION_PLAYBOOK.md) and the evidence ladder in [ROADMAP.md](ROADMAP.md).
+No production support, bit-perfect hardware claim or automatic rollout follows from a formatter fix, reference fixture success, app build or source merge. Follow [production playbook](CODEX_PRODUCTION_PLAYBOOK.md) and the evidence ladder in [ROADMAP.md](ROADMAP.md).
 
 ## 2026-10-31 branch and issue audit addendum
 

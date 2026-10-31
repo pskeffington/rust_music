@@ -4,6 +4,14 @@
 
 All runtime codecs are ours. All Cargo dependencies are local workspace paths. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
 
+## Current status — 2026-10-31
+
+The merged implementation and latest local macOS app build are on [`main` at `e8e5ff8`](https://github.com/pskeffington/rust_music/commit/e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b); PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The pushed `main` commit descends from that merge commit. The native macOS bundle compiled and launched successfully; library loading and audible output have been exercised. This is an engineering checkpoint, **not a production release**.
+
+The complete offline Rust gate passed at `de94d07`. Private FLAC, WAV, AIFF, ALAC and WavPack evidence is retained without rerunning or committing private media. Physical DAC/device-error recovery, live Rust Boy Music/Radio/TV focus, panel hardware, distribution signing/notarization, and representative app performance acceptance remain open. See the [macOS v1.0 acceptance ledger](docs/CODEX_MACOS_V1_DELIVERABLE.md), [release evidence and integration record](docs/PR1_MERGE_READINESS.md), and [current roadmap](docs/ROADMAP.md).
+
+The desktop UI is a text-only native app presented inside the Rust Boy/Pip-Boy wrapper theme. The visual reference guides layout and color; it does not authorize artwork, image extraction/caching, or visualizers. The fixed embedded display remains a 1,024-byte monochrome text/control frame.
+
 ## Product direction: desktop library manager + Pip-Boy MUSIC socket
 
 **Primary design:** [Rust Music 2000 interface direction](docs/design/PRIMARY_UI_DIRECTION.md) and [portable MUSIC socket schema](docs/design/PIPBOY_SOCKET_SCHEMA.md). The approved reference specifies the phosphor-green visual hierarchy and a mountable MUSIC content surface. It does **not** replace the native lossless engine or require the Pip-Boy to render a desktop-sized ornamental chassis. The image attachment itself has not yet been committed to this repository; the design decision is documented.
@@ -19,7 +27,7 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths. N
 
 **Architecture:** one Rust decoder/player and authoritative session; versioned, bounded catalog/command snapshots; macOS desktop and Pip-Boy presentation adapters. Rust Boy owns audio arbitration alongside Radio/TV, navigation, settings, storage permissions, and physical display. The existing micro frame is exactly 1,024 bytes. Package writing, incremental validation and mount-on-device are specified, **not yet implemented**.
 
-**Implementation sequence:** finish [standalone macOS v1.0 acceptance](docs/CODEX_MACOS_V1_DELIVERABLE.md) and RM-020 while doing read-only socket inventory; then RM-021–027 cover manifest, packager, macOS export, Pip-Boy mounting, Linux/Windows adapters and on-device tests. See [phased roadmap](docs/ROADMAP.md), [machine-readable tasks](docs/roadmap-index.json), [agent map](docs/CODEX_AGENT_MAP.md), and [portable deployment protocol](docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md). PR #1 remains gated; design documents are not build or hardware evidence.
+**Implementation sequence:** complete the remaining [standalone macOS v1.0 acceptance](docs/CODEX_MACOS_V1_DELIVERABLE.md) and RM-020 work while doing read-only socket inventory; then RM-021–027 cover manifest, packager, macOS export, Pip-Boy mounting, Linux/Windows adapters and on-device tests. See [phased roadmap](docs/ROADMAP.md), [machine-readable tasks](docs/roadmap-index.json), [agent map](docs/CODEX_AGENT_MAP.md), and [portable deployment protocol](docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md). PR #1 is merged; the remaining integration and hardware gates are tracked separately. Design documents are not build or hardware evidence.
 
 **Release scope:** macOS v1.0 is intentionally text-only, with no album art, visualizers or decorative image assets. The approved design guides information hierarchy, phosphor styling and socket layout. Optional Curie animation and advanced desktop presentation require later policy review and separate resource/accessibility gates. All playback remains local, offline, lossless-only with locally authored Rust components.
 
@@ -51,11 +59,19 @@ unverified.
 - **Rust_Boy host slot**: typed select/next/previous/play/stop/poll commands, read-only status snapshots, and host-owned RAII audio-focus leasing; no GUI requirement.
 - **Playback safety**: refuse mid-stream PCM format changes before output; clear focus state even after native close errors.
 - **Development CLI**: bounded library scan, inspect/full decode, lossless source to WAV, sample-bounded seek-range export for seek-capable decoders, 1-bit PBM screen preview, and optional native output. Decode and preview never overwrite existing output files.
-- **Standalone macOS app**: native SwiftUI shell around the local Rust CLI with explicit file selection, decoder inspection, Play and Stop. Build with `sh scripts/build-macos-app.sh`; the app bundle is local-only and does not package music.
+- **Standalone macOS app**: native SwiftUI text-only library/player around the local Rust CLI, with explicit library loading, search, queue and playlists, transport controls, and native output. Build with `sh scripts/build-macos-app.sh`; the local app bundle does not package music. See the current acceptance ledger for verified scope and remaining gates.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
 ## Get started
+
+To build the standalone macOS app bundle (requires the local macOS toolchain):
+
+```sh
+sh scripts/build-macos-app.sh
+```
+
+This builds and locally signs an app bundle for development. It does not produce Developer ID signing or notarization.
 
 ```sh
 sh scripts/offline-gate.sh      # no downloads, no third-party crates
@@ -142,4 +158,4 @@ The text-first library, search, playlist and queue roadmap is specified in [the 
 
 ## Branch and release status
 
-The implementation currently lives in [draft PR #1](https://github.com/pskeffington/rust_music/pull/1), not the released default branch. The project is designed to carry only the music you want, locally or in disjointed/offline deployments. This describes the deployment goal; playback remains offline and network-free. Do not merge until the evidence gates recorded in the roadmap have passed. See the [branch and issue triage](docs/BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md) and [RM-001 gate issue #2](https://github.com/pskeffington/rust_music/issues/2).
+PR [#1 is merged](https://github.com/pskeffington/rust_music/pull/1); `main` was verified at `e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b`, a descendant of merge commit `f8052f28cf187143b54aa15e80779ff3b8db841f`. The development branch reference may lag `main`; verify Git ancestry before continuing work. Merge status does not close the remaining production gates listed above. The project is designed to carry only the music you want, locally or in disjointed/offline deployments. Playback remains offline and network-free. See the [branch and issue triage](docs/BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md), [merge-readiness record](docs/PR1_MERGE_READINESS.md), and [RM-001 gate issue #2](https://github.com/pskeffington/rust_music/issues/2).

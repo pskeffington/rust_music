@@ -1,6 +1,6 @@
 # PR #1 merge-readiness and evidence gate — 2026-10-31
 
-**Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, physical panel/DAC acceptance, distribution signing and detached release approval remain open. Shure headphone unplug/reconnect now has active AudioQueue route-transition evidence, but no measured acoustic continuity or invalid-device failure/reopen was observed. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
+**Current integration state (2026-10-31): PR #1 is merged; production acceptance remains open.** GitHub reports PR #1 closed and merged at `f8052f28cf187143b54aa15e80779ff3b8db841f`. Remote `main` was verified at `e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b`, a descendant of that merge commit. The non-force push advanced `main` from `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`; the feature branch ref remained at `2947e6737622c3c668003130006823df0bdde3e0` at the time of verification. The latest app build/launch smoke and offline gate are recorded in the sections below and the [macOS v1.0 ledger](CODEX_MACOS_V1_DELIVERABLE.md). Live Rust_Boy MUSIC/RADIO/TV acceptance, physical panel/DAC and invalid-device recovery, representative app-performance acceptance, distribution signing/notarization, and release approval remain open. Historical snapshots below retain their original state and date.
 
 ### Local verification refresh at `0dd8f31`
 

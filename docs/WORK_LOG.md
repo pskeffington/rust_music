@@ -4,6 +4,12 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-31 — Verify mainline integration and refresh documentation navigation
+
+- Confirmed PR #1 is closed/merged at `f8052f28cf187143b54aa15e80779ff3b8db841f` and verified remote `main` at `e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b`, a descendant of that merge commit. The feature branch ref observed during verification remained `2947e6737622c3c668003130006823df0bdde3e0`.
+- Recorded the current integration, compileable app, offline-gate checkpoint, and remaining production blockers in README and the top-level release/navigation ledgers. Marked pre-merge handoff and branch-triage snapshots as historical; retained their dated evidence.
+- No application code, test status, codec evidence, or roadmap task state changed. Physical output/device recovery, live host focus, panel hardware, representative app performance, and Developer ID/notarization remain open.
+
 ## 2026-10-31 — Connect standalone text library, queue, and playlists
 
 - Added the macOS UI workflow for explicit library selection, cancellable
