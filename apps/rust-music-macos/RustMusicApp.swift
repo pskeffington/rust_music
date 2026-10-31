@@ -1311,16 +1311,21 @@ struct PlayerView: View {
             HStack(spacing: 7) {
                 Button("PREVIOUS") { model.previous() }
                     .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                    .accessibilityIdentifier("transport-previous")
                 Button("PLAY") { model.play() }
                     .buttonStyle(RustMusicButtonStyle(prominent: true))
                     .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     .keyboardShortcut(.space, modifiers: [])
+                    .accessibilityIdentifier("transport-play")
                 Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
                     .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
+                    .accessibilityIdentifier("transport-pause-resume")
                 Button("STOP") { model.stop() }
                     .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
+                    .accessibilityIdentifier("transport-stop")
                 Button("NEXT") { model.next() }
                     .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                    .accessibilityIdentifier("transport-next")
                 Spacer(minLength: 14)
                 Text("VOLUME \(model.volumePercent)%")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
@@ -1338,6 +1343,7 @@ struct PlayerView: View {
                 )
                 .frame(width: 120)
                 .disabled(model.libraryRoot == nil || model.isTransportBusy || model.isStateBusy)
+                .accessibilityIdentifier("transport-volume")
             }
             .buttonStyle(RustMusicButtonStyle())
             .padding(.horizontal, 16)

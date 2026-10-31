@@ -1725,3 +1725,17 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
 - `cargo fmt --all -- --check`, `git diff --check`, and a source scan for image
   and visualization APIs passed. This pass changed SwiftUI presentation only;
   Rust offline test results remain those already recorded at `2984278`.
+
+## 2026-10-31 — Transport accessibility identifiers
+
+- Independent `gate_verifier` review of `fb5e70d` found no theme blocker and
+  recommended distinct accessibility identifiers on transport controls for
+  reliable automated UI targeting. Added identifiers for Previous, Play,
+  Pause/Resume, Stop, Next and volume.
+- The app source compiled successfully with the installed Swift compiler at
+  macOS 13.0 target to a temporary output outside the repository (exit 0), and the
+  source scan still found no image or visualization APIs. The app bundle was
+  not replaced or relaunched because a live app session was present; the
+  bundle build and runtime accessibility check remain pending for this small
+  identifier-only change. The prior strict bundle build/launch evidence stays
+  tied to `fb5e70d`.
