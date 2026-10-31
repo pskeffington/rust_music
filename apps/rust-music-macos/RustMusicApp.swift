@@ -179,7 +179,7 @@ struct PlayerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "waveform")
+                Text("RM")
                     .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(RustMusicPalette.phosphor)
                     .frame(width: 48, height: 48)
@@ -191,7 +191,7 @@ struct PlayerView: View {
                         .foregroundStyle(RustMusicPalette.muted)
                 }
                 Spacer()
-                Button("Choose File…", systemImage: "folder") {
+                Button("Choose File…") {
                     model.chooseFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
@@ -215,21 +215,20 @@ struct PlayerView: View {
             .groupBoxStyle(RustMusicGroupBoxStyle())
 
             HStack(spacing: 12) {
-                Button("Play", systemImage: "play.fill") { model.play() }
+                Button("Play") { model.play() }
                     .disabled(model.selectedFile == nil || model.isPlaying)
                     .keyboardShortcut(.space, modifiers: [])
-                Button("Stop", systemImage: "stop.fill") { model.stop() }
+                Button("Stop") { model.stop() }
                     .disabled(!model.isPlaying)
                 Spacer()
-                Label(model.status, systemImage: model.isPlaying ? "speaker.wave.2" : "checkmark.circle")
+                Text(model.status)
                     .font(.callout)
                     .foregroundStyle(RustMusicPalette.muted)
                     .lineLimit(2)
             }
 
             Divider()
-            Label("No background scan or autoplay. Lossy and unsupported files are rejected by Rust Music.",
-                  systemImage: "lock.shield")
+            Text("No background scan or autoplay. Lossy and unsupported files are rejected by Rust Music.")
                 .font(.callout)
                 .foregroundStyle(RustMusicPalette.muted)
         }
