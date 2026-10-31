@@ -1,6 +1,6 @@
 # Rust Music independent-codec literature matrix
 
-Updated: 2026-10-29
+Updated: 2026-10-31
 
 All sources are research references **only**. No third-party decoder/player implementation is copied or linked.
 Project claims are not a hardware benchmark; status is recorded in the registry.
@@ -53,3 +53,16 @@ Project claims are not a hardware benchmark; status is recorded in the registry.
 | **RUST-014** | Do not mark ALAC as supported until demux and decoder pass corpus comparison. | G4 | planned | LIT-009 | ALAC source/PCM signed comparison with golden tests |
 | **RUST-015** | Every Cargo dependency stays inside this workspace; reject crates.io, git, build.rs and undeclared native libraries. | G0 | implemented | LIT-016, LIT-019 | cargo run --locked --offline -p rust-music-audit proves manifest, lock and FFI boundaries |
 | **RUST-016** | Do not link libasound, PulseAudio, JACK or PipeWire; Linux PCM sink must use only a /dev/snd kernel device. | G3 | implemented | LIT-014, LIT-018 | Feature-gated native ABI size checks, real PCM device setup and DAC loopback evidence |
+
+## Music-player usability literature — Winamp and macOS (2026-10-31)
+
+| ID | Source | Decision | Validation | Gate | License boundary |
+| --- | --- | --- | --- | --- | --- |
+| **LIT-022** | [Winamp desktop player UI and playlists](https://support.winamp.com/winamp-desktop-player-for-windows) | Keep transport, playlist editing, library and search immediately reachable; adopt keyboard selection and direct playlist actions. | Paired task tests: find track, add to playlist, reorder, initiate playback, return to queue without losing state. | G5 | Behavioral reference only; no skins, assets or source copying |
+| **LIT-023** | [Nielsen Norman Group ten usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) | Prioritize visible status, consistent controls, recognition over recall and user control. | Measure misclicks, task completion, discoverability and state comprehension. | G5 | Guidance only; no runtime dependency |
+| **LIT-024** | [Apple macOS design guidelines](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/) | Use resizable navigation, native keyboard conventions, discoverable toolbar/menu actions. | Validate window sizes, keyboard-only tasks and native Mac navigation. | G5 | Platform guidance only |
+| **LIT-025** | [Apple progress indicator guidelines](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) | Do not invent track progress; show bounded frame-derived elapsed/total and honest unknown status. | Pause/stop/EOF/frame count and unknown-duration state tests. | G5 | Platform guidance only |
+| **LIT-026** | [Apple keyboard guidelines](https://developer.apple.com/design/human-interface-guidelines/keyboards/) | Preserve macOS standard shortcuts, Full Keyboard Access and explicit focus states. | Keyboard-only library/queue/transport regression checks. | G5 | Platform guidance only |
+| **LIT-027** | [Apple accessibility design guidelines](https://developer.apple.com/design/human-interface-guidelines/accessibility) | Ensure labeled status, VoiceOver navigation, scalable text and low cognitive burden. | VoiceOver checks, contrast at small text, no time-limited notices. | G5 | Platform guidance only |
+
+**Synthesis:** Winamp's fast library-to-playlist-to-playback path is the behavioral benchmark, not its visual skins. Prioritize a persistent player/queue, discoverable library sorting/search, predictable keyboard access, honest audio state, and readable frame-derived elapsed/total progress. Compare against the present Rust Music UI with paired tasks before calling the redesigned UI better. Neither a Playing label nor a moving progress bar alone proves audible output. See [MAC-06](MAC06_DIAGNOSIS_UI_AB_PLAN.md) and [Winamp usability agent work plan](WINAMP_UI_AGENT_RESEARCH.md).
