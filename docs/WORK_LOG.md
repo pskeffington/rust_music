@@ -1631,3 +1631,31 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   host-integrator owns the initial ML-01/ML-03 catalog/search implementation in
   `crates/rust-music-library/src/lib.rs`. The zero-artwork policy now records
   the complete ML-00–ML-07 feature and performance contract.
+
+## 2026-10-31 — Integrated standalone transport controls
+
+- Added Pause/Resume, bounded 0–100 software volume and functional Next/
+  Previous queue/catalog transitions to the standalone SwiftUI workflow using
+  the persistent RBPK package process. Queue/library selection stays
+  non-autoplay. State commands are blocked during transport and a deferred
+  persistent-state reload handles a successful catalog load while Stop is
+  finishing. Window shutdown sends Stop/Shutdown, closes pipes and escalates
+  through terminate/SIGKILL with a child reap if needed.
+- Rust transport work is committed in `fc47a19` (engine/host/IPC/CLI/panel
+  controls) and `7ae312b` (AudioQueue/ALSA pause before first buffer). The
+  integrated package-stream Play/Pause/Resume/volume/Stop E2E passes. The
+  macOS injected AudioQueue suite passes 15/15; ALSA target compilation for
+  `aarch64-unknown-linux-gnu` passes, but Linux device execution is unavailable
+  on this Mac.
+- At `7ae312b` plus the integration diff, `sh scripts/offline-gate.sh` exited
+  0 (17 local crates, 32 local path edges, no registry/Git crates), and
+  `sh scripts/build-macos-app.sh` exited 0 with strict local ad-hoc bundle
+  signature verification. Roadmap/literature validators and `git diff --check`
+  exited 0. Source search found no image or visualizer APIs. Independent Swift
+  review found and verified a fix for Next/Previous while paused with an empty
+  queue. No private codec corpus was rerun.
+- MAC-01 is implemented pending observed interaction with this exact app
+  window. Hardware output/device disconnect and recovery, physical panel/DAC,
+  Rust Boy shared Radio/TV focus, cold startup/incremental RSS, Developer ID
+  distribution signing, and final security review remain open. PR #1 stays
+  draft and unmerged.

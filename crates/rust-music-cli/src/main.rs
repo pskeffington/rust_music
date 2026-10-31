@@ -1278,6 +1278,20 @@ impl<S: PcmSink, F: FnOnce() -> Result<S>> PcmSink for LazySink<S, F> {
             .write(block)
     }
 
+    fn pause(&mut self) -> Result<()> {
+        self.sink
+            .as_mut()
+            .ok_or(MusicError::Output("audio sink is not open".into()))?
+            .pause()
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.sink
+            .as_mut()
+            .ok_or(MusicError::Output("audio sink is not open".into()))?
+            .resume()
+    }
+
     fn finish(&mut self) -> Result<()> {
         match self.sink.as_mut() {
             Some(sink) => sink.finish(),
@@ -2023,6 +2037,88 @@ mod tests {
         assert_eq!(shutdown.request_id, 3);
         assert_eq!(shutdown.body, Reply::Ack);
         assert_eq!(read_frame(&mut replies).unwrap(), None);
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_stream_runs_play_pause_resume_volume_stop_end_to_end() {
+        let root = temp_root("package-transport-stream");
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let mut wave = header(format, 8);
+        wave.extend_from_slice(&[0; 8]);
+        fs::write(root.join("track.wav"), wave).unwrap();
+
+        let id = rust_music_host::MUSIC_PACKAGE_ID;
+        let requests = [
+            Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+            Request::ScanLibrary {
+                root: root.to_string_lossy().into_owned(),
+            },
+            Request::Play,
+            Request::Pause,
+            Request::ResumePlayback,
+            Request::SetVolumePercent { percent: 25 },
+            Request::Stop,
+            Request::Shutdown,
+        ];
+        let request_count = requests.len();
+        let mut input = Vec::new();
+        for (offset, body) in requests.into_iter().enumerate() {
+            let request = Envelope {
+                package_id: id.into(),
+                request_id: offset as u64 + 1,
+                body,
+            };
+            write_frame(&mut input, &request.encode().unwrap()).unwrap();
+        }
+        let mut output = Vec::new();
+        serve_stream::<NullSink, _, _, _>(
+            || Ok(NullSink::default()),
+            std::io::Cursor::new(input),
+            &mut output,
+        )
+        .unwrap();
+
+        let mut frames = output.as_slice();
+        let replies = (0..request_count)
+            .map(|_| {
+                let payload = read_frame(&mut frames).unwrap().unwrap();
+                Envelope::<Reply>::decode(&payload).unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            replies[0].body,
+            Reply::Hello {
+                selected_version: PROTOCOL_VERSION
+            }
+        );
+        let playback = replies[1..7]
+            .iter()
+            .map(|reply| match &reply.body {
+                Reply::View(view) => view.playback,
+                other => panic!("expected playback view, got {other:?}"),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            playback,
+            [
+                rust_music_ipc::Playback::Stopped,
+                rust_music_ipc::Playback::Playing,
+                rust_music_ipc::Playback::Paused,
+                rust_music_ipc::Playback::Playing,
+                rust_music_ipc::Playback::Playing,
+                rust_music_ipc::Playback::Stopped,
+            ]
+        );
+        assert_eq!(replies[7].body, Reply::Ack);
+        assert_eq!(read_frame(&mut frames).unwrap(), None);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(any(

@@ -141,3 +141,23 @@ The new [premerge checker](../scripts/premerge-check.sh) is entirely offline onc
 6. Update root `AGENTS.md`, README, roadmap metadata and PR references after merge so Codex does not check out an obsolete branch; no production tags/releases without independent release acceptance.
 
 **Policy:** The user's request to work toward merge authorizes the reconciliation and preparation work. It does not convert an unexecuted gate into a PASS. See [production playbook](CODEX_PRODUCTION_PLAYBOOK.md), [RM-001 operator gate](RM001_OPERATOR_GATE.md), and [roadmap](ROADMAP.md).
+
+## 2026-10-31 standalone transport integration — not merge approval
+
+Rust transport controls are committed locally as `fc47a19` and the native
+pause-before-first-buffer handling as `7ae312b`. The working integration
+connects persistent RBPK transport to the macOS app's Play/Pause/Resume/Stop/
+Next/Previous/software-volume controls. At this source snapshot,
+`sh scripts/offline-gate.sh`, `sh scripts/build-macos-app.sh`, roadmap and
+literature checks, and `git diff --check` all exited 0. AudioQueue injected
+failure/teardown tests passed 15/15, and the package-stream transport E2E
+regression passed. Independent Swift review identified and confirmed the fix
+for Next/Previous while paused with an empty queue; a separate final security
+review is pending.
+
+This does not close MAC-02 or authorize merge. Exact-window UI interaction,
+audible target-device output, device loss/recovery, Rust Boy shared focus with
+Radio/TV, panel/DAC, cold startup/incremental memory, and Developer ID /
+notarization remain unverified. Existing private FLAC 6/6, WAVE 6/6 and
+AIFF/AIFF-C 7/7 evidence is retained and was not rerun. Keep PR #1 draft and
+`main` unchanged until policy gates and independent approval are satisfied.

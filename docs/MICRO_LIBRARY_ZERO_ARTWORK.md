@@ -207,3 +207,26 @@ Cold application startup and incremental idle memory were not isolated, so the
 under-8-MiB additional-memory target remains unverified. The exact fixture
 generator and query are in
 [`examples/profile_micro_library.rs`](../crates/rust-music-library/examples/profile_micro_library.rs).
+
+### Integrated standalone transport continuation (2026-10-31)
+
+The standalone UI now keeps one persistent RBPK child process for transport
+and wires Play, Pause, Resume, Stop, Next, Previous, queue transitions, and
+bounded 0–100 software volume. Pausing releases the Rust host lease; Resume
+must reacquire it. Focus-denied Resume remains paused. Catalog browsing,
+search, queue selection, and playlist selection do not start playback. State
+operations and transport serialize at the UI boundary, and window shutdown
+sends Stop/Shutdown before bounded termination escalation and child reaping.
+
+The package-stream regression `package_stream_runs_play_pause_resume_volume_stop_end_to_end`
+passes. It initially exposed and fixed `LazySink` not forwarding pause/resume.
+The macOS AudioQueue fault suite passes 15/15, including pause/resume before
+the first write. `sh scripts/offline-gate.sh` and `sh scripts/build-macos-app.sh`
+exited 0; the app bundle passed local strict ad-hoc signature verification.
+Roadmap/literature checks and the no-image-API search passed. Independent
+review caught and fixed a Next/Previous while-paused selection mismatch; the
+follow-up review confirmed the fix. These checks do not prove window UI use,
+audible device output, physical device recovery, Rust Boy shared focus, cold
+startup, or incremental catalog memory. Autoplay and native EQ remain follow-on
+features for the standalone v1.0 scope. This work adds no artwork or image
+functionality and does not rerun private codec parity.
