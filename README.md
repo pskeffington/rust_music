@@ -77,6 +77,10 @@ All **16 workspace crates** are locally authored and have zero third-party Cargo
 - [Codex production and release playbook](docs/CODEX_PRODUCTION_PLAYBOOK.md)
 - [Dated work and validation log](docs/WORK_LOG.md)
 - [Codex root instructions](AGENTS.md)
+- [Current engineering handoff and agent assignments (2026-10-30)](docs/ENGINEERING_HANDOFF_2026-10-30.md)
+- [RM-001 operator gate and private evidence capture](docs/RM001_OPERATOR_GATE.md)
+- [PR #1 merge-readiness ledger and offline premerge check](docs/PR1_MERGE_READINESS.md)
+- [2026-10-31 branch and issue triage](docs/BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md)
 - [Zero third-party dependency policy and offline gate](docs/DEPENDENCY_POLICY.md)
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
@@ -96,3 +100,7 @@ All **16 workspace crates** are locally authored and have zero third-party Cargo
 **Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 previously reported `startup_failure` with no jobs scheduled. The local offline build and generated-vector PCM parity pass; all six private tracks passed the combined reference/native PCM corpus run. No current CI result, host integration, or physical bit-perfect output is inferred.
 
 **Local ownership boundary:** The implementation is independent; OS system APIs are permitted but not separately installed codec or sound libraries. macOS AudioQueue and Linux kernel ALSA hardware testing remain outstanding. The offline gate was locally executed with Rust/Cargo 1.99.1 on macOS; the native Linux feature and hardware path remain unverified here.
+
+## Branch and release status
+
+The implementation currently lives in [draft PR #1](https://github.com/pskeffington/rust_music/pull/1), not the released default branch. The project is designed to carry only the music you want, locally or in disjointed/offline deployments. This describes the deployment goal; playback remains offline and network-free. Do not merge until the evidence gates recorded in the roadmap have passed. See the [branch and issue triage](docs/BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md) and [RM-001 gate issue #2](https://github.com/pskeffington/rust_music/issues/2).

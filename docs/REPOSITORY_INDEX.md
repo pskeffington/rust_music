@@ -18,6 +18,8 @@ index whenever a crate, document, script, test or workflow is added or removed.
 - **Which Codex guidance loads?** Root [AGENTS.md](../AGENTS.md) and `.codex/agents/` definitions documented in [CODEX_AGENT_MAP.md](CODEX_AGENT_MAP.md).
 - **What changed and what was verified?** [Work log](WORK_LOG.md); task status remains authoritative in [roadmap JSON](roadmap-index.json).
 
+- **How does the operator capture a complete offline gate?** [RM-001 gate runbook](RM001_OPERATOR_GATE.md) and [evidence wrapper](../scripts/capture_offline_gate.sh).
+
 ## Crate ownership
 
 | Area | Repository entry | Owning agent | Gate / evidence |

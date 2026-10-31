@@ -33,6 +33,10 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 - `index_curator` reconciles evidence and routing, but **must not** promote gate outcomes just because a source commit landed.
 - Current evidence: `RM-001`, `RM-002`, and `RM-008` through `RM-010`, plus `RM-017` M4A ingestion/upstream corpus parity, have source/build/parity evidence recorded in the roadmap. `RM-005` physical output and `RM-006` host audio arbitration remain blocked on device/host integration; under this goal, sibling repositories stay read-only. Broad ALAC admission remains open pending wider real-world source/encoder coverage.
 
+## Current handoff
+
+Use [engineering handoff — 2026-10-30](ENGINEERING_HANDOFF_2026-10-30.md) to verify branch selection, evidence provenance, and exact next-agent assignments before launching Codex. `main` was README/LICENSE-only at inspection; do not treat it as the engineering checkout. Preserve stable RM task IDs and explicit prerequisite blocks.
+
 ## Codex kickoff prompt
 
 ```text

@@ -19,6 +19,20 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - When a toolchain/hardware/private corpus is unavailable, mark the task **blocked or unverified**, with explicit required operator command. Source implemented ≠ compiled ≠ PCM parity ≠ measured DAC.
 - Do not advance a dependent gate while its prerequisite evidence is still blocked. Do not automatically create schedules, install dependencies, change sibling repositories, push/merge branches, or configure hardware outside the user-authorized task.
 
+## Merge-preparation and verification
+
+- Before any merge into `main`, read [PR #1 merge-readiness](docs/PR1_MERGE_READINESS.md). On the current clean PR branch run `PRIVATE_FLAC_DIRECTORY=/private/corpus sh scripts/premerge-check.sh` with an operator-provisioned toolchain; do not upload private logs/media. The checker is fail-closed, performs no network/downloads, and does **not** merge.
+- GitHub `mergeable=true` confirms ancestry/conflict resolution only. Do not mark RM-001 complete, close issue #2, clear downstream blocks, or certify hardware from a static audit. Keep draft PR #1 unmerged until required acceptance evidence is recorded; never move `main` by force.
+
+## RM-001 evidence capture
+
+- For a local operator gate, follow [docs/RM001_OPERATOR_GATE.md](docs/RM001_OPERATOR_GATE.md) and run `sh scripts/capture_offline_gate.sh` from the clean active PR branch. The wrapper records the real gate exit status and private transcript outside the repository; it does not claim success or change roadmap states. Do not upload private transcripts without review.
+
+## Current handoff and branch sanity
+
+- Before any engineering pass, read [docs/ENGINEERING_HANDOFF_2026-10-30.md](docs/ENGINEERING_HANDOFF_2026-10-30.md). The live implementation is on draft PR #1 branch `build/native-codecs-g0`; `main` was README/LICENSE-only at the October 30 inspection. Never infer missing implementation from an accidental `main` checkout.
+- Keep `RM-001` first until an actual complete offline gate pass is observed. Review-only/index work can continue independently; never mark dependent native PCM, host, or hardware tasks complete from source or operator reference tests.
+
 ## Historical checkpoint (2026-10-29; superseded below)
 
 At the time of this checkpoint, the branch was `build/native-codecs-g0`, draft PR #1. Operator-reported AIFF/AIFF-C native CLI golden PCM parity was 7/7. The operator audit passed for 12 local crates/21 local edges, but the full offline gate stopped at rustfmt. The 14-file rustfmt diff and three audit warnings were subsequently repaired in commits ending `13f8e85975f7b4cae921593df2ab0e7f310b8d30`. The later complete offline-gate result is recorded below and supersedes the gate status in this historical checkpoint.
