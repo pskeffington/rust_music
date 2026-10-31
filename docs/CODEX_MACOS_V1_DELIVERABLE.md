@@ -579,3 +579,18 @@ does not pass the app-wide memory gate. Cold-start/app RSS qualification still
 needs a measurement method that separates transient page reclamation from
 catalog allocation. Playback was not started; Cmd-Q removed the tested app
 process, and the synthetic fixture directory was deleted.
+
+### 2026-10-31 debug subprocess cleanup regression
+
+The first `python3 scripts/test_macos_parent_exit.py --binary
+target/debug/rust-music-cli` attempt exited **1** because the existing debug
+binary exited before its Hello reply. Rebuilding with
+`cargo build --locked --offline -p rust-music-cli --features
+macos-output,test-support` exited **0**; rerunning the harness exited **0**.
+It observed normal EOF child PID 22405 exit 0, malformed-protocol child PID
+22406 exit 1, three repeated launch/exit children 22407–22409, and child PID
+22411 exit after its app-like parent was force-killed. A subsequent host
+`ps -p 22405,22406,22407,22408,22409,22411 -o pid,ppid,args` returned exit **1**
+with only the header, confirming none of those PIDs remained. This is
+CLI-child lifecycle evidence with the injected test sink; it does not add
+physical-device recovery or audible-output evidence.
