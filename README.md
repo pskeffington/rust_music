@@ -4,6 +4,19 @@
 
 All runtime codecs are ours. All Cargo dependencies are local workspace paths. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
 
+## Start here — documentation navigation
+
+| Goal | Read |
+| --- | --- |
+| Install, compile, launch, or verify the app | [Quickstart and build guide](docs/START_HERE.md) |
+| Understand the system architecture | [Architecture](docs/ARCHITECTURE.md) |
+| Understand the desktop/Pip-Boy product direction | [Primary UI direction](docs/design/PRIMARY_UI_DIRECTION.md) and [socket schema](docs/design/PIPBOY_SOCKET_SCHEMA.md) |
+| Find current tasks and release gaps | [Roadmap](docs/ROADMAP.md), [machine task index](docs/roadmap-index.json), and [macOS acceptance](docs/CODEX_MACOS_V1_DELIVERABLE.md) |
+| Develop with Codex | [Agent instructions](AGENTS.md) and [agent routing](docs/CODEX_AGENT_MAP.md) |
+| Inspect the prior merge evidence | [PR #1 record](docs/PR1_MERGE_READINESS.md) |
+
+**Source of truth:** the checked-out code and measured validation evidence take precedence over dated handoffs. Historical draft-PR instructions are not current merge policy. `main` and `build/native-codecs-g0` were identical at `deb6f879` on 2026-10-31.
+
 ## Current status — 2026-10-31
 
 The merged implementation and latest local macOS app build are on [`main` at `e8e5ff8`](https://github.com/pskeffington/rust_music/commit/e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b); PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The pushed `main` commit descends from that merge commit. The native macOS bundle compiled and launched successfully; library loading and audible output have been exercised. This is an engineering checkpoint, **not a production release**.
