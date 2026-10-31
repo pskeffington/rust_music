@@ -837,6 +837,16 @@ observes native queue playback on the available default route, not measured
 acoustic output, DAC sample fidelity, other-device negotiation, or device
 disconnect/recovery.
 
+At source HEAD `9a86a5a1de79fcb40cb97f3628f3de8bf735b1be`, the focused
+feature-gated subprocess command
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0** (7/7). It
+covers wrong package identity, inert activation/shutdown, removed-track
+rejection, playback-error cleanup, repeated parent-pipe closure, active
+playback parent closure, and shutdown during active playback. These use the
+test support sink and complement, but do not replace, the native host output
+check above.
+
 The same command in the restricted shell exited **1** with AudioQueueStart
 OSStatus `-66680`, which Apple's Audio Toolbox documentation identifies as
 `kAudioQueueErr_InvalidDevice` ([Apple result code](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueerr_invaliddevice)). The host-level retry passed. This indicates an environment-specific output restriction; the error is preserved rather than counted as a product pass or ignored. Physical device loss/recovery remains untested.
