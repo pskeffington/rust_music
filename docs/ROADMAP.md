@@ -112,6 +112,13 @@ This adds current graceful-close evidence to RM-019; device disconnect/recovery,
 physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
 remain open. No private corpus was rerun.
 
+**Synthetic app-memory observation (2026-10-31):** one same-process Activity
+Monitor sample rose from 84.1 MB to 87.3 MB `anonymousMemory` while the app held
+a generated 2,000-entry catalog of 12-byte RIFF/WAVE signatures. The app showed
+playback stopped; no track was played. This single pair is not RSS, exact
+catalog heap, a repeated profile, or a passed memory threshold. The app-wide
+memory gate remains open.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

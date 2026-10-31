@@ -627,3 +627,19 @@ observable graceful app-quit cleanup during synthetic silent playback. No
 private media was selected. Device disconnect/recovery, live Rust Boy focus,
 physical DAC/panel, app-wide incremental-memory qualification, and
 Developer ID/notarization remain open.
+
+### 2026-10-31 Activity Monitor sample after a generated catalog scan
+
+The signed app bundle built from code at
+`be6615e802b24c42da3d2b5d89906da52938c110` (carried unchanged through
+documentation-only commit `96fae343145cce4171934ad3fbed9faffc68fe9b`) was
+launched as PID 23091. Activity Monitor's `anonymousMemory` column showed
+84.1 MB before scanning. The app explicitly scanned 2,000 generated 12-byte
+RIFF/WAVE-signature files and displayed `LOADED 2000 TRACKS. PLAYBACK IS
+STOPPED.`; the same PID then showed 87.3 MB, a single observed increase of
+3.2 MB. No generated file was played. This is one before/after
+`anonymousMemory` pair, not RSS, exact catalog heap, repeated profiling, or
+acceptance against a performance threshold. After choosing Quit Rust Music,
+Activity Monitor's refreshed `Rust Music` filter showed no app or CLI rows; the
+generated fixture directory was removed. This does not close the app-wide
+memory gate.
