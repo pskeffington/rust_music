@@ -91,3 +91,7 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 **Validation truth:** Native MD5 verification occurs after complete decoding, not before playback starts. An all-zero FLAC STREAMINFO digest cannot establish end-to-end integrity. GitHub Actions PR #1 initially reported `startup_failure` with no jobs scheduled; Rust compilation and the full differential suite remain unverified until a runner successfully executes them.
 
 **Local ownership boundary:** The implementation is independent; OS system APIs are permitted but not separately installed codec or sound libraries. AudioQueue and Linux kernel ALSA hardware testing and full decoder conformance are still outstanding. `Cargo.lock` is bootstrap-pinned; Rust toolchain validation has not yet run in this environment.
+
+## Branch and release status
+
+The implementation currently lives in [draft PR #1](https://github.com/pskeffington/rust_music/pull/1), not the released default branch. The project is a lightweight music app in Rust, designed to carry only the music you want, locally or in disjointed/offline deployments. This descriptive goal is not a claim that network-based playback is implemented; the engine remains offline and network-free. See [2026-10-31 branch/issue triage](docs/BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md) and [RM-001 gate issue #2](https://github.com/pskeffington/rust_music/issues/2). Do not merge until the evidence gates recorded in the roadmap have passed.
