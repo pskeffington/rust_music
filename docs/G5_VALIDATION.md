@@ -68,6 +68,30 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
   was run; physical device disconnect/recovery and DAC qualification remain
   pending. The current adapter has no asynchronous route-loss observer.
 
+## macOS playback-failure UI recovery — 2026-10-31
+
+At candidate `01ac0e6384039cc078dda0f0a1c8ff6e325a2039`, the standalone app
+maps terminal stopped, finished, and failed snapshots to inactive transport
+controls. Package-command failures clear stale playing/paused state and request
+one authoritative snapshot when transport was active. Non-playing snapshots
+also cancel the pending UI polling flag. This allows an explicit Play retry
+after a native output failure without acquiring focus automatically.
+
+`swiftc apps/rust-music-macos/PlaybackUIState.swift
+apps/rust-music-macos/PlaybackUIStateTests.swift -o
+/private/tmp/rust-music-playback-ui-state-tests` and the resulting test binary
+exited **0**; playing and paused flags are preserved only for states 2 and 6,
+while stopped/finished/failed states clear both. `sh
+scripts/build-macos-app.sh` exited **0**, including strict local ad-hoc
+signature verification. `sh scripts/offline-gate.sh` exited **0** on this
+candidate: 17 local crates, 32 path-only edges, zero registry/Git crates, zero
+third-party system links, and one Apple OS framework link. The native
+AudioQueue simulated recovery suite passed 17/17 as part of the gate.
+
+No private codec corpus was rerun. These checks do not simulate a physical
+device disconnect, asynchronous route loss, audible output, DAC fidelity, or
+Rust Boy live focus contention; those acceptance gates remain open.
+
 ## 2026-10-31 restricted-shell device query
 
 - Sandboxed `system_profiler SPAudioDataType -detailLevel full` exited 0 but
