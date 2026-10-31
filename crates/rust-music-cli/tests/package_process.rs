@@ -244,3 +244,94 @@ fn spawned_cli_unit_fails_closed_on_wrong_package_identity() {
         "wrong package identity must fail the unit"
     );
 }
+
+#[test]
+fn spawned_cli_rejects_track_removed_after_scan_without_starting_playback() {
+    let root = std::env::temp_dir().join(format!(
+        "rust-music-removed-track-{}-{}",
+        std::process::id(),
+        Instant::now().elapsed().as_nanos()
+    ));
+    std::fs::create_dir(&root).expect("create removable library fixture");
+    let track_path = root.join("track.wav");
+    std::fs::write(&track_path, b"RIFF1234WAVE").expect("write catalogable WAV signature");
+
+    let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
+        .arg("serve")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn Rust Music process unit");
+    let mut child = ChildGuard(child);
+    let mut stdin = child.0.stdin.take().expect("child stdin");
+    let stdout = child.0.stdout.take().expect("child stdout");
+    let (replies, reply_reader) = start_reply_reader(stdout);
+
+    send_request(
+        &mut stdin,
+        1,
+        Request::Hello {
+            min_version: PROTOCOL_VERSION,
+            max_version: PROTOCOL_VERSION,
+        },
+    );
+    assert_eq!(
+        receive_reply(&replies).body,
+        Reply::Hello {
+            selected_version: PROTOCOL_VERSION
+        }
+    );
+
+    send_request(
+        &mut stdin,
+        2,
+        Request::Activate {
+            width: 480,
+            height: 320,
+        },
+    );
+    assert!(matches!(receive_reply(&replies).body, Reply::View(_)));
+
+    send_request(
+        &mut stdin,
+        3,
+        Request::ScanLibrary {
+            root: root.to_string_lossy().into_owned(),
+        },
+    );
+    let scanned = receive_reply(&replies);
+    let Reply::View(scanned) = scanned.body else {
+        panic!("scan should return the indexed track");
+    };
+    assert_eq!(scanned.track_count, 1);
+    assert!(!scanned.audio_claimed);
+    std::fs::remove_file(&track_path).expect("simulate removable-media loss");
+
+    send_request(&mut stdin, 4, Request::Play);
+    assert_eq!(
+        receive_reply(&replies).body,
+        Reply::Error {
+            code: rust_music_ipc::ErrorCode::Decoder,
+            message: "local music file could not be read".into(),
+        },
+        "a stale catalog entry must fail before opening output"
+    );
+
+    send_request(&mut stdin, 5, Request::Snapshot { page: 0 });
+    let snapshot = receive_reply(&replies);
+    let Reply::View(snapshot) = snapshot.body else {
+        panic!("snapshot should remain available after media loss");
+    };
+    assert_eq!(snapshot.playback, Playback::Stopped);
+    assert!(!snapshot.audio_claimed);
+
+    send_request(&mut stdin, 6, Request::Shutdown);
+    assert_eq!(receive_reply(&replies).body, Reply::Ack);
+    drop(stdin);
+    let status = wait_for_exit(&mut child.0);
+    assert!(status.success(), "child exited with {status}");
+    assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
+    reply_reader.join().expect("join child reply reader");
+    std::fs::remove_dir_all(root).expect("remove removable library fixture");
+}

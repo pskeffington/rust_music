@@ -1687,3 +1687,21 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   and the zero-artwork library ledger. Device loss/recovery, measured DAC,
   Rust Boy shared focus, repeatable startup/memory/latency measurements and
   final release review remain.
+
+## 2026-10-31 — Stale removable-track process regression
+
+- Added `spawned_cli_rejects_track_removed_after_scan_without_starting_playback`
+  to the macOS package-process E2E suite. It scans a generated WAV signature,
+  removes the file, then sends Play to the real spawned CLI process.
+- The process returns the bounded `Decoder` error, remains queryable with
+  playback `Stopped` and `audio_claimed=false`, and exits successfully after an
+  explicit Shutdown. The focused test passed 1/1 and the full package-process
+  integration suite passed 5/5. An initial test assertion expected `Empty`
+  instead of the observed post-scan `Stopped` state; correcting that
+  expectation made the regression pass without product-code changes.
+- `sh scripts/offline-gate.sh` passed at working tree based on `110bfed` (17
+  local crates, 32 local edges, zero registry/Git dependencies, all unit and
+  workspace tests, Clippy, release build and macOS feature checks; injected
+  AudioQueue failure/teardown 15/15). Physical device loss during active
+  output, Rust Boy shared focus, DAC measurement, repeatable app profiling,
+  distribution signing, and mainline release approval remain open.

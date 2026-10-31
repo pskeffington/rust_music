@@ -175,6 +175,16 @@ closed PID 93393; the follow-up process query found it absent and no
 not added to Git. Device disconnect/recovery, physical DAC measurement and
 Rust Boy shared focus remain open.
 
+### Removable-track process regression
+
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited 0 (5/5). The new
+spawned-process case scans a generated track, removes it before Play, observes
+the bounded `local music file could not be read` error, verifies the process
+still answers a snapshot as Stopped with no audio claim, then requests
+Shutdown and observes a clean child exit. This covers stale media before
+output starts; it does not simulate a device disappearing during active audio.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
