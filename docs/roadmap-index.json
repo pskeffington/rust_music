@@ -369,7 +369,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "done",
+      "status": "in_progress",
       "depends_on": [
         "RM-004"
       ],
