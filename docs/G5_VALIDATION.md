@@ -102,6 +102,14 @@ bundled CLI SHA-256 was
 These CLI tests establish child-process behavior, not the SwiftUI app closing
 its child during this pass or physical device behavior.
 
+The rebuilt bundle was also launched twice through `/usr/bin/open -n`; the
+captured second invocation exited **0**. `lsappinfo` identified bundle ID
+`dev.rustmusic.standalone`, the expected `RustMusic.app` path, and
+`Contents/MacOS/RustMusic`. The check-created idle instances were sent TERM
+and disappeared; pre-existing Rust Music PID 24897 was left running. No
+`rust-music-cli` child was present. This is a current LaunchServices startup
+smoke, not a Cmd-Q or active-playback child-cleanup observation.
+
 No private codec corpus was rerun. These checks do not simulate a physical
 device disconnect, asynchronous route loss, audible output, DAC fidelity, or
 Rust Boy live focus contention; those acceptance gates remain open.
