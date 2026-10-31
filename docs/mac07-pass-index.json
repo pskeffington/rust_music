@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-31",
+  "project": "pskeffington/rust_music",
+  "source": "docs/MAC07_WINAMP_UI_ALIGNMENT.md",
+  "branch": "docs/mac07-winamp-ui-alignment-20261031",
+  "execution_rule": "Do not run downstream implementation until preceding pass acceptance is evidenced; independent read-only reviews may proceed",
+  "policy": [
+    "No third-party runtime dependencies",
+    "Preserve original lossless decoders and 16-bit/44.1kHz playback floor",
+    "No artwork/assets or visualizer",
+    "Preserve 1KiB Pip-Boy panel and RBPK v1",
+    "No unexpected startup scan or autoplay",
+    "Do not commit private audio or paths"
+  ],
+  "passes": [
+    {
+      "id": "MAC07-00",
+      "title": "Baseline and reproducibility",
+      "roadmap_task": "RM-028",
+      "priority": "P0",
+      "status": "planned",
+      "depends_on": [],
+      "owner_agent": "gate_verifier",
+      "review_agent": "host_integrator",
+      "scope": "Pin current SHA; same-file CLI/GUI reproduction; resolve actual selected file and surface child failures",
+      "acceptance": "CLI audible versus GUI failure classified; commands and sanitized logs recorded",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-01",
+      "title": "Repair native GUI playback handoff",
+      "roadmap_task": "RM-028",
+      "priority": "P0",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-00"
+      ],
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "scope": "Add failing managed-process regression; fix proven select/queue/play/focus/IPC defect; preserve native decoder",
+      "acceptance": "Actual FLAC audible from Mac GUI; no false Playing; tests pass",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-02",
+      "title": "Truthful progress and state",
+      "roadmap_task": "RM-029",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-01"
+      ],
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "scope": "Typed RBPK view parsing; elapsed/duration, output state, pause/end/error reset; safe accessibility labels",
+      "acceptance": "Counters advance and reset correctly, malformed IPC tests pass",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-03",
+      "title": "Winamp-layout skeleton",
+      "roadmap_task": "RM-029",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-02"
+      ],
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "scope": "Compact persistent player; navigation sidebar; sortable/searchable track table; docked queue; adaptive resizing",
+      "acceptance": "Desktop layout screenshot checks at two window sizes; keyboard order validated",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-04",
+      "title": "Play and queue semantics",
+      "roadmap_task": "RM-030",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-03"
+      ],
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "scope": "Double-click/Enter Play Now, multiselect, Play Next, Next/Previous playback, natural EOF exactly once",
+      "acceptance": "User journey tests, no overlapping sinks, operator audio confirmation",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-05",
+      "title": "Playlist editing and persistence",
+      "roadmap_task": "RM-030",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-04"
+      ],
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "scope": "Queue reorder, Finder import, named playlists, safe M3U8, restart restoration without autoplay",
+      "acceptance": "Persistence, symlink/traversal, Unicode and media-byte preservation tests",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-06",
+      "title": "A/B acceptance",
+      "roadmap_task": "RM-030",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-05"
+      ],
+      "owner_agent": "gate_verifier",
+      "review_agent": "safety_reviewer",
+      "scope": "Same-file baseline/candidate, WAV/FLAC, route, queue UX, 2k/20k catalogs; raw latency and task metrics",
+      "acceptance": "Three functional repetitions, five UX pilots, observable acoustic evidence and failure rows",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    },
+    {
+      "id": "MAC07-07",
+      "title": "Release evidence handoff",
+      "roadmap_task": "RM-030",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "MAC07-06"
+      ],
+      "owner_agent": "index_curator",
+      "review_agent": "gate_verifier",
+      "scope": "Update registry and logs with exact SHAs; run offline gate, macOS build/signature checks, mark remaining hardware blocks",
+      "acceptance": "No pass without reproduced evidence; reviewable commits and next-stage readiness report",
+      "evidence_status": "not_run",
+      "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
+    }
+  ]
+}
