@@ -34,6 +34,69 @@ retain no image bytes or reference to an artwork payload.
 - The IPC `View` contains bounded display fields and playback state only; it
   has no artwork field. The panel framebuffer remains exactly 1024 bytes.
 
+## Text-first library roadmap
+
+The standalone app and Rust Boy MUSIC slot are to become a local, user-directed
+media manager with browsing by artist/album/track, text search, sorting,
+playlists, a persistent queue, repeat/shuffle, transport controls, and compact
+metadata. The existing scanner remains explicit and bounded: catalog discovery
+is not decoder admission, and scanning never autoplays or acquires audio focus.
+
+### Forbidden subsystems
+
+- No artwork, image UI, placeholders, thumbnails, galleries, image widgets,
+  visualizers, animated skins, image packages, image fetching, or image caches.
+- Never extract, copy, decode, retain, export, or cache FLAC PICTURE, ID3 APIC,
+  MP4 `covr`, or other image payloads. Skip bounded length-delimited metadata
+  without allocating the payload.
+- No network metadata, telemetry, downloads, third-party runtime Cargo
+  dependencies, or general-purpose media framework.
+- Never modify source audio. Playlist and queue operations only update their
+  own bounded text records.
+
+### Data and UI boundaries
+
+| Boundary | Responsibility |
+| --- | --- |
+| Catalog | Explicit approved roots, bounded scan/refresh, stable root-scoped track IDs, missing-media state |
+| Metadata | Locally parsed allowlisted text; filename fallback; bounded fields; image-bearing tags skipped |
+| Search | Case-folded text-only filtering, stable sorting, bounded pagination |
+| Playlist | Bounded versioned list, safe M3U/M3U8 import/export, audio files untouched |
+| Queue | Enqueue/dequeue/reorder, next/previous, repeat-one/all, deterministic seeded shuffle; do not invent pause/seek support |
+| Persistence | Compact versioned local state, atomic replacement, malformed-state recovery, no media payloads |
+| Presentation | Text-first desktop views and existing fixed 1024-byte monochrome panel |
+
+Revalidate catalog paths before playback, refuse symlinks and traversal, bound
+roots/entries/fields/queues/serialization, and make explicit updates cancellable
+and off UI/audio callbacks. Stable IDs must include the selected root identity
+and must not depend on a filename alone. Keep the known local TOCTOU limitation
+documented unless the host uses OS no-follow descriptor APIs.
+
+### ML implementation passes
+
+| Pass | Scope | State |
+| --- | --- | --- |
+| ML-00 | Baseline inventory of scanner, host slot, UI, persistence, tests and footprint | complete; current scanner is explicit and bounded, but has no stable IDs, search, playlists, or durable queue |
+| ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | in progress |
+| ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
+| ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | planned |
+| ML-04 | Durable playlists and safe M3U/M3U8 import/export | planned |
+| ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | planned |
+| ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | planned |
+
+Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
+engineering target: under 8 MiB additional idle catalog memory for a defined
+typical library and zero idle scan CPU. Measure cold startup, peak RSS, catalog
+build and search latency; record the fixture shape and tool rather than
+presenting unmeasured targets as achieved.
+
+Required regressions cover duplicate/non-ASCII search, stable pagination,
+malformed or oversized tags/playlists, huge image lengths, symlink/traversal
+and missing paths, restart after interrupted persistence, no autoplay/network,
+read-only source files, deterministic queue replay, and the fixed 1024-byte
+framebuffer.
+
 ## Evidence
 
 `rust-music-library::tests::flac_tags_are_allowlisted_utf8_bounded_and_artwork_is_skipped`

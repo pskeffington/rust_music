@@ -43,7 +43,7 @@ index whenever a crate, document, script, test or workflow is added or removed.
 | Directory scanner | `crates/rust-music-library/` | `host_integrator` | G5 / G11 |
 | Music socket and audio lease | `crates/rust-music-host/` | `host_integrator` | G5 |
 | Bounded package-process codec | `crates/rust-music-ipc/`, `crates/rust-music-cli/src/main.rs` (`serve`), `crates/rust-music-cli/tests/package_process.rs` | `host_integrator` | G5 / RM-018; spawned CLI lifecycle passes, trusted release binary/live mount remain open |
-| Standalone macOS application | `apps/rust-music-macos/`, `scripts/build-macos-app.sh`, `scripts/test_release_package_process.py`, `scripts/test_macos_parent_exit.py` | `host_integrator` | G5 / RM-019; child cleanup regression and UI window-close process absence observed; LaunchServices/package and hardware checks remain open |
+| Standalone macOS application | `apps/rust-music-macos/`, `scripts/build-macos-app.sh`, `scripts/test_release_package_process.py`, `scripts/test_macos_parent_exit.py` | `host_integrator` | G5 / RM-019 local acceptance done; signed bundle, LaunchServices auto-registration launch and window-close child absence observed; distribution signing and hardware acceptance remain open |
 | Fixed 1 KiB screen | `crates/rust-music-panel/` | `host_integrator` | G6 / G9 / G11 (CAF format label) |
 | Native macOS desktop GUI | `apps/rust-music-macos/`, `scripts/build-macos-app.sh` | `host_integrator` | Standalone open/inspect/play/stop shell; phosphor palette aligned with Pip-Boy; embedded host integration remains G5 |
 | Roadmap and Codex role index | `docs/roadmap-index.json` | `index_curator` | G0 |

@@ -1558,3 +1558,31 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
 - This completes the scripted local gates only. Host shared-focus, actual
   panel/DAC and device failure/recovery, LaunchServices installation, and
   independent release approval remain open. PR #1 remains draft and unpushed.
+
+## 2026-10-31 — RM-019 LaunchServices and RM-020 text catalog start
+
+- Verified local checkout at `8a057792586ba050521e6989137db4492f1ffb27`,
+  preserved backup/stash, clean tree, and `main` ancestry before edits. Loaded
+  the pinned `agent_skills` reference at
+  `6989d835c62f9e0858db56252f1ac7ff6ce65414` and used host, audio-backend,
+  gate, security and release specialist reviews.
+- Fixed `scripts/build-macos-app.sh`: removes only the generated app's stale
+  `_CodeSignature`, compiles the SwiftUI executable for macOS 13.0, ad-hoc
+  signs after all payload copies, and fails unless strict deep verification
+  passes. From clean source commit `bbd5dc3c52d3e187a1a332010f07d2a72906766c`,
+  `sh scripts/build-macos-app.sh` exited 0; plist lint and strict signature
+  verification passed; `vtool` reports `minos 13.0` matching Info.plist.
+- The constrained terminal sandbox cannot contact LaunchServices: sandboxed
+  `lsregister -f` fails `-10822`, and sandboxed `open -n` reports `-10827`.
+  In the host macOS context, unregistering only the generated bundle exited 0,
+  then `open -n` by bundle path exited 0 and auto-registered it. Narrow unified
+  logs recorded LaunchServices CHECKIN. After opening a generated silent WAV,
+  Play/Stop worked; closing the window during playback left no
+  `rust-music-cli` row in Activity Monitor. `spctl` rejects ad-hoc signing;
+  Developer ID/notarization/distribution are not claimed.
+- Marked RM-019 local app lifecycle acceptance done. RM-005 hardware and
+  RM-006/RM-018 live host integration remain separate. ML-00 inventory found
+  no stable catalog IDs, text search, playlists, or persistent queue; the
+  host-integrator owns the initial ML-01/ML-03 catalog/search implementation in
+  `crates/rust-music-library/src/lib.rs`. The zero-artwork policy now records
+  the complete ML-00–ML-07 feature and performance contract.

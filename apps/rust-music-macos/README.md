@@ -26,6 +26,12 @@ use only the installed local toolchains and Apple frameworks. No music files
 are bundled. Pause, playlist persistence, artwork, and hardware bit-perfect
 certification are not claimed.
 
+The local build script removes a stale generated code-resource seal, compiles
+for the declared macOS 13.0 minimum, ad-hoc signs the completed bundle, and
+verifies its signature. Ad-hoc signing supports local LaunchServices testing;
+it is not Developer ID signing, notarization, or distribution Gatekeeper
+acceptance.
+
 App-managed playback uses the local `play-managed` CLI entry point and a
 private stdin pipe. Stop and window close close the app's pipe writer; if the
 app process is terminated, the operating system closes it. The Rust child

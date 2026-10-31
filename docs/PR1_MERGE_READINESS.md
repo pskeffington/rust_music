@@ -1,6 +1,6 @@
 # PR #1 merge-readiness and evidence gate — 2026-10-31
 
-**Current decision: not yet release-merge eligible.** [PR #1](https://github.com/pskeffington/rust_music/pull/1) is technically conflict-free, but compilation and several acceptance gates have not passed with current evidence. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
+**Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
 ## Local post-commit verification — 2026-10-31
 
@@ -14,19 +14,35 @@ six exact manifest FLACs (L1/L2/L3/G4/G5/G6) passed native PCM/metadata/hash
 parity. The checker printed its final automated-check PASS. Private files and
 captured logs remain outside Git.
 
-This completes the scripted local premerge checks, but does not satisfy the
-remaining host shared-focus, physical panel/DAC, native device failure and
-recovery, LaunchServices installation, or release approval requirements below.
-At this checkpoint local `HEAD` is one commit ahead of the GitHub PR head; keep
-PR #1 draft and do not push or merge until all release gates and required
-approval are recorded.
+This completes the scripted local premerge checks at that checkpoint, but does
+not satisfy the remaining host shared-focus, physical panel/DAC, native device
+failure and recovery, or release approval requirements below. PR #1 remained
+draft and unpushed.
+
+## Standalone package and LaunchServices — 2026-10-31
+
+At clean local commit `bbd5dc3c52d3e187a1a332010f07d2a72906766c`,
+`sh scripts/build-macos-app.sh` exited 0. `plutil -lint` and
+`codesign --verify --deep --strict` passed; the app's `LC_BUILD_VERSION`
+minimum is macOS 13.0, matching `LSMinimumSystemVersion`. After unregistering
+the generated app (`lsregister -u`, exit 0), unsandboxed `open -n` by path
+auto-registered and launched it (exit 0); unified logs contain
+LaunchServices CHECKIN for `dev.rustmusic.standalone`. Rebuilt-app UI checks
+inspected and played a generated 16-bit/44.1 kHz WAV, stopped playback, then
+closed the window during playback; Activity Monitor showed no
+`rust-music-cli` process afterward. The sandboxed `open` error and `lsregister`
+`-10822` were sandbox service-access failures. The local ad-hoc signature is
+not accepted by `spctl`; Developer ID signing/notarization and distribution
+acceptance remain unverified. This closes local RM-019 launch acceptance, not
+the independent hardware gates.
 
 ## GitHub evidence verified on 2026-10-31
 
 - `build/native-codecs-g0` incorporated `main` in a real, non-force two-parent merge `ed241ac60ddd9b3a2f22ebc71bc557597d505d5a`. GitHub compare reported **74 ahead, 0 behind** before the subsequent premerge-script commit.
 - PR #1 is open and draft. No required status checks or review submissions are recorded on the audited head.
-- The latest head has **zero successful check runs**. All six historical Actions attempts ended in `startup_failure` and scheduled no jobs; they cannot be counted as test results.
-- GitHub's current workflow is operator-dispatched, bound to a preprovisioned offline self-hosted runner. This environment has no local `cargo` or `rustc` and could not execute the Rust compiler.
+- The remote PR head remains `7dc75e13ab242d6ac7353139f0955ccce96b10cf`; the local development branch is at `bbd5dc3c52d3e187a1a332010f07d2a72906766c`. Its PR-hosted status checks are empty; local test evidence is not GitHub CI evidence.
+- Local Rust/Cargo 1.99.1 is available, and the complete offline and corpus premerge gate passed at local commit `8a057792586ba050521e6989137db4492f1ffb27`. Later local edits are limited to the macOS app build/signing script and documentation; the macOS app build itself passed on `bbd5dc3`.
+- The local remote-tracking ref is stale. GitHub PR #1 has six remote-only commits since common base `4e3d24a`; local has 47 commits from that base. Integrate both histories without force before any eventual authorized push.
 - [Issue #2](https://github.com/pskeffington/rust_music/issues/2) remains open for `RM-001`. Do not close it from static inspection.
 
 ## Read-only static audit in this pass

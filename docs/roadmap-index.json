@@ -361,7 +361,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "done",
       "depends_on": [
         "RM-004"
       ],
@@ -629,7 +629,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "gate_verifier",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "done",
       "depends_on": [
         "RM-001"
       ],
@@ -643,7 +643,7 @@
       ],
       "create_paths": [],
       "acceptance": "Build the standalone app bundle from a clean offline macOS checkout; launch it, inspect supported and rejected files, verify explicit Play/Stop and window-close child cleanup, and confirm no network or background scan. Record actual output-device checks separately; this task cannot certify bit-perfect hardware.",
-      "blocker": "A rebuilt bundle was launched directly through the desktop UI; generated WAV inspect, Play/Stop, MP3 refusal and window-close playback cleanup were observed. Activity Monitor showed no rust-music-cli process on subsequent refreshes. Automated tests pass for playback error, repeated parent-pipe closure, and a force-killed app-like supervisor whose child PID exits. However, `open -n target/macos/RustMusic.app` fails with LaunchServices kLSNoExecutableErr, so package launch/install behavior is unresolved. Child watchdog escalation is last-resort cleanup, not proof of graceful AudioQueue teardown. Clean-checkout package verification and actual device availability/failure/disconnect/recovery remain open; keep RM-019 in progress."
+      "blocker": "Local acceptance completed at clean source commit bbd5dc3c52d3e187a1a332010f07d2a72906766c: offline bundle build, macOS 13.0 target, final ad-hoc bundle signature and strict signature verification pass. After unregistering the generated bundle, unsandboxed `open -n` by path auto-registered and launched it (exit 0; LaunchServices CHECKIN observed). UI supported-WAV inspection, Play/Stop, generated-MP3 refusal and window-close child cleanup were observed; Activity Monitor showed no rust-music-cli child after close. Sandboxed LaunchServices diagnostics are blocked by the sandbox, while local `spctl` rejects ad-hoc signatures; Developer ID/notarization/distribution and graceful AudioQueue teardown under watchdog escalation are not claimed. Physical device failure/disconnect/recovery and DAC acceptance are separate hardware tasks."
     },
     {
       "id": "RM-020",
@@ -652,7 +652,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "gate_verifier",
       "priority": "P1",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "RM-019"
       ],
@@ -663,8 +663,8 @@
         "docs/MICRO_LIBRARY_ZERO_ARTWORK.md"
       ],
       "create_paths": [],
-      "acceptance": "Provide explicit-root user-facing browsing, bounded metadata indexing and search, playlists, persistent queue, repeat and shuffle. Retain zero artwork/image extraction/cache/visualizers and zero third-party runtime dependencies; measure startup, memory and search performance.",
-      "blocker": "Not started; begins after standalone application lifecycle/package RM-019 is closed."
+      "acceptance": "Provide explicit-root browsing, stable root-scoped track IDs, bounded metadata indexing and text search, deterministic sorting/pagination, playlists, persistent queue, repeat and shuffle. Keep user audio read-only, skip image payloads without allocation, and add no artwork/image extraction/cache/visualizers or third-party runtime dependencies. Benchmark startup, memory and search across synthetic 0/1/100/2k/20k-track catalogs.",
+      "blocker": "ML-00 inventory complete: existing scanner is single-root, bounded, explicit, deterministic and image-free, but has no stable IDs, search API, playlists or persistent queue. ML-01/ML-03 catalog identity and search slice is in progress; remaining features and profiles are not yet implemented."
     }
   ]
 }
