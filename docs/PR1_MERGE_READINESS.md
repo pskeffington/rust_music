@@ -2,6 +2,24 @@
 
 **Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+## Text library foundation and cancellable scans — 2026-10-31
+
+At source commit `e5d6b34`, named playlists use bounded, versioned `.rmp`
+storage with safe relative paths and atomic replacement, and explicit scans
+can be cancelled without returning a partial catalog. The library suite passed
+27/27; `python3 scripts/check_roadmap_index.py` and
+`python3 scripts/check_literature.py` exited 0. A fresh
+`sh scripts/offline-gate.sh` at `e5d6b34` exited 0 across 17 local crates,
+32 path-only edges, zero registry/Git crates, workspace tests, release build,
+and macOS feature checks. The first offline-gate attempt after adding the new
+cancellation error exited 101 because the CLI's exhaustive error mapping lacked
+a cancellation arm; that arm was added and the committed rerun passed. Private
+codec parity evidence was not rerun because this change does not touch decoder
+or PCM paths. These APIs are not yet wired to the standalone UI or host queue.
+`sh scripts/build-macos-app.sh` also exited 0 at this source commit; the local
+bundle's ad-hoc signature passed strict `codesign` verification. Developer ID,
+notarization, and distribution signing remain unverified.
+
 ## 2026-10-31 catalog and package hardening pass
 
 At this recording, the latest implementation snapshot on

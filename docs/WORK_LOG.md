@@ -4,6 +4,27 @@ This log records observed repository work and the next release gates. The
 machine-readable task state is authoritative in [roadmap-index.json](roadmap-index.json).
 Private audio paths and recordings are deliberately excluded.
 
+## 2026-10-31 — Add durable playlists and cancellation-aware scans
+
+- Added `rust-music-library::playlist_store` with named playlist CRUD,
+  versioned `.rmp` persistence, 128-playlist/10,000-entry/1 MiB bounds, safe
+  relative paths, same-directory atomic replacement, and malformed-state and
+  symlink refusal. This stores text only; it never opens or modifies media.
+- Added `scan_cancellable` with caller-owned cancellation and no partial catalog
+  return. Added a deterministic cancellation regression and mapped the typed
+  cancellation result in the CLI error response.
+- At commit `e5d6b34`, `cargo test --locked --offline -p rust-music-library`
+  passed 27/27; `python3 scripts/check_roadmap_index.py`,
+  `python3 scripts/check_literature.py`, and `git diff --check` exited 0.
+  `sh scripts/offline-gate.sh` exited 0: 17 local crates, 32 path-only edges,
+  0 registry/Git crates, full workspace tests, release build and macOS feature
+  check. An initial attempt exited 101 on an exhaustive CLI error match; fixed
+  before the passing run. Private decoder parity was not rerun.
+- RM-020 remains in progress. Standalone library/search/playlist/queue UI,
+  persistent queue-to-host wiring, opt-in explicit-load autoplay, Pause,
+  equalizer, measured startup/incremental memory, native device recovery, live
+  Radio/TV contention, panel/DAC, and distribution signing remain open.
+
 ## 2026-10-30 — Add WavPack high-quality cross-channel predictor coverage
 
 - Extended the bounded decorrelation subset with terms -2/-1 and lag terms
