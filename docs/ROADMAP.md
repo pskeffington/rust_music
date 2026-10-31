@@ -121,7 +121,9 @@ The full offline gate and app bundle build passed. Generated 20k UI load,
 last-item search and selection succeeded while stopped; CLI-process peak RSS
 was 11,059,200 bytes in a single `ru_maxrss` sample. Full-app 20k memory,
 repeatable UI latency, physical DAC/device recovery and live host focus remain
-open; RM-020 stays in progress.
+open. Activity Monitor showed one post-scan same-PID pair of 33.5/33.3 MB
+anonymousMemory; there is no same-process baseline, and `footprint` could not
+read the process through the shell sandbox. RM-020 stays in progress.
 
 **Current candidate recheck (2026-10-31, source HEAD `be6615e`):** the full
 offline gate exited 0 (17 local crates, 32 path-only edges, zero registry/Git

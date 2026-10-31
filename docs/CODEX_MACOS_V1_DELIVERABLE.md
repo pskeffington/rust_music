@@ -1036,3 +1036,10 @@ or repeatable performance qualification. Full offline Rust gate passed with
 the 20k catalog test; focused desktop/host bound test and Swift catalog index
 validation cases also passed. Physical device recovery, DAC output, Rust Boy
 shared focus, and 20k app-wide memory remain open.
+
+After the picker closed, Activity Monitor showed the same loaded 20k app PID
+at 33.5 MB and 33.3 MB in rounded `anonymousMemory` readings. This is not a
+pre/post scan pair, the host was under memory pressure, and no incremental
+memory conclusion follows. A `/usr/bin/footprint` attempt returned exit 0 but
+reported `Operation not permitted` for task access, so full-app physical
+footprint remains unmeasured.

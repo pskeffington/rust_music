@@ -433,3 +433,12 @@ search latency profile remain open. `sh scripts/build-macos-app.sh` exited 0
 with strict ad-hoc signature validation and the Swift index/output-bound
 tests passed. No private media was opened and no artwork/image/visualizer code
 was added. RM-020 remains in progress.
+
+For the loaded 20k signature-only app, Activity Monitor sampled the same PID
+at 33.5 MB and 33.3 MB in its rounded `anonymousMemory` column after the
+picker closed. Playback remained stopped. This is one settled same-process
+pair without a same-process pre-scan baseline, under system memory pressure;
+it does not establish incremental catalog memory or a threshold pass. A
+`footprint` attempt exited 0 but reported `Operation not permitted` for
+`task_read_for_pid`, so exact physical-footprint sampling was unavailable.
+The temporary generated directory was removed.
