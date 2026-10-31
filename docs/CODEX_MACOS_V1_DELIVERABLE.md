@@ -28,9 +28,9 @@ tests selected. `sh scripts/offline-gate.sh` exited 0 across the workspace.
 signature verification exited 0; the Swift UI and bundled CLI are arm64
 Mach-O executables.
 
-The exact absolute bundle was then launched by host LaunchServices:
-`/usr/bin/open -n /Users/null/GitHub/rust_music/target/macos/RustMusic.app`
-exited 0. `lsappinfo` reported the expected bundle ID and executable path; the
+The exact bundle was then launched by host LaunchServices:
+`/usr/bin/open -n target/macos/RustMusic.app` exited 0. `lsappinfo` reported
+the expected bundle ID and executable path; the
 UI showed Ready / No Track with no scan or autoplay. After menu Quit, a second
 `cua.listApps()` reported Rust Music stopped, and host `lsappinfo`/`ps` showed
 no Rust Music or CLI process. A host `system_profiler SPAudioDataType
@@ -249,7 +249,7 @@ control paths on silent PCM, not audible output or physical-device behavior.
 ### Launch and memory sample for the rebuilt bundle
 
 The rebuilt bundle was launched with `open -n` (exit 0). `lsappinfo list`
-showed bundle `/Users/null/GitHub/rust_music/target/macos/RustMusic.app`,
+showed bundle `target/macos/RustMusic.app`,
 executable `Contents/MacOS/RustMusic`, PID 89533, and LaunchServices check-in;
 reported launch-to-check-in was 0.218 s. A single `ps` snapshot about 20 s
 after launch reported RSS 94,432 KiB. This is not a cold-launch distribution,
@@ -704,8 +704,8 @@ At source HEAD `713c7e90d28d12f4cc1c002c02c4355847f6bcb1`,
 signature verification passed. The rebuilt bundle has a valid plist whose
 `CFBundleExecutable` is `RustMusic`; the arm64 Mach-O exists at that path and
 `codesign --verify --deep --strict` exited **0**. In this sandboxed shell,
-`/usr/bin/open -n /Users/null/GitHub/rust_music/target/macos/RustMusic.app`
-still exited **1** with LaunchServices `kLSNoExecutableErr` (-10827), and
+`/usr/bin/open -n target/macos/RustMusic.app` still exited **1** with
+LaunchServices `kLSNoExecutableErr` (-10827), and
 `lsregister -f` failed to scan the bundle with -10822. Directly invoking the
 executable exited **134**; the matching crash report records SIGABRT inside
 AppKit application registration. The desktop CUA launcher opened that same
