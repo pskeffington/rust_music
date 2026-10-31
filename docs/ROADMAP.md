@@ -395,3 +395,18 @@ captured. RM-020 remains **in progress**: real invalid-device recovery, direct
 interactive performance, representative-library behavior, physical DAC/panel,
 live Rust Boy focus and distribution acceptance remain open. No private codec
 corpus was rerun; PR #1 remains draft and no remote synchronization occurred.
+
+**RM-020 current-bundle tagged-library UI exercise (2026-10-31, product
+source `1941cadab95eae3490bf4d599748acb60b21b8b1`):** the rebuilt bundle
+explicitly loaded 2,000 generated 187-byte FLAC metadata-only entries with
+unique titles and bounded TITLE/ARTIST/ALBUM comments, but no audio frames.
+Visible search counts matched the fixtures for an artist (100), album (50),
+missing query (0), exact title (1), and broad title (2,000). Six set-value plus
+accessibility readback round trips took 901–1,421 ms (median 1,030 ms); the
+measure includes CUA/AX overhead and is not direct UI latency or an acceptance
+threshold. A temporary named playlist was created, the selected track was
+added, and playlist queueing showed one queued track while playback remained
+stopped. Queue and playlist test entries were removed, the app quit, and the
+fixture was deleted. This extends current-bundle search and selection-only
+queue evidence; representative-library behavior and direct interactive latency
+remain open. No private media was used.

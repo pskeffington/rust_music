@@ -70,6 +70,30 @@ corpus was rerun. The build does not close physical invalid-device recovery,
 DAC/panel, live Rust Boy focus, representative performance, or distribution
 acceptance.
 
+### 2026-10-31 current-bundle tagged-library UI smoke
+
+The bundle built from product source `1941cadab95eae3490bf4d599748acb60b21b8b1`
+explicitly loaded 2,000 generated 187-byte FLAC metadata-only files with unique
+titles and 20 artist / 40 album groups. The files contained bounded TITLE,
+ARTIST and ALBUM comments, no audio frames, and no private media. The library
+view displayed the expected 2,000 tracks. Search produced the expected visible
+counts: 100 for `Rust Collective 00`, 50 for `Circuit Dreams 00`, 0 for a
+missing term, 1 for `Track 01999`, and 2,000 for `Signal in the Static`.
+Including the initial exact-track query, six set-value plus accessibility
+readback round trips took 901–1,421 ms (median 1,030 ms). This is an
+automation-inclusive UI observation, not a direct latency measurement or
+threshold pass; the standalone optimized core harness remains the direct
+filter measurement.
+
+The same stopped session created a temporary named playlist, added the
+selected catalog entry, and queued that playlist. The queue showed one entry;
+Play remained available while Pause and Stop remained disabled, and no output
+was started. The queue entry and playlist were removed, Cmd-Q returned the app
+inventory to `isRunning=false`, and the generated fixture was deleted. This
+smoke validates current-bundle text search and selection-only queueing on a
+synthetic tagged catalog, not real FLAC playback or representative-library
+acceptance.
+
 ### 2026-10-31 current-candidate offline and app-bundle refresh
 
 At documentation candidate commit `0dd8f3104c0a62393632c75e9821a9f1b656cd15`
