@@ -1007,6 +1007,19 @@ struct TestPacedNullSink(NullSink);
         all(target_os = "linux", feature = "alsa-output")
     )
 ))]
+struct TestRecoveringNullSink {
+    inner: NullSink,
+    fail_next_write: Arc<AtomicBool>,
+}
+
+#[cfg(all(
+    debug_assertions,
+    feature = "test-support",
+    any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    )
+))]
 impl PcmSink for TestPacedNullSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
         self.0.open(format)
@@ -1028,6 +1041,43 @@ impl PcmSink for TestPacedNullSink {
 
     fn finish(&mut self) -> Result<()> {
         self.0.finish()
+    }
+}
+
+#[cfg(all(
+    debug_assertions,
+    feature = "test-support",
+    any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    )
+))]
+impl PcmSink for TestRecoveringNullSink {
+    fn open(&mut self, format: AudioFormat) -> Result<()> {
+        self.inner.open(format)
+    }
+
+    fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+        if self.fail_next_write.swap(false, Ordering::AcqRel) {
+            return Err(MusicError::Output(
+                "injected output-device loss on first write".into(),
+            ));
+        }
+        self.inner.write(block)?;
+        thread::sleep(Duration::from_millis(2));
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        self.inner.pause()
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.inner.resume()
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        self.inner.finish()
     }
 }
 
@@ -1625,6 +1675,31 @@ fn run() -> Result<()> {
         }
         return serve_with_sink_and_limits(
             || Ok(TestPacedNullSink(NullSink::default())),
+            ScanLimits::default(),
+        );
+    }
+    #[cfg(all(
+        debug_assertions,
+        feature = "test-support",
+        any(
+            all(target_os = "macos", feature = "macos-output"),
+            all(target_os = "linux", feature = "alsa-output")
+        )
+    ))]
+    if action == "__test-serve-recovering-null" {
+        if args.next().is_some() {
+            return Err(MusicError::Invalid(
+                "unexpected recovering-null server test arguments",
+            ));
+        }
+        let fail_next_write = Arc::new(AtomicBool::new(true));
+        return serve_with_sink_and_limits(
+            || {
+                Ok(TestRecoveringNullSink {
+                    inner: NullSink::default(),
+                    fail_next_write,
+                })
+            },
             ScanLimits::default(),
         );
     }

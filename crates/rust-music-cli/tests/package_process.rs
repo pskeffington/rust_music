@@ -323,7 +323,9 @@ fn spawned_cli_unit_handshakes_activates_inertly_and_shuts_down() {
 }
 
 #[cfg(all(debug_assertions, feature = "test-support"))]
-fn start_active_playback_child() -> (
+fn start_scanned_child(
+    action: &str,
+) -> (
     TempLibrary,
     ChildGuard,
     ChildStdin,
@@ -334,7 +336,7 @@ fn start_active_playback_child() -> (
     write_sparse_silent_wav(&library.0.join("long-silence.wav"));
 
     let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
-        .arg("__test-serve-paced-null")
+        .arg(action)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -383,6 +385,20 @@ fn start_active_playback_child() -> (
     assert_eq!(scanned.track_count, 1);
     assert!(!scanned.audio_claimed);
 
+    (library, child, stdin, replies, reply_reader)
+}
+
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn start_active_playback_child() -> (
+    TempLibrary,
+    ChildGuard,
+    ChildStdin,
+    Receiver<Result<Option<Vec<u8>>, rust_music_ipc::ProtocolError>>,
+    JoinHandle<()>,
+) {
+    let (library, child, mut stdin, replies, reply_reader) =
+        start_scanned_child("__test-serve-paced-null");
+
     send_request(&mut stdin, 4, Request::Play);
     let playing = receive_reply(&replies);
     let Reply::View(playing) = playing.body else {
@@ -406,6 +422,88 @@ fn start_active_playback_child() -> (
     );
 
     (library, child, stdin, replies, reply_reader)
+}
+
+#[test]
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn spawned_cli_output_failure_recovers_only_after_explicit_play() {
+    let (_library, mut child, mut stdin, replies, reply_reader) =
+        start_scanned_child("__test-serve-recovering-null");
+
+    send_request(&mut stdin, 4, Request::Play);
+    let started = receive_reply(&replies);
+    let Reply::View(started) = started.body else {
+        panic!("Play should report its initial active state");
+    };
+    assert_eq!(started.playback, Playback::Playing);
+    assert!(started.audio_claimed);
+
+    // The test sink fails its first asynchronous write. Polling must expose a
+    // failed, unclaimed state without retrying or resuming output implicitly.
+    let mut request_id = 5;
+    let deadline = Instant::now() + REPLY_DEADLINE;
+    let failed = loop {
+        send_request(&mut stdin, request_id, Request::Snapshot { page: 0 });
+        request_id += 1;
+        let snapshot = receive_reply(&replies);
+        let Reply::View(snapshot) = snapshot.body else {
+            panic!("Snapshot should return playback state");
+        };
+        if snapshot.playback == Playback::Failed {
+            break snapshot;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "injected device error was not observed: {snapshot:?}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    };
+    assert!(!failed.audio_claimed);
+    assert_eq!(failed.frames_delivered, 0);
+
+    // Device recovery is explicit. A separate Play must reacquire the host
+    // lease, reopen the sink, and deliver frames before Stop/Shutdown.
+    send_request(&mut stdin, request_id, Request::Play);
+    request_id += 1;
+    let restarted = receive_reply(&replies);
+    let Reply::View(restarted) = restarted.body else {
+        panic!("explicit recovery Play should return playback state");
+    };
+    assert_eq!(restarted.playback, Playback::Playing);
+    assert!(restarted.audio_claimed);
+    thread::sleep(Duration::from_millis(30));
+    send_request(&mut stdin, request_id, Request::Snapshot { page: 0 });
+    request_id += 1;
+    let active = receive_reply(&replies);
+    let Reply::View(active) = active.body else {
+        panic!("recovered Snapshot should return playback state");
+    };
+    assert_eq!(active.playback, Playback::Playing);
+    assert!(active.audio_claimed);
+    assert!(active.frames_delivered > 0);
+
+    send_request(&mut stdin, request_id, Request::Stop);
+    request_id += 1;
+    let stopped = receive_reply(&replies);
+    let Reply::View(stopped) = stopped.body else {
+        panic!("Stop should return the stopped state");
+    };
+    assert_eq!(stopped.playback, Playback::Stopped);
+    assert!(!stopped.audio_claimed);
+
+    send_request(&mut stdin, request_id, Request::Shutdown);
+    let shutdown = receive_reply(&replies);
+    assert_eq!(shutdown.body, Reply::Ack);
+    drop(stdin);
+    let status = wait_for_exit(&mut child.0);
+    assert!(
+        status.success(),
+        "recovered package child exited with {status}"
+    );
+    assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
+    reply_reader
+        .join()
+        .expect("join recovered child reply reader");
 }
 
 #[test]

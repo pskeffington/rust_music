@@ -100,6 +100,28 @@ startup, or an app-wide acceptance threshold. Playback was never started;
 Cmd-Q returned the app to `isRunning=false`, and both fixture and probe were
 removed.
 
+### 2026-10-31 package-process device-error recovery regression
+
+The feature-gated debug `package_process` suite now includes
+`spawned_cli_output_failure_recovers_only_after_explicit_play`. Its spawned
+test-support package process scans one generated sparse silent WAV, starts,
+then injects an output write failure. IPC snapshots observe `Failed` with
+`audio_claimed=false` and zero delivered frames; no retry occurs until a
+separate explicit Play. The same sink then reopens, delivers frames while
+`Playing` and claimed, and Stop clears the claim before Shutdown is
+acknowledged and the child exits successfully. This exercises package-worker,
+host-slot and IPC state transitions with a fake sink; it is not a real
+AudioQueue callback/device test.
+
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0** (9/9).
+`sh scripts/offline-gate.sh` exited **0** after the source change: 17 local
+crates, 32 local path edges, zero registry/Git crates, 17/17 simulated native
+AudioQueue tests and successful warnings-denied Clippy, workspace tests,
+release build and macOS feature checks. Rustfmt and `git diff --check` passed.
+A separate read-only safety review found no blocking issue in the injected
+test path and confirmed it is excluded from ordinary/release builds.
+
 At current pre-recording docs candidate `153ccced8444345e3340917ca65e1c8c2234300e`,
 the focused subprocess regression was rerun against unchanged current CLI
 source: `cargo test --locked --offline -p rust-music-cli --features
