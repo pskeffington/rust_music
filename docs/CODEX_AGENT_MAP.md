@@ -1,5 +1,7 @@
 # Codex agent routing — Rust Music
 
+**Machine-readable MAC-07 pass routing:** [mac07-pass-index.json](mac07-pass-index.json), with explicit dependency, sole writer, reviewer and evidence contract. Evidence recorded in [MAC07_PASS_RESULTS.md](evidence/MAC07_PASS_RESULTS.md); do not infer a PASS from this documentation.
+
 ## Active assignment: MAC-07 Winamp-functional Mac UI (2026-10-31)
 
 Read [MAC-07 UI alignment](MAC07_WINAMP_UI_ALIGNMENT.md) before tasking. **host_integrator** is the sole SwiftUI/library/queue implementation writer; **audio_backend** investigates native output without changing it unless a defect is proven; **codec_engineer** verifies FLAC preservation; **gate_verifier** independently reviews same-file CLI versus GUI reproduction and A/B outcomes; **safety_reviewer** audits local paths, focus and dependency policy; **index_curator** serially maintains documentation, roadmap and registry. MAC07-00/01 are highest priority. No recorded source implementation or passing GUI audio test is implied by this tasking.
