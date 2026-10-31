@@ -26,6 +26,12 @@ case "$SWIFT_ARCH" in
   *) echo "Unsupported macOS build architecture: $SWIFT_ARCH" >&2; exit 2 ;;
 esac
 swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+  -O \
+  apps/rust-music-macos/CatalogSearch.swift \
+  apps/rust-music-macos/CatalogSearchTests.swift \
+  -o "$ROOT/target/macos/CatalogSearchTests"
+"$ROOT/target/macos/CatalogSearchTests"
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   apps/rust-music-macos/PlaybackUIState.swift \
   apps/rust-music-macos/PlaybackUIStateTests.swift \
   -o "$ROOT/target/macos/PlaybackUIStateTests"
@@ -36,7 +42,7 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   -o "$ROOT/target/macos/CatalogValidationTests"
 "$ROOT/target/macos/CatalogValidationTests"
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
-  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
+  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 printf 'Built native app: %s\n' "$APP"

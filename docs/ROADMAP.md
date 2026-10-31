@@ -287,6 +287,28 @@ error/reopen was observed. `system_profiler` listed no devices and shell
 were the direct observations. RM-019 lifecycle evidence is strengthened;
 physical output and device-recovery acceptance stay open.
 
+**RM-020 direct Swift catalog-search profile (2026-10-31):** the standalone
+app now uses the same pure bounded filter that its optimized Swift harness
+tests. On a warmed 20,000-row synthetic catalog, 101 last-item searches
+measured **5.749 ms p50 / 6.030 ms p95**; the previous four separate
+`localizedCaseInsensitiveContains` checks measured **73.380 / 74.487 ms** in
+the same harness. The cached folded UTF-8 index contains 65 payload bytes per
+synthetic row (1.3 MB at 20k). Tests cover empty, last-item, artist/path,
+Unicode composed/decomposed forms, case folding, controls/NUL and the 512-byte
+query cap. `sh scripts/build-macos-app.sh` exited **0**, including this
+optimized correctness/profile harness, prior Swift regressions and strict
+local signature validation; the full offline Rust gate exited **0**. This
+times the production filter only: scan/index construction, SwiftUI rendering,
+full interaction latency and an accepted threshold remain unqualified.
+
+The rebuilt bundle was also opened from its explicit path and explicitly
+loaded three generated one-second WAV tracks. The Library UI initially showed
+three rows; setting search to `nEoN hOrIzOnS` showed exactly the `Neon Horizons`
+row and left playback stopped. After Cmd-Q, Activity Monitor showed no Rust
+Music app or CLI process (only the transient AutoFill helper); the generated
+directory was removed, and a fresh launch returned to Ready / No Track without
+autoplay.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

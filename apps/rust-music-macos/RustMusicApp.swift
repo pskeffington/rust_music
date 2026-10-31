@@ -19,15 +19,6 @@ struct RustMusicFailure: LocalizedError {
     var errorDescription: String? { message }
 }
 
-struct CatalogTrack: Identifiable, Equatable {
-    let id: Int
-    let container: String
-    let title: String
-    let artist: String
-    let album: String
-    let relativePath: String
-}
-
 struct QueueEntry: Identifiable, Equatable {
     let index: Int
     let isSelected: Bool
@@ -350,14 +341,7 @@ final class PlayerModel: ObservableObject {
     }
 
     var visibleTracks: [CatalogTrack] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return tracks }
-        return tracks.filter {
-            $0.title.localizedCaseInsensitiveContains(query)
-                || $0.artist.localizedCaseInsensitiveContains(query)
-                || $0.album.localizedCaseInsensitiveContains(query)
-                || $0.relativePath.localizedCaseInsensitiveContains(query)
-        }
+        CatalogSearch.visibleTracks(in: tracks, matching: searchText)
     }
 
     var selectedTrack: CatalogTrack? {
@@ -366,14 +350,7 @@ final class PlayerModel: ObservableObject {
     }
 
     func boundSearchText() {
-        var bounded = ""
-        for scalar in searchText.unicodeScalars {
-            let value = scalar.value
-            if value < 0x20 || (0x7f...0x9f).contains(value) { continue }
-            let scalarBytes = String(scalar).utf8.count
-            if bounded.utf8.count + scalarBytes > 512 { break }
-            bounded.unicodeScalars.append(scalar)
-        }
+        let bounded = CatalogSearch.boundedQuery(searchText)
         if bounded != searchText { searchText = bounded }
         // Filtering never changes the selected playback target. A playing
         // track may be outside the current search results without switching.

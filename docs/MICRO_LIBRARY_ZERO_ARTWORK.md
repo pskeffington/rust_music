@@ -94,7 +94,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model, versioned `.rmp` persistence, CLI CRUD, and standalone text UI for create/rename/delete/add/queue; host workflow and import/export remain |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, CLI/UI queue editing, queue navigation, repeat and seeded shuffle; explicit queue selection is non-autoplay; standalone process focus does not prove Rust Boy shared focus |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | partial: explicit folder selection, cancellable bounded catalog load, text search/list, queue and named-playlist controls, Play/Pause/Resume/Stop/Next/Previous and software volume; fixed panel is implemented, physical input/display and host workflow remain |
-| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: library core is profiled at 0/1/100/2k/20k; the desktop app explicitly loaded 20k signature-only tracks and returned one last-item search result. One same-process app run measured a settled +18.61 MiB physical-footprint delta at 20k, under memory pressure; a separate 2k run measured +5.48 MiB. App-wide 20k memory, repeatability, cold/system startup, direct app search latency and representative tagged-library qualification remain open. |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: library core is profiled at 0/1/100/2k/20k; the desktop app explicitly loaded 20k signature-only tracks and returned one last-item search result. Its shared production Swift filter measured 5.749 ms p50 / 6.030 ms p95 on 101 warmed 20k last-item queries; this excludes scan/index build and UI rendering and has no pass threshold. One same-process app run measured a settled +18.61 MiB physical-footprint delta at 20k, under memory pressure; a separate 2k run measured +5.48 MiB. App-wide memory repeatability, cold/system startup, full interaction latency and representative tagged-library qualification remain open. |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
 engineering target: under 8 MiB additional idle catalog memory for a defined
@@ -465,3 +465,27 @@ repeatability. The under-8-MiB target is unresolved because the expected
 library size and measurement conditions have not been formally specified.
 The app now supports this desktop scale; app memory, direct search latency,
 system-boot cold startup and real-library performance remain open.
+
+### Direct Swift search filter profile (2026-10-31)
+
+`CatalogSearch.visibleTracks` is the production filter used by the standalone
+UI and by the optimized harness in `CatalogSearchTests.swift`. The harness
+builds 20,000 synthetic text-only tracks and times 101 warmed last-item
+queries. The original filter, with four separate
+`localizedCaseInsensitiveContains` checks per track, measured p50 **73.380 ms**
+and p95 **74.487 ms**. The cached folded UTF-8 index measured p50 **5.749 ms**
+and p95 **6.030 ms** in the later app-build run, around a 12.8× p50 reduction.
+It stores **65 searchable payload bytes per synthetic track** (1,300,000 bytes
+at 20k); Data allocator overhead and representative real-library memory were
+not measured. The app build ran the optimized harness, Unicode
+composed/decomposed, artist/path, empty-result, NUL/control and query-bound
+checks and exited 0. Search keys use the locale current when the app starts;
+reload the library after changing the system locale. These direct filter
+measurements exclude scan/index construction, UI rendering and accessibility
+overhead and have no acceptance threshold. They do not close ML-07.
+
+An app-level check of the rebuilt bundle explicitly loaded three generated
+one-second WAVs, showed three tracks, then searched for `nEoN hOrIzOnS` and
+returned exactly one `Neon Horizons` row. Playback stayed stopped. Cmd-Q left
+no Rust Music app or CLI row in Activity Monitor; a fresh launch returned to
+Ready / No Track without autoplay. The synthetic directory was removed.
