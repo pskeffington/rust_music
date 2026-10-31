@@ -219,6 +219,14 @@ interaction, and the updated close-path observation remain pending. The
 compile and source checks do not replace the full offline gate or app bundle
 acceptance.
 
+After commit `31cb4cb3d8a2855f5a1132085371ae22871ef151`,
+`python3 scripts/test_macos_parent_exit.py --binary target/debug/rust-music-cli`
+exited 0. It observed real serve-child PIDs reaped after normal EOF (exit 0),
+malformed protocol (exit 1), three repeated launch/exit cycles, and forced
+termination of an app-like parent. These tests do not launch the SwiftUI app or
+prove its window-close callback ran; that app-level observation remains
+pending.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
