@@ -261,7 +261,42 @@ pub struct AlsaSink {
     device: PathBuf,
     handle: Option<File>,
     format: Option<AudioFormat>,
+    started: bool,
     paused: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PauseAction {
+    AlreadyPaused,
+    MarkPausedBeforeFirstWrite,
+    PauseStartedDevice,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResumeAction {
+    ResumeBeforeFirstWrite,
+    ResumeStartedDevice,
+}
+
+fn pause_action(started: bool, paused: bool) -> PauseAction {
+    if paused {
+        PauseAction::AlreadyPaused
+    } else if started {
+        PauseAction::PauseStartedDevice
+    } else {
+        PauseAction::MarkPausedBeforeFirstWrite
+    }
+}
+
+fn resume_action(started: bool, paused: bool) -> Result<ResumeAction> {
+    if !paused {
+        return Err(MusicError::Invalid("ALSA sink is not paused"));
+    }
+    Ok(if started {
+        ResumeAction::ResumeStartedDevice
+    } else {
+        ResumeAction::ResumeBeforeFirstWrite
+    })
 }
 impl AlsaSink {
     pub fn new(device: &str, _strict_hw: bool) -> Result<Self> {
@@ -269,6 +304,7 @@ impl AlsaSink {
             device: device_path(device)?,
             handle: None,
             format: None,
+            started: false,
             paused: false,
         })
     }
@@ -309,6 +345,7 @@ impl PcmSink for AlsaSink {
         call(&file, readwrite::<SwParams>(0x13), &mut sw).map_err(|e| as_output("SW_PARAMS", e))?;
         command(&file, none(0x40)).map_err(|e| as_output("PREPARE", e))?;
         self.format = Some(format);
+        self.started = false;
         self.paused = false;
         self.handle = Some(file);
         Ok(())
@@ -355,6 +392,7 @@ impl PcmSink for AlsaSink {
             };
             match call(file, write::<Transfer>(0x50), &mut transfer) {
                 Ok(()) if transfer.result > 0 => {
+                    self.started = true;
                     let frames = transfer.result as usize;
                     if frames > left {
                         return Err(MusicError::Invalid("ALSA reported excess frames"));
@@ -389,34 +427,52 @@ impl PcmSink for AlsaSink {
             .handle
             .as_ref()
             .ok_or(MusicError::Invalid("ALSA sink is closed"))?;
-        if self.paused {
-            return Ok(());
+        match pause_action(self.started, self.paused) {
+            PauseAction::AlreadyPaused => Ok(()),
+            PauseAction::MarkPausedBeforeFirstWrite => {
+                // Direct kernel PCM is not started until the first write.
+                // Retain the pause intent locally instead of issuing PAUSE
+                // against a prepared but idle device.
+                self.paused = true;
+                Ok(())
+            }
+            PauseAction::PauseStartedDevice => {
+                let mut enabled: c_int = 1;
+                call(file, write::<c_int>(0x45), &mut enabled)
+                    .map_err(|e| as_output("PAUSE", e))?;
+                self.paused = true;
+                Ok(())
+            }
         }
-        let mut enabled: c_int = 1;
-        call(file, write::<c_int>(0x45), &mut enabled).map_err(|e| as_output("PAUSE", e))?;
-        self.paused = true;
-        Ok(())
     }
     fn resume(&mut self) -> Result<()> {
         let file = self
             .handle
             .as_ref()
             .ok_or(MusicError::Invalid("ALSA sink is closed"))?;
-        if !self.paused {
-            return Err(MusicError::Invalid("ALSA sink is not paused"));
+        match resume_action(self.started, self.paused)? {
+            ResumeAction::ResumeBeforeFirstWrite => {
+                self.paused = false;
+                Ok(())
+            }
+            ResumeAction::ResumeStartedDevice => {
+                let mut enabled: c_int = 0;
+                call(file, write::<c_int>(0x45), &mut enabled)
+                    .map_err(|e| as_output("RESUME", e))?;
+                self.paused = false;
+                Ok(())
+            }
         }
-        let mut enabled: c_int = 0;
-        call(file, write::<c_int>(0x45), &mut enabled).map_err(|e| as_output("RESUME", e))?;
-        self.paused = false;
-        Ok(())
     }
     fn finish(&mut self) -> Result<()> {
+        let was_started = self.started;
         let was_paused = self.paused;
         let handle = self.handle.take();
         self.format = None;
+        self.started = false;
         self.paused = false;
         if let Some(file) = handle {
-            if !was_paused {
+            if was_started && !was_paused {
                 command(&file, none(0x44)).map_err(|e| as_output("DRAIN", e))?;
             }
         }
@@ -462,5 +518,24 @@ mod tests {
         ] {
             assert!(device_path(wrong).is_err(), "{wrong}");
         }
+    }
+
+    #[test]
+    fn pause_and_resume_before_first_write_use_only_local_state() {
+        assert_eq!(
+            pause_action(false, false),
+            PauseAction::MarkPausedBeforeFirstWrite
+        );
+        assert_eq!(
+            resume_action(false, true).unwrap(),
+            ResumeAction::ResumeBeforeFirstWrite
+        );
+        assert_eq!(pause_action(true, false), PauseAction::PauseStartedDevice);
+        assert_eq!(pause_action(true, true), PauseAction::AlreadyPaused);
+        assert_eq!(
+            resume_action(true, true).unwrap(),
+            ResumeAction::ResumeStartedDevice
+        );
+        assert!(resume_action(false, false).is_err());
     }
 }

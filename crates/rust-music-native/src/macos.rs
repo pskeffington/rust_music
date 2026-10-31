@@ -401,10 +401,17 @@ impl PcmSink for MacAudioQueueSink {
         Ok(())
     }
     fn pause(&mut self) -> Result<()> {
-        if self.queue.is_null() || !self.started {
-            return Err(MusicError::Invalid("AudioQueue is not playing"));
+        if self.queue.is_null() {
+            return Err(MusicError::Invalid("AudioQueue is closed"));
         }
         if self.paused {
+            return Ok(());
+        }
+        // Player::play opens the sink before its worker submits the first
+        // decoded block. A pause in that interval is a local state change;
+        // there is not yet a running AudioQueue to pause.
+        if !self.started {
+            self.paused = true;
             return Ok(());
         }
         let err = self.api.pause(self.queue);
@@ -417,8 +424,14 @@ impl PcmSink for MacAudioQueueSink {
         Ok(())
     }
     fn resume(&mut self) -> Result<()> {
-        if self.queue.is_null() || !self.started || !self.paused {
+        if self.queue.is_null() || !self.paused {
             return Err(MusicError::Invalid("AudioQueue is not paused"));
+        }
+        // Do not start an empty AudioQueue. The first subsequent write will
+        // enqueue source PCM and start it through the normal write path.
+        if !self.started {
+            self.paused = false;
+            return Ok(());
         }
         let err = self.api.start(self.queue);
         if err != 0 {
@@ -954,6 +967,28 @@ mod tests {
         assert!(matches!(sink.pause(), Err(MusicError::Output(_))));
         assert!(!sink.paused);
         api.0.lock().unwrap().suppress_callbacks = false;
+        sink.finish().unwrap();
+    }
+
+    #[test]
+    fn pause_and_resume_before_first_buffer_defer_queue_start_until_write() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.open(valid_format()).unwrap();
+
+        sink.pause().unwrap();
+        assert!(sink.paused);
+        assert!(!sink.started);
+        assert!(api.0.lock().unwrap().events.is_empty());
+
+        sink.resume().unwrap();
+        assert!(!sink.paused);
+        assert!(!sink.started);
+        assert!(api.0.lock().unwrap().events.is_empty());
+
+        sink.write(&one_sample()).unwrap();
+        assert!(sink.started);
+        assert_eq!(api.0.lock().unwrap().events, vec!["enqueue", "start"]);
         sink.finish().unwrap();
     }
 
