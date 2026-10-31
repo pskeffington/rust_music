@@ -1543,3 +1543,18 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   native device availability/failure/disconnect/recovery tests. Physical DAC
   qualification and graceful teardown under forced watchdog escalation remain
   unverified.
+
+## 2026-10-31 — six-file private FLAC and premerge revalidation
+
+- Re-ran `PRIVATE_FLAC_DIRECTORY=<operator-supplied six-file corpus>
+  RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-gate-evidence sh
+  scripts/premerge-check.sh` on clean commit
+  `0bc3f1673a635e688b928406c63baa46bbbb22da` with Rust/Cargo 1.99.1 on macOS.
+- Roadmap and literature validators plus eight roadmap-index unit tests passed;
+  the offline Rust gate exited 0; WAVE passed 6/6; AIFF/AIFF-C passed 7/7;
+  native FLAC metadata, compressed-file digest and full PCM hash/byte-count
+  parity passed for L1, L2, L3, G4, G5 and G6. The premerge checker reached
+  its final automated-check PASS. Its private log and summary stay outside Git.
+- This completes the scripted local gates only. Host shared-focus, actual
+  panel/DAC and device failure/recovery, LaunchServices installation, and
+  independent release approval remain open. PR #1 remains draft and unpushed.

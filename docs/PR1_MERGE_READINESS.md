@@ -2,6 +2,25 @@
 
 **Current decision: not yet release-merge eligible.** [PR #1](https://github.com/pskeffington/rust_music/pull/1) is technically conflict-free, but compilation and several acceptance gates have not passed with current evidence. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+## Local post-commit verification — 2026-10-31
+
+Local commit `0bc3f1673a635e688b928406c63baa46bbbb22da` is clean, includes the
+RM-019 child-lifecycle changes, and has local `origin/main` as an ancestor. The
+operator-provisioned Rust/Cargo 1.99.1 toolchain completed
+`PRIVATE_FLAC_DIRECTORY=<private six-file directory> RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-gate-evidence sh scripts/premerge-check.sh`:
+roadmap/literature checks and eight roadmap unit tests passed, the complete
+offline Rust gate exited 0, WAVE passed 6/6, AIFF/AIFF-C passed 7/7, and the
+six exact manifest FLACs (L1/L2/L3/G4/G5/G6) passed native PCM/metadata/hash
+parity. The checker printed its final automated-check PASS. Private files and
+captured logs remain outside Git.
+
+This completes the scripted local premerge checks, but does not satisfy the
+remaining host shared-focus, physical panel/DAC, native device failure and
+recovery, LaunchServices installation, or release approval requirements below.
+At this checkpoint local `HEAD` is one commit ahead of the GitHub PR head; keep
+PR #1 draft and do not push or merge until all release gates and required
+approval are recorded.
+
 ## GitHub evidence verified on 2026-10-31
 
 - `build/native-codecs-g0` incorporated `main` in a real, non-force two-parent merge `ed241ac60ddd9b3a2f22ebc71bc557597d505d5a`. GitHub compare reported **74 ahead, 0 behind** before the subsequent premerge-script commit.

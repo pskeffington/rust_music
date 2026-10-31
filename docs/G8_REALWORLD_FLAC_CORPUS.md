@@ -30,6 +30,17 @@ generated native Rust PCM vectors with digest, CRC and truncation rejection.
 
 ## Reproduce with the locally retained recordings
 
+## Revalidation on 2026-10-31
+
+The exact six manifest-matched user files were supplied again in a local
+operator corpus and passed the clean-branch premerge gate at Rust Music commit
+`0bc3f1673a635e688b928406c63baa46bbbb22da`. The run checked the complete
+offline gate, WAVE (6/6), AIFF/AIFF-C (7/7), and native Rust PCM/metadata/hash
+parity for L1, L2, L3, G4, G5, and G6. The premerge script reached its final
+automated-check PASS; its non-certification notice remains applicable to
+Rust_Boy shared focus, physical panel/DAC and release acceptance. The operator
+corpus and captured private gate log remain outside Git.
+
 ```sh
 # Reference integrity, full FLAC/FFmpeg PCM parity. Test-only external executables.
 python3 scripts/test_flac_user_corpus.py --mode oracle --require-complete /private/music
