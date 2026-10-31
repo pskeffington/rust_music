@@ -202,7 +202,16 @@ impl<S: PcmSink> MusicSlot<S> {
             .get(queue_index)
             .ok_or(MusicError::Invalid("queue selection is out of bounds"))?
             .clone();
-        let track_index = self.resolve_queue_path(&path)?;
+        let track_index = match self.resolve_queue_path(&path) {
+            Ok(index) => index,
+            Err(error) => {
+                // A stale queue target must not leave the previously playing
+                // track and its host-owned focus lease active after the user
+                // explicitly requested a different queue item.
+                self.stop()?;
+                return Err(error);
+            }
+        };
         self.queue.select(queue_index)?;
         self.select(track_index)
     }
@@ -214,7 +223,13 @@ impl<S: PcmSink> MusicSlot<S> {
         }
         .ok_or(MusicError::Invalid("queue has no next candidate"))?
         .to_path_buf();
-        let track_index = self.resolve_queue_path(&path)?;
+        let track_index = match self.resolve_queue_path(&path) {
+            Ok(index) => index,
+            Err(error) => {
+                self.stop()?;
+                return Err(error);
+            }
+        };
         self.select(track_index)
     }
     fn resolve_queue_path(&self, path: &Path) -> Result<usize> {
@@ -788,6 +803,51 @@ mod tests {
         ));
         assert_eq!(focus.attempts.load(Ordering::Relaxed), 0);
         assert!(!focus.claimed.load(Ordering::Acquire));
+        assert!(slot.sink().opened.is_none());
+        assert_eq!(slot.sink().frames_written, 0);
+    }
+
+    #[test]
+    fn stale_queue_navigation_stops_active_playback_and_releases_focus() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        temp.wav("b.wav");
+        let b_bytes = fs::read(temp.0.join("b.wav")).unwrap();
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        slot.handle(Command::EnqueueSelection, &focus).unwrap(); // a.wav
+        slot.handle(Command::Next, &focus).unwrap();
+        slot.handle(Command::EnqueueSelection, &focus).unwrap(); // b.wav
+        slot.handle(Command::SelectQueue(0), &focus).unwrap();
+        slot.handle(Command::Play, &focus).unwrap();
+        assert_eq!(slot.status().playback.state, PlaybackState::Playing);
+        assert!(focus.claimed.load(Ordering::Acquire));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 1);
+
+        fs::remove_file(temp.0.join("b.wav")).unwrap();
+        assert!(matches!(
+            slot.handle(Command::QueueNext, &focus),
+            Err(MusicError::Io(_))
+        ));
+        assert_eq!(slot.status().playback.state, PlaybackState::Stopped);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 1);
+        assert!(slot.sink().opened.is_none());
+        assert_eq!(slot.sink().frames_written, 0);
+
+        // A stale explicit queue selection must also stop the active song.
+        fs::write(temp.0.join("b.wav"), b_bytes).unwrap();
+        slot.handle(Command::Play, &focus).unwrap();
+        assert_eq!(slot.status().playback.state, PlaybackState::Playing);
+        fs::remove_file(temp.0.join("a.wav")).unwrap();
+        assert!(matches!(
+            slot.handle(Command::SelectQueue(0), &focus),
+            Err(MusicError::Io(_))
+        ));
+        assert_eq!(slot.status().playback.state, PlaybackState::Stopped);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 2);
         assert!(slot.sink().opened.is_none());
         assert_eq!(slot.sink().frames_written, 0);
     }
