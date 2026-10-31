@@ -2,6 +2,10 @@
 
 Rust Music is an independent, ultra-lightweight **lossless-only** audio module for Rust_Boy and standalone offline systems. Follow the repository, not assumptions about other Rust_Boy modules.
 
+## CURRENT MAINLINE OVERRIDE — 2026-10-31
+
+PR #1 has **merged**. The prior draft-PR and README-only-main handoffs below are historical snapshots, not instructions to merge or block PR #1 now. `main` and `build/native-codecs-g0` matched at `deb6f879` before the latest documentation commits. Verify the current refs on every pass. Read [the operator quickstart](docs/START_HERE.md) and [the current README](README.md) before using dated task notes. Continue remaining Mac hardware, recovery, performance and distribution acceptance independently; do not claim production release from a passing offline gate. Do not rewrite or erase historical validation ledgers: add dated corrections. Preserve local work, require observed test evidence and keep all proprietary audio outside Git.
+
 ## FIRST: agent_skills orchestration
 
 Before any mutable development work, load the verified sibling [`agent_skills`](https://github.com/pskeffington/agent_skills) hierarchy, following [docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md). First perform a read-only Git safety inspection; then pin the actual agent_skills development SHA and read applicable SKILL.md role contracts. Do not assume agent_skills/main contains the hierarchy. Only after routing the agents should Codex resolve the checkout, implement, test and pursue an evidence-backed mainline merge. If unavailable, report the limitation and preserve this repository's existing agents. Never treat a skill as evidence of a passed test.
