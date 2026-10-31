@@ -88,6 +88,20 @@ candidate: 17 local crates, 32 path-only edges, zero registry/Git crates, zero
 third-party system links, and one Apple OS framework link. The native
 AudioQueue simulated recovery suite passed 17/17 as part of the gate.
 
+The focused feature-gated subprocess suite
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0**, **7/7**.
+`python3 scripts/test_macos_parent_exit.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0** and
+observed normal EOF exit 0, malformed protocol exit 1, three repeated
+launch/exit cycles, and a real serve child exit after its app-like parent was
+force-killed. `python3 scripts/test_release_package_process.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0**; the
+bundled CLI SHA-256 was
+`37cef5529b89937a7494f5d20af2dbff6ddd9dd19f4558036018aea15163ba2b`.
+These CLI tests establish child-process behavior, not the SwiftUI app closing
+its child during this pass or physical device behavior.
+
 No private codec corpus was rerun. These checks do not simulate a physical
 device disconnect, asynchronous route loss, audible output, DAC fidelity, or
 Rust Boy live focus contention; those acceptance gates remain open.
