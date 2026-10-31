@@ -401,15 +401,36 @@ final class PlayerModel: ObservableObject {
         stateProcess = process
         isStateBusy = true
         Task { [weak self] in
-            let (bytes, exitStatus) = await Task.detached(priority: .userInitiated) {
-                let bytes = output.fileHandleForReading.readDataToEndOfFile()
+            let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
+                let bytes: Data
+                let outputFailure: String?
+                do {
+                    if let bounded = try CatalogValidation.readBounded(
+                        output.fileHandleForReading,
+                        maximumBytes: CatalogValidation.maximumStateOutputBytes,
+                        onFailure: {
+                            if process.isRunning { process.terminate() }
+                        }
+                    ) {
+                        bytes = bounded
+                        outputFailure = nil
+                    } else {
+                        bytes = Data()
+                        outputFailure = "Rust Music state output exceeded its size limit."
+                    }
+                } catch {
+                    bytes = Data()
+                    outputFailure = "Could not read Rust Music state output: \(error.localizedDescription)"
+                }
                 process.waitUntilExit()
-                return (bytes, process.terminationStatus)
+                return (bytes, outputFailure, process.terminationStatus)
             }.value
             guard let self, self.stateProcess === process else { return }
             self.stateProcess = nil
             self.isStateBusy = false
-            if exitStatus == 0 {
+            if let outputFailure {
+                completion(.failure(RustMusicFailure(message: outputFailure)))
+            } else if exitStatus == 0 {
                 completion(.success(bytes))
             } else {
                 let message = String(data: bytes, encoding: .utf8)?
@@ -702,7 +723,10 @@ final class PlayerModel: ObservableObject {
                 do {
                     if let bounded = try CatalogValidation.readBounded(
                         output.fileHandleForReading,
-                        maximumBytes: CatalogValidation.maximumOutputBytes
+                        maximumBytes: CatalogValidation.maximumOutputBytes,
+                        onFailure: {
+                            if process.isRunning { process.terminate() }
+                        }
                     ) {
                         bytes = bounded
                         outputFailure = nil
@@ -713,9 +737,6 @@ final class PlayerModel: ObservableObject {
                 } catch {
                     bytes = Data()
                     outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
-                }
-                if outputFailure != nil && process.isRunning {
-                    process.terminate()
                 }
                 process.waitUntilExit()
                 return (bytes, outputFailure, process.terminationStatus)
