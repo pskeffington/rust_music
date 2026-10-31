@@ -217,6 +217,69 @@ under-8-MiB additional-memory target remains unverified. The exact fixture
 generator and query are in
 [`examples/profile_micro_library.rs`](../crates/rust-music-library/examples/profile_micro_library.rs).
 
+### Repeated profile with host RSS accounting (2026-10-31)
+
+At code source `a40758d53b27d63673697dc68595cb680050b5f5`, the same release
+example rebuilt offline (exit 0). Two serial invocations of
+`/usr/bin/time -l target/release/examples/profile_micro_library` exited 0.
+The 20,000-entry rows were:
+
+| Run | Catalog build | Search p50 | Search p95 | Fixture creation | Maximum RSS | Peak footprint |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 312 ms | 702.792 µs | 756.250 µs | 1,394 ms | 11,321,344 B | 10,682,728 B |
+| 2 | 310 ms | 691.541 µs | 750.875 µs | 1,193 ms | 11,223,040 B | 9,748,840 B |
+
+RSS and peak footprint include the executable, fixture creation, and the
+profile's earlier catalog sizes; they do not isolate the catalog's incremental
+memory and do not demonstrate the under-8-MiB additional-memory target. The
+two serial warm runs were consistent for catalog build and search. A first
+serial run immediately after build took 964 ms, and two deliberately
+concurrent runs took 2,167 / 2,333 ms, so disk/cache warmth and contention
+materially affect scan time. Cold app startup, incremental catalog RSS and the
+under-8-MiB target remain unverified.
+
+### Compact metadata and tagged-catalog RSS (2026-10-31)
+
+At code commit `7c1b1d0ba795a8af6cd0ff36bb55abf3fd087bcc`, each `Track` stores
+optional metadata out of line, and the accepted title/artist/album fields are
+packed into one bounded UTF-8 string with 16-bit spans. The public accessors
+are `TrackTags::title()`, `artist()`, and `album()`. This changes the
+pre-release public struct fields and `Track.tags` type; workspace clients were
+migrated. The layout assertions document the current desktop memory budget,
+not a stable ABI.
+
+The release example `profile_micro_library_memory` with
+`scripts/profile_catalog_memory.py` keeps each scanned catalog alive while
+sampling the same process's RSS before and after scan. For every phase the
+driver takes three `/bin/ps` readings and reports their median. Three runs of
+each 20,000-track scenario produced these RSS delta estimates:
+
+```sh
+cargo build --release --locked --offline -p rust-music-library --example profile_micro_library_memory
+python3 scripts/profile_catalog_memory.py target/release/examples/profile_micro_library_memory --counts 20000 --tagged-count 0 --repeats 3
+python3 scripts/profile_catalog_memory.py target/release/examples/profile_micro_library_memory --counts 20000 --tagged-count 2000 --repeats 3
+python3 scripts/profile_catalog_memory.py target/release/examples/profile_micro_library_memory --counts 20000 --tagged-count 20000 --repeats 3
+```
+
+On macOS the driver requires permission to inspect its own child with `/bin/ps`;
+when a restricted runner denies that query, rerun it under the approved host
+execution context.
+
+| Metadata mix | Median RSS delta | Range |
+| --- | ---: | ---: |
+| No tags | 5,248 KiB | 5,248–5,264 KiB |
+| 10% tagged | 5,568 KiB | 5,536–5,584 KiB |
+| All tagged | 7,824 KiB | 7,792–7,872 KiB |
+
+All three synthetic cases are below the 8,192 KiB target. Tagged entries use
+small FLAC STREAMINFO/Vorbis-comment fixtures with no audio frames; WAV
+entries are 12-byte signatures. RSS can include allocator-retained parser
+temporaries and OS page effects, so this is not exact heap accounting or a
+measurement of the full SwiftUI app's catalog increment. The all-tagged result
+has a 320 KiB margin in these runs; app-level and real-library memory
+qualification remains open. Cold startup and transition latency are also
+unmeasured.
+
 ### Repeated synthetic profile — current catalog implementation
 
 At source code `b03c592ec67d102325c4b0af0adc93acc71e9651`,

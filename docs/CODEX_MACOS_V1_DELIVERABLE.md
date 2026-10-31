@@ -13,8 +13,8 @@ release approval.
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. Synthetic silent short-track UI checks verified Repeat One continues and Repeat All loops; Repeat Off finishes at the final item instead of replaying it. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
 | MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / NORMAL AND FORCED ACTIVE-PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. Normal Cmd-Q had already shown no app or child process. On 2026-10-31, app PID 16381 was SIGKILLed while UI reported Playing through AudioQueue; its `rust-music-cli serve` child PID 16556 disappeared within the 8-second process deadline, and CUA reported `isRunning=false`. The absolute bundle also launches through host LaunchServices with `open -n` exit 0 and the expected bundle ID/executable. Separate process tests verify playback-error cleanup and three repeated serve launch/exit cycles. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
-| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links. Focused CLI tests passed twice: 19/19 unit tests and 7/7 subprocess tests each run. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc `codesign --verify --deep --strict` exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Repeat-boundary fix received independent read-only safety review with no blocker. Repeatable incremental-memory profiles, transition latency, device recovery and distribution acceptance remain open. |
-| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, clean local branch `build/native-codecs-g0` is 36 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; local `origin/main` ancestry has not been freshly rechecked in this pass. This local-ref comparison is not a fresh GitHub comparison. No push was made; PR #1 remains draft per last recorded remote inspection. Preserve backup branches and stash through post-merge verification. |
+| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At code source `7c1b1d0ba795a8af6cd0ff36bb55abf3fd087bcc`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links. Focused macOS CLI tests passed 19/19 unit and 7/7 subprocess tests. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc `codesign --verify --deep --strict` exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Independent code/security review found no blocking issue; the public pre-v1 `Track.tags` API changed and is documented below. Serial profile measured 20k catalog construction at 310–312 ms and search p95 at 751–756 µs. New repeated process-RSS deltas were below 8 MiB for synthetic no-tag, 10%-tagged and all-tagged catalogs, but are OS-observed estimates, not exact heap accounting or app-wide RSS. Cold-start distribution, actual-app incremental memory, transition latency, device recovery and distribution acceptance remain open. |
+| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At code source `7c1b1d0ba795a8af6cd0ff36bb55abf3fd087bcc`, local branch `build/native-codecs-g0` is 40 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; local `origin/main` ancestry has not been freshly rechecked in this pass. This local-ref comparison is not a fresh GitHub comparison. No push was made; PR #1 remains draft per last recorded remote inspection. Preserve backup branches and stash through post-merge verification. |
 
 ### 2026-10-31 candidate verification at `c1ce494`
 
@@ -69,7 +69,7 @@ active synthetic silent AudioQueue playback. No private corpus was rerun.
 | Volume | User-visible functional native volume | Implemented as bounded software attenuation (0–100), with strict 100% integer-sample bypass. It is not hardware gain or bit-perfect processing. The app slider changed 100→95→100 during the two-tone output smoke. |
 | Application | Valid bundle, LaunchServices and shutdown | Local bundle build/plist/ad-hoc code-sign validation and LaunchServices launch evidence are in PR readiness ledger. Revalidate after binary/UI changes; distribution signature/notarization remains open. |
 | Security | Bounded parsers, safe paths, no network/artwork | Workspace-local Cargo edges and fail-closed bounded inputs are enforced by offline gate. Maintain no image/artwork/visualizer functionality and never modify source audio during library operations. |
-| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Five fresh-process launch-to-Ready accessibility samples took 891, 858, 753, 798 and 779 ms (median 798 ms, range 753–891 ms); all showed Ready / No Track with no scan/autoplay, and each app process exited before the next run. One separate idle sample showed 28.2 MB Activity Monitor anonymous memory with no CLI child. These are process-launch samples, not a system-boot cold-start profile or performance threshold. Repeatable incremental catalog memory, peak RSS, transition latency, and attenuation processing cost remain unmeasured. |
+| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Five fresh-process launch-to-Ready accessibility samples took 891, 858, 753, 798 and 779 ms (median 798 ms, range 753–891 ms); all showed Ready / No Track with no scan/autoplay, and each app process exited before the next run. One separate idle sample showed 28.2 MB Activity Monitor anonymous memory with no CLI child. The new same-process profile measured 20k synthetic catalog RSS deltas below 8 MiB at no, 10%, and 100% metadata mixes; this does not measure SwiftUI app RSS or exact heap allocation. These are not system-boot cold-start profiles or performance guarantees. Transition latency and attenuation processing cost remain unmeasured. |
 | Release | Reproducible build and independent acceptance | Local offline/app build evidence exists at recorded commits. Require fresh build evidence at candidate SHA, independent code/security review, operator hardware record, clean mainline build and app launch before declaring v1.0 ready. |
 
 ### 2026-10-31 fresh-process startup and idle-memory sample
@@ -83,6 +83,60 @@ child; after Quit, `listApps()` and the refreshed Activity Monitor filter
 showed no Rust Music or CLI process. This is a five-run process-launch sample,
 not a system-boot cold-start profile or performance threshold, and one idle
 memory reading, not repeatable memory profiling or RSS.
+
+### 2026-10-31 catalog memory reduction and repeated RSS delta
+
+At code commit `7c1b1d0ba795a8af6cd0ff36bb55abf3fd087bcc`, common catalog
+tracks no longer carry an inline three-String metadata struct. FLAC/AIFF
+metadata is packed into a single bounded UTF-8 buffer with 16-bit field spans,
+and allocated only when tags exist. Public `TrackTags` reads now use
+`title()`, `artist()`, and `album()`; the previous public fields and
+`Track.tags: Option<TrackTags>` layout were pre-v1 and source-incompatible with
+the compact representation. All in-workspace consumers were updated and the
+full workspace builds. The memory-layout tests guard current supported desktop
+targets; they are not a stable ABI promise.
+
+The new `profile_micro_library_memory` example and
+`scripts/profile_catalog_memory.py` measure the same process before scanning
+and after keeping the catalog alive. The driver samples `/bin/ps` three times
+at each phase and reports the median; fixtures contain no user media, FLAC
+frames, or playback. Three independent 20,000-track runs per scenario on the
+rebuilt release profile produced:
+
+| Metadata mix | RSS delta median | Range | 8 MiB target |
+| --- | ---: | ---: | --- |
+| No tags | 5,248 KiB | 5,248–5,264 KiB | Below |
+| 10% tagged | 5,568 KiB | 5,536–5,584 KiB | Below |
+| All tagged | 7,824 KiB | 7,792–7,872 KiB | Below |
+
+The FLAC fixtures have bounded Vorbis comments and no audio frames. This
+measurement includes any allocator-retained parser temporaries and OS page
+behavior, so it is an RSS delta estimate, not exact live-catalog heap usage or
+the full macOS app's incremental memory. The all-tagged case is 320 KiB under
+8 MiB in these samples; confirm against real catalogs and app-level profiling
+before calling the product memory target fully qualified. Cold startup,
+transition latency, and app-wide RSS delta remain open.
+
+### 2026-10-31 repeatable synthetic library profile
+
+At code source `a40758d53b27d63673697dc68595cb680050b5f5`, the unchanged
+release example built with `cargo build --release --locked --offline
+-p rust-music-library --example profile_micro_library` (exit 0). Two serial
+runs of `/usr/bin/time -l target/release/examples/profile_micro_library`
+exited 0. They create only 12-byte RIFF/WAVE-signature synthetic files; no
+audio payload is generated, read, or played. At 20,000 entries the runs
+measured catalog construction of **312 ms / 310 ms**, search p50 of
+**702,792 / 691,541 ns**, search p95 of **756,250 / 750,875 ns**, and fixture
+creation of **1,394 / 1,193 ms**. Whole-process maximum RSS was
+**11,321,344 / 11,223,040 bytes**; `time -l` peak footprint was
+**10,682,728 / 9,748,840 bytes**. These include the executable, fixture
+creation and all profile sizes, so they are not incremental catalog-memory
+measurements and are not an under-8-MiB catalog pass. Two deliberately parallel
+runs took 2.17 / 2.33 s for catalog construction, demonstrating contention
+sensitivity; one first serial run after the build took 964 ms. Treat the two
+later serial samples as the repeatable warm-run observation, not a hard
+performance guarantee. Cold system startup, incremental catalog RSS, and
+transition latency remain unmeasured.
 
 ## Operating constraints
 
