@@ -123,7 +123,7 @@ This evidence applies to the local scanner and catalog model. It does not
 certify every third-party player or OS component, nor claim that source audio
 files have been scrubbed of artwork.
 
-The current catalog slice adds deterministic opaque IDs derived from the
+The initial catalog slice adds deterministic opaque IDs derived from the
 canonical selected root and relative path, duplicate-ID rejection, bounded
 Unicode lowercase text filtering, container filtering, deterministic sort,
 and bounded pagination. The ID hash is for local identity only, not
@@ -131,9 +131,11 @@ authentication. `cargo test --locked --offline -p rust-music-library` passes
 15 tests covering repeat-scan stability, root scoping, duplicate filenames,
 Unicode queries, pagination, query bounds, safe M3U8 round trips, and playlist
 limits. The new playlist model accepts only bounded UTF-8 relative paths with
-supported lossless-container suffixes; it does no filesystem access. Playlist
-durability, multiple roots, host queue transport/focus wiring, presentation,
-and scale profiling remain unimplemented.
+supported lossless-container suffixes; it does no filesystem access. This
+describes the initial catalog-model slice. Named playlist durability, the
+standalone queue/transport UI, and initial catalog scale profiling were added
+in later slices below; multiple-root reconciliation and Rust Boy shared
+Radio/TV focus remain open.
 
 `rust-music-library::queue` adds a bounded versioned text record, Unix atomic
 save/load restricted to `.rmq` state files, relative lossless paths, repeat
@@ -155,19 +157,25 @@ native rename behavior elsewhere. The store refuses symlink/non-file targets,
 duplicate names, malformed versions, traversal and over-limit state. Four new
 tests cover CRUD/restart round trip, malformed and unsafe records, Unix atomic
 replacement/symlink refusal, and that playlist edits never open or change
-audio files. This is a data-model/persistence slice; no standalone or host
-workflow is implied by it. Like queue and catalog state, the symlink metadata
-check and subsequent file open can race a hostile local filesystem actor;
-hosts requiring that threat model need an OS no-follow/openat-style API.
+audio files. This describes only the data-model/persistence slice; the
+standalone workflow is recorded below. Like queue and catalog state, the
+symlink metadata check and subsequent file open can race a hostile local
+filesystem actor; hosts requiring that threat model need an OS
+no-follow/openat-style API.
 
 `scan_cancellable` accepts a caller-owned `AtomicBool`, checks it between
 filesystem entries, and returns a cancellation error without exposing a
 partial catalog. Callers can replace the committed catalog only after a full
 successful result, so cancel preserves the prior snapshot. A deterministic
-mid-scan cancellation test verifies that path; UI worker ownership and progress
-presentation remain unimplemented.
+mid-scan cancellation test verifies that path. The standalone app owns the
+explicit-load scan process and can cancel it; continuous background scanning
+remains prohibited. The current UI reports scan state but does not claim a
+detailed per-file progress display.
 
-### Standalone catalog/queue/playlist workflow slice (2026-10-31)
+### Initial standalone catalog/queue/playlist workflow slice (2026-10-31)
+
+This subsection records the earlier implementation snapshot; the integrated
+transport continuation below supersedes its transport status.
 
 The macOS app now offers explicit folder selection, a bounded Rust CLI catalog
 scan with cancellation, text search and catalog rows, explicit Play and Stop,
@@ -179,10 +187,11 @@ storage scoped by canonical root; catalog paths are revalidated before managed
 playback. Selecting queue rows or using Next/Previous does not start playback
 or acquire audio focus. `sh scripts/offline-gate.sh` and
 `sh scripts/build-macos-app.sh` both exited 0 at the recorded implementation
-snapshot; local ad-hoc app bundle signature verification passed. The image and
-visualizer symbol search over the app source returned no matches. Pause,
-volume, autoplay preference, EQ, host transport/focus bridge, physical output,
-and live Radio/TV contention are not implemented or verified by this slice.
+snapshot; local ad-hoc app bundle signature verification passed. The image
+and visualizer symbol search over the app source returned no matches. Pause
+and volume were added in the continuation below. Optional autoplay and EQ
+remain separately gated; Rust Boy shared focus, physical output and live
+Radio/TV contention remain unverified.
 
 ### Initial synthetic catalog profile (2026-10-31)
 
