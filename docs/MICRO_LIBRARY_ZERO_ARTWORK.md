@@ -94,7 +94,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model, versioned `.rmp` persistence, CLI CRUD, and standalone text UI for create/rename/delete/add/queue; host workflow and import/export remain |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, CLI/UI queue editing, queue navigation, repeat and seeded shuffle; explicit queue selection is non-autoplay; standalone process focus does not prove Rust Boy shared focus |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | partial: explicit folder selection, cancellable bounded catalog load, text search/list, queue and named-playlist controls, Play/Pause/Resume/Stop/Next/Previous and software volume; fixed panel is implemented, physical input/display and host workflow remain |
-| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: library process profiled at 0/1/100/2k/20k; two fresh app runs measured rounded +6–7 MB for a 2k signature-only catalog and one exact-byte run measured +5.48 MiB `phys_footprint`; the app rejects 20k at its 2,048-track default limit. Full-app 20k, cold startup, and real-library qualification remain |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: library core is profiled at 0/1/100/2k/20k; the desktop app explicitly loaded 20k signature-only tracks and returned one last-item search result. One same-process app run measured a settled +18.61 MiB physical-footprint delta at 20k, under memory pressure; a separate 2k run measured +5.48 MiB. App-wide 20k memory, repeatability, cold/system startup, direct app search latency and representative tagged-library qualification remain open. |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
 engineering target: under 8 MiB additional idle catalog memory for a defined
@@ -377,6 +377,12 @@ defaults cap the app scan at 2,048 tracks. Therefore the independent 20k Rust
 library example does not establish app behavior at that scale. No private
 media was loaded, and all generated fixtures were removed after the tests.
 
+**Historical scope note:** the preceding 2,048-track rejection was observed
+before the desktop catalog path adopted its separate 20,000-track limit. It
+remains evidence for that earlier source snapshot only; it does not describe
+the current standalone app behavior. The current behavior and memory sample
+are recorded below.
+
 ### Repeated 2k UI search responses (2026-10-31)
 
 With the same 2,000-entry generated catalog, five UI queries returned 1, 1,
@@ -442,3 +448,20 @@ it does not establish incremental catalog memory or a threshold pass. A
 `footprint` attempt exited 0 but reported `Operation not permitted` for
 `task_read_for_pid`, so exact physical-footprint sampling was unavailable.
 The temporary generated directory was removed.
+
+### Current desktop 20k app footprint sample (2026-10-31)
+
+At code HEAD `de7c5642fe4bf8030c9c21c24e3b612c32c6f25f`, a fresh standalone app
+process explicitly loaded 20,000 generated 12-byte WAV-signature entries.
+Five settled same-process `proc_pid_rusage(RUSAGE_INFO_V4)` samples had a
+median physical footprint of 31,425,424 bytes before load and 50,938,768 bytes
+after load, a **19,513,344-byte (18.61 MiB)** delta. The app displayed 20,000
+tracks; searching the final synthetic title returned one match. Playback
+remained stopped and no CLI playback child appeared. The post-search median
+rose to 71,992,256 bytes with Library UI/accessibility active, so it is not a
+catalog-only measurement. This was one synthetic run during host memory
+pressure; it neither qualifies a typical tagged library nor establishes
+repeatability. The under-8-MiB target is unresolved because the expected
+library size and measurement conditions have not been formally specified.
+The app now supports this desktop scale; app memory, direct search latency,
+system-boot cold startup and real-library performance remain open.
