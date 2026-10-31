@@ -507,3 +507,18 @@ passing. A direct executable invocation exited **134**. Attempted
 `lsregister -f` exited **1** with a Spotlight scan error (-10822). CUA launch of
 the temporary app copy worked, but the shell `open -n` path remains
 **UNVERIFIED** and must be resolved before accepting LaunchServices packaging.
+
+### 2026-10-31 live PR ancestry check
+
+The connected GitHub read of PR #1 reports it open, draft, unmerged and
+`mergeable=true`, with remote head `2947e6737622c3c668003130006823df0bdde3e0`
+and base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. At local source
+`9ef316d502f04b916dfbea15b2f875f6dedc6d49`, the PR head object is present and
+is an ancestor of the local branch. The command
+`git rev-list --left-right --count
+2947e6737622c3c668003130006823df0bdde3e0...HEAD` reported `0 44`. Thus all
+commits on the fetched PR head are in local history, followed by 44 local
+commits. `mergeable=true` only
+describes GitHub's mergeability result; it does not satisfy release acceptance.
+No push or merge was performed. Hardware acceptance and the LaunchServices
+shell-launch result remain open.
