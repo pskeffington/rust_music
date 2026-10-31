@@ -1,5 +1,10 @@
 # Codex agent routing — Rust Music
 
+## Active assignment: MAC-07 Winamp-functional Mac UI (2026-10-31)
+
+Read [MAC-07 UI alignment](MAC07_WINAMP_UI_ALIGNMENT.md) before tasking. **host_integrator** is the sole SwiftUI/library/queue implementation writer; **audio_backend** investigates native output without changing it unless a defect is proven; **codec_engineer** verifies FLAC preservation; **gate_verifier** independently reviews same-file CLI versus GUI reproduction and A/B outcomes; **safety_reviewer** audits local paths, focus and dependency policy; **index_curator** serially maintains documentation, roadmap and registry. MAC07-00/01 are highest priority. No recorded source implementation or passing GUI audio test is implied by this tasking.
+
+
 Codex reads [AGENTS.md](../AGENTS.md) as root project instructions. Actual **project-scoped subagent definitions** live in `.codex/agents/*.toml` and are recognized by Codex versions supporting custom agents. [Codex project config](../.codex/config.toml) allows up to **three** concurrent spawned agents and intentionally pins no model, cloud provider, server or dependencies. These are development assistants, not part of the offline player. Custom-agent instructions do not create separate sandbox permissions.
 
 The separately pinned workflow reference and mapping from its orchestrator/reviewer roles to these Rust Music specialists is documented in [AGENT_SKILLS_INTEGRATION.md](AGENT_SKILLS_INTEGRATION.md). It is guidance only; repository instructions, task dependencies and actual Codex permissions remain controlling.
