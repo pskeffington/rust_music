@@ -109,6 +109,24 @@ cover forced termination, an injected live playback error, device disconnect
 and recovery, physical DAC/panel output, or live Rust Boy/Radio/TV contention;
 those remain open acceptance gates.
 
+### 2026-10-31 subprocess force-close and playback-error verification
+
+At checkout `7467753d503419e03991886b334044a645dc3783`, rebuilding the debug
+CLI with `cargo build --locked --offline -p rust-music-cli --features
+macos-output,test-support` exited 0. Then
+`python3 scripts/test_macos_parent_exit.py --binary target/debug/rust-music-cli`
+exited 0 and observed normal EOF exit 0, malformed-protocol exit 1, three
+repeated launch/EOF/exit cycles, and exit of the real serve child after its
+app-like parent was SIGKILLed. The package subprocess regression command
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` also exited 0 (7/7), including
+managed playback-error cleanup, active-playback parent-pipe close, and
+Stop/Shutdown child exit. This establishes process-level cleanup behavior
+with the real CLI child and test output sink; the SIGKILL harness is not an
+end-to-end forced termination of the SwiftUI app while AudioQueue has an open
+device. Physical device loss/recovery and OS-level active-playback force-close
+remain unverified.
+
 
 - No artwork, image extraction/decoding/caching, visualizers, remote metadata,
   telemetry, third-party runtime Cargo dependencies, or runtime network use.
