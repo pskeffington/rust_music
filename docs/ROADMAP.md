@@ -137,7 +137,7 @@ physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
 remain open. No private corpus was rerun.
 
 **RM-020 app subprocess output hardening and headphone reconnect smoke
-(2026-10-31, code `37379598a5c0cf4dbb379e5e5f04b99a5fd748d6`):** Swift state
+(2026-10-31, code `3737959c6750ff8280188a3b8dcc6857be965c31`):** Swift state
 commands now enforce the CLI's 6 MiB stdout/stderr bound. Exact-limit output,
 over-limit termination, and read-error cleanup pass in the Foundation test
 harness. `sh scripts/build-macos-app.sh` and `sh scripts/offline-gate.sh`

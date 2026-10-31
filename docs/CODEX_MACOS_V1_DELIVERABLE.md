@@ -1046,7 +1046,7 @@ footprint remains unmeasured.
 
 ### 2026-10-31 bounded state output and post-reconnect playback
 
-At code commit `37379598a5c0cf4dbb379e5e5f04b99a5fd748d6`, the Swift state
+At code commit `3737959c6750ff8280188a3b8dcc6857be965c31`, the Swift state
 command reader enforces the CLI's 6 MiB output limit while catalog and state
 stdout/stderr are merged. Overflow and read errors discard partial output,
 terminate the child, wait for exit, and return a distinct bounded UI error.
