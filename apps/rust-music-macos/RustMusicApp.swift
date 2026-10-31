@@ -363,13 +363,16 @@ final class PlayerModel: ObservableObject {
         guard libraryRoot != nil, !isStateBusy, !isTransportBusy else { return }
         let process = Process()
         process.executableURL = decoderURL
-        process.arguments = ["state"] + arguments
+        process.arguments = ["state", "--managed-parent-stdin"] + arguments
+        let input = Pipe()
         let output = Pipe()
+        process.standardInput = input
         process.standardOutput = output
         process.standardError = output
         do {
             try process.run()
         } catch {
+            try? input.fileHandleForWriting.close()
             completion(.failure(RustMusicFailure(
                 message: "Could not start Rust Music state storage: \(error.localizedDescription)"
             )))
@@ -379,6 +382,7 @@ final class PlayerModel: ObservableObject {
         isStateBusy = true
         Task { [weak self] in
             let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
+                defer { try? input.fileHandleForWriting.close() }
                 let bytes: Data
                 let outputFailure: String?
                 do {
@@ -679,13 +683,16 @@ final class PlayerModel: ObservableObject {
         stop()
         let process = Process()
         process.executableURL = decoderURL
-        process.arguments = ["catalog", root.path]
+        process.arguments = ["catalog", "--managed-parent-stdin", root.path]
+        let input = Pipe()
         let output = Pipe()
+        process.standardInput = input
         process.standardOutput = output
         process.standardError = output
         do {
             try process.run()
         } catch {
+            try? input.fileHandleForWriting.close()
             status = "Could not start the Rust Music catalog: \(error.localizedDescription)"
             return
         }
@@ -695,6 +702,7 @@ final class PlayerModel: ObservableObject {
         status = "Scanning the selected folder… playback will not start."
         Task { [weak self] in
             let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
+                defer { try? input.fileHandleForWriting.close() }
                 let bytes: Data
                 let outputFailure: String?
                 do {

@@ -27,7 +27,7 @@ use rust_music_library::{scan, AudioContainer as LibraryContainer, Library};
 use std::{
     env,
     fs::OpenOptions,
-    io::{Seek, SeekFrom, Write},
+    io::{Read, Seek, SeekFrom, Write},
 };
 #[cfg(any(
     all(target_os = "macos", feature = "macos-output"),
@@ -55,6 +55,48 @@ const STANDALONE_SCAN_LIMITS: ScanLimits = ScanLimits {
     max_tracks: STANDALONE_MAX_TRACKS,
     max_depth: 6,
 };
+
+const MANAGED_PARENT_STDIN_FLAG: &str = "--managed-parent-stdin";
+
+/// Opt-in lifetime supervision for one-shot jobs launched by the desktop app.
+/// The caller must provide a pipe on stdin and keep its write end open until
+/// the job is no longer owned by the app. Reading at most one byte keeps this
+/// watcher bounded; any input is treated as an invalid supervision signal.
+fn supervise_parent_stdin() -> Result<()> {
+    std::thread::Builder::new()
+        .name("rust-music-parent-watch".into())
+        .spawn(|| {
+            let mut input = std::io::stdin().lock();
+            let mut byte = [0u8; 1];
+            #[cfg(all(debug_assertions, feature = "test-support"))]
+            {
+                let stderr = std::io::stderr();
+                let mut output = stderr.lock();
+                let _ = writeln!(
+                    output,
+                    "rust_music: managed child pid={} status=watching-parent",
+                    std::process::id()
+                );
+                let _ = output.flush();
+            }
+            let (status, code) = match input.read(&mut byte) {
+                Ok(0) => ("parent-disconnected", 0),
+                Ok(_) => ("unexpected-parent-data", 1),
+                Err(_) => ("parent-pipe-error", 1),
+            };
+            let stderr = std::io::stderr();
+            let mut output = stderr.lock();
+            let _ = writeln!(
+                output,
+                "rust_music: managed child pid={} status={status}",
+                std::process::id()
+            );
+            let _ = output.flush();
+            std::process::exit(code);
+        })
+        .map_err(MusicError::Io)?;
+    Ok(())
+}
 
 fn append_hex(output: &mut String, value: &str) {
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -1550,7 +1592,7 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | state queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog [--managed-parent-stdin] DIRECTORY [QUERY] | state [--managed-parent-stdin] queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
     #[cfg(all(
         debug_assertions,
         feature = "test-support",
@@ -1623,9 +1665,16 @@ fn run() -> Result<()> {
         return play_managed(&checked, device.as_deref());
     }
     if action == "state" {
-        let category = args
+        let first = args
             .next()
             .ok_or(MusicError::Invalid("state requires queue or playlist"))?;
+        let managed = first == MANAGED_PARENT_STDIN_FLAG;
+        let category = if managed {
+            args.next()
+                .ok_or(MusicError::Invalid("state requires queue or playlist"))?
+        } else {
+            first
+        };
         let root = args
             .next()
             .ok_or(MusicError::Invalid("state requires a library root"))?;
@@ -1639,6 +1688,9 @@ fn run() -> Result<()> {
             }
             arguments.push(argument);
         }
+        if managed {
+            supervise_parent_stdin()?;
+        }
         let output = state_command(
             &platform_state_base()?,
             &category,
@@ -1646,6 +1698,38 @@ fn run() -> Result<()> {
             &operation,
             &arguments,
         )?;
+        print!("{output}");
+        return Ok(());
+    }
+    if action == "catalog" {
+        let first = args
+            .next()
+            .ok_or(MusicError::Invalid("catalog requires a directory"))?;
+        let (managed, path) = if first == MANAGED_PARENT_STDIN_FLAG {
+            (
+                true,
+                args.next()
+                    .ok_or(MusicError::Invalid("managed catalog requires a directory"))?,
+            )
+        } else {
+            (false, first)
+        };
+        let query = args.next().unwrap_or_default();
+        if args.next().is_some() {
+            return Err(MusicError::Invalid("too many catalog arguments"));
+        }
+        if managed {
+            supervise_parent_stdin()?;
+        }
+        let output = catalog_tsv(std::path::Path::new(&path), &query)?;
+        #[cfg(all(debug_assertions, feature = "test-support"))]
+        if let Ok(delay) = env::var("RUST_MUSIC_TEST_MANAGED_CATALOG_DELAY_MS") {
+            if let Ok(milliseconds) = delay.parse::<u64>() {
+                if milliseconds <= 5_000 {
+                    std::thread::sleep(std::time::Duration::from_millis(milliseconds));
+                }
+            }
+        }
         print!("{output}");
         return Ok(());
     }
@@ -1663,14 +1747,6 @@ fn run() -> Result<()> {
             }
             println!("{} tracks | {} entries checked | {} skipped",
                 library.len(), library.examined_entries, library.skipped_entries);
-            Ok(())
-        }
-        "catalog" => {
-            let query = args.next().unwrap_or_default();
-            if args.next().is_some() {
-                return Err(MusicError::Invalid("too many catalog arguments"));
-            }
-            print!("{}", catalog_tsv(std::path::Path::new(&path), &query)?);
             Ok(())
         }
         "preview" => {

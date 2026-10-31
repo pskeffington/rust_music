@@ -12,7 +12,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use std::{
-    io::Read,
+    io::{BufRead, BufReader, Read},
     process::{Child, ChildStdin, Command, Stdio},
     sync::mpsc::{self, Receiver},
     thread::{self, JoinHandle},
@@ -189,6 +189,67 @@ fn managed_playback_error_exits_without_leaving_a_child() {
         !status.success(),
         "invalid media should report playback failure"
     );
+}
+
+#[test]
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn managed_catalog_command_exits_on_parent_pipe_eof() {
+    let library = TempLibrary::new();
+    let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
+        .args([
+            "catalog",
+            "--managed-parent-stdin",
+            library.0.to_str().expect("temporary path is UTF-8"),
+        ])
+        .env("RUST_MUSIC_TEST_MANAGED_CATALOG_DELAY_MS", "5000")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn managed catalog command");
+    let mut child = ChildGuard(child);
+    let parent_pipe = child.0.stdin.take().expect("managed parent pipe");
+    let stdout = child.0.stdout.take().expect("managed catalog output");
+    let stderr = child.0.stderr.take().expect("managed catalog diagnostics");
+    let mut stderr = BufReader::new(stderr);
+    let mut attached = String::new();
+    stderr
+        .read_line(&mut attached)
+        .expect("read managed watcher readiness");
+    let pid = attached
+        .split("pid=")
+        .nth(1)
+        .and_then(|value| value.split_whitespace().next())
+        .and_then(|value| value.parse::<u32>().ok())
+        .expect("watcher readiness includes child pid");
+    assert!(attached.contains("status=watching-parent"), "{attached:?}");
+    thread::sleep(Duration::from_millis(50));
+    assert!(
+        child
+            .0
+            .try_wait()
+            .expect("managed catalog is still active")
+            .is_none(),
+        "managed catalog exited while its parent pipe remained open"
+    );
+
+    drop(parent_pipe);
+    let status = wait_for_exit(&mut child.0);
+    assert!(
+        status.success(),
+        "managed catalog child exited with {status}"
+    );
+    let mut diagnostics = String::new();
+    stderr
+        .read_to_string(&mut diagnostics)
+        .expect("read disconnect status");
+    assert!(
+        diagnostics.contains(&format!(
+            "managed child pid={pid} status=parent-disconnected"
+        )),
+        "missing exit evidence for managed catalog PID {pid}: {diagnostics:?}"
+    );
+    drop(stdout);
 }
 
 #[test]
