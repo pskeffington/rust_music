@@ -11,10 +11,10 @@ release approval.
 
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
-| MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / ACTIVE SILENT-PLAYBACK CHILD CLOSE + HOST LAUNCH VERIFIED; DEVICE RECOVERY OPEN** | On 2026-10-31, the current app loaded only the generated `silent-60s.wav` fixture and displayed `PLAYING … THROUGH RUST MUSIC AND MACOS AUDIOQUEUE`. Before Cmd-Q, Activity Monitor showed Rust Music PID 11612 and `rust-music-cli` PID 11664. After foreground Cmd-Q and a process-list refresh, neither remained and `cua.listApps()` reported `isRunning=false`. At candidate source `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, the rebuilt absolute bundle launched through host LaunchServices with `open -n` exit 0; `lsappinfo` reported bundle ID `dev.rustmusic.standalone` and the expected `Contents/MacOS/RustMusic` executable. The UI showed Ready / No Track without scan or autoplay. After menu Quit, LaunchServices and the host process query showed no Rust Music or CLI process. These prove local bundle launch and observed close, not audible-content or physical-output behavior. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
-| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At candidate source `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links; all workspace tests, warnings-denied Clippy, release build and macOS feature tests passed, including 15 injected AudioQueue failure/teardown tests. The package-process suite passed 7/7; the release-mode targeted filter exited 0 with no debug-only matching test. `sh scripts/build-macos-app.sh`, `plutil -lint`, and strict ad-hoc `codesign --verify` exited 0; both bundled executables are arm64. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. The bundle was launched through LaunchServices with exit 0 and closed cleanly. Cold-launch distribution, repeatable incremental-memory profiles and transition latency remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
-| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At candidate `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, the clean local branch `build/native-codecs-g0` is 33 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; local `origin/main` is an ancestor. This is a local-ref comparison, not a fresh GitHub comparison. No push was made; PR #1 remains draft per the last recorded remote inspection. Preserve backup branches and stash through post-merge verification. |
+| MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. Synthetic silent short-track UI checks verified Repeat One continues and Repeat All loops; Repeat Off finishes at the final item instead of replaying it. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / HOST LAUNCH AND ACTIVE PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | On 2026-10-31, the current rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. Before Cmd-Q, process inspection showed the Rust Music app and `rust-music-cli`; after quit, `cua.listApps()` reported `isRunning=false`, and refreshed host process/LaunchServices queries found neither app nor child. The absolute bundle launched through host LaunchServices using `open -n` with exit 0; `lsappinfo` showed bundle ID `dev.rustmusic.standalone` and expected executable. Normal quit was observed, but no new force-close, playback-error, or device-disconnect scenario was exercised in this pass. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
+| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links. Focused CLI tests passed twice: 19/19 unit tests and 7/7 subprocess tests each run. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc `codesign --verify --deep --strict` exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Repeat-boundary fix received independent read-only safety review with no blocker. Repeatable incremental-memory profiles, transition latency, device recovery and distribution acceptance remain open. |
+| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, clean local branch `build/native-codecs-g0` is 36 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; local `origin/main` ancestry has not been freshly rechecked in this pass. This local-ref comparison is not a fresh GitHub comparison. No push was made; PR #1 remains draft per last recorded remote inspection. Preserve backup branches and stash through post-merge verification. |
 
 ### 2026-10-31 candidate verification at `c1ce494`
 
@@ -85,6 +85,30 @@ not a system-boot cold-start profile or performance threshold, and one idle
 memory reading, not repeatable memory profiling or RSS.
 
 ## Operating constraints
+
+### 2026-10-31 repeat-boundary regression and final automated verification
+
+At source commit `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, queue Next and
+Previous report whether a candidate exists at Repeat Off boundaries. The
+standalone app now keeps the current selection at a manual boundary and shows
+Finished after natural completion of the final item rather than restarting it.
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support` passed on two consecutive runs: each had 19/19 unit
+tests and 7/7 subprocess tests. The test fixture path race exposed during the
+first run was fixed by unique atomic sequence suffixes in
+`crates/rust-music-cli/tests/package_process.rs`.
+
+The rebuilt app passed `sh scripts/build-macos-app.sh`, Info.plist lint, and
+`codesign --verify --deep --strict`; LaunchServices `open -n` exited 0. A
+synthetic silent short-track UI smoke observed Repeat Off finishing, Repeat
+One continuing, Repeat All looping, and Stop returning to stopped controls.
+On quit, app and playback-child processes were absent from refreshed process
+and LaunchServices checks. `sh scripts/offline-gate.sh` exited 0 at this same
+source commit. No private codec corpus was rerun. These observations do not
+cover forced termination, an injected live playback error, device disconnect
+and recovery, physical DAC/panel output, or live Rust Boy/Radio/TV contention;
+those remain open acceptance gates.
+
 
 - No artwork, image extraction/decoding/caching, visualizers, remote metadata,
   telemetry, third-party runtime Cargo dependencies, or runtime network use.
