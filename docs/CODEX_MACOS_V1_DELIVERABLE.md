@@ -52,6 +52,35 @@ unplug event was observed, so no device-loss result is recorded. The earlier
 route-switch observation in MAC-02 remains valid, while real AudioQueue
 error/reopen behavior and DAC/acoustic measurement remain open.
 
+### 2026-10-31 committed-candidate app and subprocess refresh
+
+At committed candidate `5e1e94edd199ed2fbd5cf49937c423bcdf582214`,
+`sh scripts/build-macos-app.sh` exited **0**. Its 18 symlink-path refusal
+cases, production catalog-search correctness harness, playback-state tests,
+catalog bounds tests, bundle build and strict deep ad-hoc signature check
+passed. The 20,000-track harness measured search p50 **6,198.791 µs** and
+p95 **7,836.334 µs** (101 queries); indexed model construction measured
+116.170 ms p50 / 126.887 ms p95 and cached-index payload was 1,300,000 bytes.
+These remain synthetic core measurements, not interactive UI latency or
+app-wide memory.
+
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0** (8/8),
+including active-playback parent closure, repeated parent-pipe closure,
+managed playback error, and Shutdown during active playback. `python3
+scripts/check_roadmap_index.py` exited **0** (16 gates, 27 tasks, six agents).
+
+Bundle inspection found a lint-clean plist (`CFBundleExecutable=RustMusic`),
+the declared executable present as arm64 Mach-O, and strict deep signature
+validation passed. Sandboxed `/usr/bin/open -n target/macos/RustMusic.app`
+exited **1** with `kLSNoExecutableErr` (-10827); the same rebuilt bundle
+launched through host-context `/usr/bin/open -n "$PWD/target/macos/RustMusic.app"`
+and exited **0**. The UI showed Ready / No Track, with Play disabled and no
+startup scan/autoplay; Cmd-Q returned CUA app inventory to `isRunning=false`.
+The sandboxed error is not host LaunchServices failure. This smoke did not
+start a playback child; active-child close evidence remains in the earlier
+MAC-02 and package-process records.
+
 At current pre-recording docs candidate `153ccced8444345e3340917ca65e1c8c2234300e`,
 the focused subprocess regression was rerun against unchanged current CLI
 source: `cargo test --locked --offline -p rust-music-cli --features
