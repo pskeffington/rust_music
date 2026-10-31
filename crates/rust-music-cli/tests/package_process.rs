@@ -8,6 +8,7 @@ use std::{
     fs::{self, File},
     io::Write,
     path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use std::{
@@ -84,14 +85,18 @@ fn wait_for_exit(child: &mut Child) -> std::process::ExitStatus {
 struct TempLibrary(PathBuf);
 
 #[cfg(all(debug_assertions, feature = "test-support"))]
+static TEMP_LIBRARY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(all(debug_assertions, feature = "test-support"))]
 impl TempLibrary {
     fn new() -> Self {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock after Unix epoch")
             .as_nanos();
+        let sequence = TEMP_LIBRARY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "rust-music-active-shutdown-{}-{stamp}",
+            "rust-music-active-shutdown-{}-{stamp}-{sequence}",
             std::process::id()
         ));
         fs::create_dir(&path).expect("create temporary library");
