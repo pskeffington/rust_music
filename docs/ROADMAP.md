@@ -370,3 +370,28 @@ to Ready / No Track without scanning or playback; after an explicit reload,
 both the playlist row and queue item were restored, with Play enabled and Pause
 disabled. The test entries and temporary files were removed. This is restart
 acceptance after completed writes, not an interruption-during-write guarantee.
+
+## RM-020 current gate refresh — 2026-10-31
+
+At product source `1941cadab95eae3490bf4d599748acb60b21b8b1` (documentation
+HEAD `793638f21be9b2691e39fe36e581d91365e31c60`),
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+internal edges, zero registry/Git crates, zero third-party system links, and
+17/17 simulated AudioQueue tests. The focused package-process integration
+suite passed **9/9**; `sh scripts/build-macos-app.sh` exited **0** with 18/18
+symlink guards, lifecycle/process-drain harnesses, catalog/UI checks, and strict
+local ad-hoc bundle signature validation. The current optimized 20k catalog
+harness measured search at 5,626.208 µs p50 / 5,770.333 µs p95 and indexed
+construction at 116.770 / 120.649 ms p50/p95. These are synthetic core timings,
+not full scan or interactive UI measurements.
+
+Three fresh-app-process explicit scans of the same generated 2,000-track
+metadata-only profile measured physical-footprint deltas of 1.328–2.438 MiB;
+tracks had no audio frames and playback stayed stopped. This is a limited
+synthetic app measurement, not a representative-library threshold or startup
+qualification. Shure analog headphone reconnection returned the System Settings
+route to External Headphones, but no AudioQueue error/reopen transition was
+captured. RM-020 remains **in progress**: real invalid-device recovery, direct
+interactive performance, representative-library behavior, physical DAC/panel,
+live Rust Boy focus and distribution acceptance remain open. No private codec
+corpus was rerun; PR #1 remains draft and no remote synchronization occurred.
