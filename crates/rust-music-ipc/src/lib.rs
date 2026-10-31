@@ -15,7 +15,9 @@ pub const MAX_FRAME_BYTES: usize = 16 * 1024;
 pub const MAX_PACKAGE_ID_BYTES: usize = 96;
 pub const MAX_PATH_BYTES: usize = 4096;
 pub const MAX_TRACKS_PER_VIEW: usize = 32;
-pub const MAX_LIBRARY_TRACKS: u16 = 2048;
+/// Absolute protocol bound. Host `serve` mode still defaults to 2,048 tracks;
+/// the standalone desktop mode may opt into its independently bounded 20k cap.
+pub const MAX_LIBRARY_TRACKS: u16 = 20_000;
 pub const MAX_TITLE_BYTES: usize = 128;
 pub const MAX_ERROR_BYTES: usize = 256;
 
@@ -850,6 +852,42 @@ mod tests {
             package_id: ID.into(),
             request_id: 1,
             body: Reply::View(view)
+        }
+        .encode()
+        .is_err());
+    }
+
+    #[test]
+    fn standalone_track_limit_accepts_twenty_thousand_and_rejects_more() {
+        let view = View {
+            playback: Playback::Empty,
+            selected: Some(19_999),
+            track_count: 20_000,
+            page_offset: 19_999,
+            tracks: vec![TrackView {
+                index: 19_999,
+                title: "last track".into(),
+                container: AudioContainer::Wave,
+            }],
+            format: None,
+            frames_delivered: 0,
+            total_frames: None,
+            audio_claimed: false,
+        };
+        assert!(Envelope {
+            package_id: ID.into(),
+            request_id: 1,
+            body: Reply::View(view.clone()),
+        }
+        .encode()
+        .is_ok());
+
+        let mut oversized = view;
+        oversized.track_count = 20_001;
+        assert!(Envelope {
+            package_id: ID.into(),
+            request_id: 2,
+            body: Reply::View(oversized),
         }
         .encode()
         .is_err());

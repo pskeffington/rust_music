@@ -112,6 +112,17 @@ confounded the incremental measurement. Device disconnect/recovery, DAC/panel,
 and live Rust Boy shared focus remain open; keep RM-020 in progress and PR #1
 draft.
 
+**RM-020 desktop 20k continuation (2026-10-31):** standalone CLI catalog and
+`serve --desktop` explicitly opt into 20,000 tracks; ordinary host scanning
+keeps its default 2,048 limit. IPC caps at 20,000 with 32-row pages. Swift
+reads at most 20 MiB of catalog output plus one byte, terminates
+over-producing children, and rejects gaps, duplicates, or reordered indexes.
+The full offline gate and app bundle build passed. Generated 20k UI load,
+last-item search and selection succeeded while stopped; CLI-process peak RSS
+was 11,059,200 bytes in a single `ru_maxrss` sample. Full-app 20k memory,
+repeatable UI latency, physical DAC/device recovery and live host focus remain
+open; RM-020 stays in progress.
+
 **Current candidate recheck (2026-10-31, source HEAD `be6615e`):** the full
 offline gate exited 0 (17 local crates, 32 path-only edges, zero registry/Git
 crates, zero third-party system links); the app bundle built and passed strict

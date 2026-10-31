@@ -164,7 +164,7 @@ private final class PackageProcessClient {
     init(executable: URL, root: URL) throws {
         let process = Process()
         process.executableURL = executable
-        process.arguments = ["serve"]
+        process.arguments = ["serve", "--desktop"]
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         process.standardInput = inputPipe
@@ -696,14 +696,35 @@ final class PlayerModel: ObservableObject {
         scanCancellationRequested = false
         status = "Scanning the selected folder… playback will not start."
         Task { [weak self] in
-            let (bytes, exitStatus) = await Task.detached(priority: .userInitiated) {
-                let bytes = output.fileHandleForReading.readDataToEndOfFile()
+            let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
+                let bytes: Data
+                let outputFailure: String?
+                do {
+                    if let bounded = try CatalogValidation.readBounded(
+                        output.fileHandleForReading,
+                        maximumBytes: CatalogValidation.maximumOutputBytes
+                    ) {
+                        bytes = bounded
+                        outputFailure = nil
+                    } else {
+                        bytes = Data()
+                        outputFailure = "Rust Music catalog exceeded its output limit."
+                    }
+                } catch {
+                    bytes = Data()
+                    outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
+                }
+                if outputFailure != nil && process.isRunning {
+                    process.terminate()
+                }
                 process.waitUntilExit()
-                return (bytes, process.terminationStatus)
+                return (bytes, outputFailure, process.terminationStatus)
             }.value
             guard let self, self.scanProcess === process else { return }
             let result: Result<[CatalogTrack], RustMusicFailure>
-            if exitStatus == 0 {
+            if let outputFailure {
+                result = .failure(RustMusicFailure(message: outputFailure))
+            } else if exitStatus == 0 {
                 result = Self.parseCatalog(bytes)
             } else {
                 let message = String(data: bytes, encoding: .utf8)?
@@ -937,16 +958,22 @@ final class PlayerModel: ObservableObject {
     }
 
     nonisolated private static func parseCatalog(_ data: Data) -> Result<[CatalogTrack], RustMusicFailure> {
+        let maximumTrackCount = 20_000
+        guard data.count <= CatalogValidation.maximumOutputBytes else {
+            return .failure(RustMusicFailure(message: "Rust Music catalog exceeded its output limit."))
+        }
         guard let output = String(data: data, encoding: .utf8) else {
             return .failure(RustMusicFailure(message: "Rust Music returned invalid catalog text."))
         }
         var tracks: [CatalogTrack] = []
+        let estimatedRows = min(maximumTrackCount, data.count / 96)
+        tracks.reserveCapacity(estimatedRows)
         var reportedCount: Int?
         for line in output.split(whereSeparator: \.isNewline) {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             if fields.first == "summary" {
                 guard fields.count == 4,
-                      let count = Int(fields[1]), count >= 0,
+                      let count = Int(fields[1]), (0...maximumTrackCount).contains(count),
                       Int(fields[2]) != nil, Int(fields[3]) != nil,
                       reportedCount == nil else {
                     return .failure(RustMusicFailure(message: "Rust Music returned a malformed catalog summary."))
@@ -954,9 +981,10 @@ final class PlayerModel: ObservableObject {
                 reportedCount = count
                 continue
             }
-            guard fields.first == "track", fields.count == 7,
-                  let index = Int(fields[1]), index >= 0,
-                  !tracks.contains(where: { $0.id == index }),
+            guard tracks.count < maximumTrackCount,
+                  fields.first == "track", fields.count == 7,
+                  let index = Int(fields[1]),
+                  CatalogValidation.acceptsIndex(index, after: tracks.count, maximum: maximumTrackCount),
                   let title = decodeHex(fields[3]),
                   let artist = decodeHex(fields[4]),
                   let album = decodeHex(fields[5]),

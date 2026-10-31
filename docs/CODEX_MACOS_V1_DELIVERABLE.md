@@ -743,10 +743,10 @@ showed no app or CLI row; generated fixtures were removed.
 
 ### 2026-10-31 repeated app-level catalog footprint at byte resolution
 
-The app's `ScanLimits::default()` admits at most 2,048 tracks; the 20,000-file
-UI probe returned `RUST_MUSIC: AUDIO RESOURCE LIMIT: MUSIC LIBRARY TRACK
-BUDGET EXCEEDED` and did not begin playback. Thus the UI cannot load the 20k
-profile size through its default scan path.
+At this historical measurement point, the app used the default 2,048-track
+scan limit; the subsequent desktop-only 20,000-track opt-in and verification
+are recorded in the later 20k acceptance section below. The following paired
+2,000-entry samples remain useful evidence for their original scope.
 
 For a 2,000-entry generated catalog of 12-byte RIFF/WAVE-signature files, a
 fresh app process (PID 23814) was sampled for five seconds before and after
@@ -762,10 +762,10 @@ played. Fixtures had no PCM payload or real metadata. This provides repeatable
 app catalog, real tagged libraries, cold startup, exact live heap, or DAC and
 device behavior; app-scale memory acceptance remains partial.
 
-The same 20k folder is above the UI's configured 2,048-track default, so the
-standalone app's 20k memory/search behavior remains unmeasured. The separate
-Rust library example still profiles 20k entries; that is not a substitute for
-an app-level scan.
+At the time of this profile, app-level 20k memory/search behavior was
+unmeasured. The later desktop-only scan limit removes the former 2,048-track
+functional cap; it does not substitute for a repeatable 20k full-app memory
+measurement.
 
 ### 2026-10-31 repeated 2k UI search responses
 
@@ -1022,3 +1022,17 @@ controls. Activity Monitor's Rust filter showed no playback child. This
 reproduces the known shell-sandbox LaunchServices limitation and confirms a
 fresh host-context launch of the current bundle; it does not establish
 Developer ID signing, notarization, or distribution acceptance.
+
+### 2026-10-31 desktop 20k library follow-up
+
+The UI and standalone playback child now explicitly use a desktop-only
+20,000-track scan bound; ordinary host mode stays at the small-host default
+of 2,048. A rebuilt, strict ad-hoc-signed app loaded a generated 20,000-entry
+WAV-signature directory, found and selected `track-19999` at index 19,999, and
+remained stopped. Import took about 10 seconds in this one run. CLI catalog
+build/query wall times were 2.70/2.22 seconds including scan; one catalog
+process peak `ru_maxrss` was 11,059,200 bytes. This is not full-app footprint
+or repeatable performance qualification. Full offline Rust gate passed with
+the 20k catalog test; focused desktop/host bound test and Swift catalog index
+validation cases also passed. Physical device recovery, DAC output, Rust Boy
+shared focus, and 20k app-wide memory remain open.

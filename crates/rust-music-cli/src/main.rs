@@ -18,11 +18,12 @@ use rust_music_ipc::{
     read_frame, write_frame, AudioContainer, Envelope, ErrorCode, Playback, Reply, Request,
     TrackView, View, MAX_ERROR_BYTES, MAX_TITLE_BYTES, MAX_TRACKS_PER_VIEW, PROTOCOL_VERSION,
 };
+use rust_music_library::ScanLimits;
 #[cfg(any(
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 ))]
-use rust_music_library::{scan, AudioContainer as LibraryContainer, Library, ScanLimits};
+use rust_music_library::{scan, AudioContainer as LibraryContainer, Library};
 use std::{
     env,
     fs::OpenOptions,
@@ -48,6 +49,12 @@ const PCM_GUID: [u8; 16] = [
 
 const MAX_CATALOG_OUTPUT_BYTES: usize = 20 * 1024 * 1024;
 const MAX_STATE_TSV_BYTES: usize = 6 * 1024 * 1024;
+const STANDALONE_MAX_TRACKS: usize = 20_000;
+const STANDALONE_SCAN_LIMITS: ScanLimits = ScanLimits {
+    max_entries: 100_000,
+    max_tracks: STANDALONE_MAX_TRACKS,
+    max_depth: 6,
+};
 
 fn append_hex(output: &mut String, value: &str) {
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -68,65 +75,79 @@ fn container_name(container: rust_music_library::AudioContainer) -> &'static str
 }
 
 fn catalog_tsv(root: &std::path::Path, query_text: &str) -> Result<String> {
-    use rust_music_library::{scan, ScanLimits, TrackQuery, TrackSort, MAX_PAGE_SIZE};
+    use rust_music_library::{scan, Track, TrackQuery, TrackSort, MAX_PAGE_SIZE};
 
-    let library = scan(root, ScanLimits::default())?;
+    let library = scan(root, STANDALONE_SCAN_LIMITS)?;
     let mut output = String::new();
-    let mut offset = 0usize;
     let mut emitted = 0usize;
-    loop {
-        let page = library.query(&TrackQuery {
-            text: query_text.to_owned(),
-            sort_by: TrackSort::Path,
-            offset,
-            limit: MAX_PAGE_SIZE,
-            ..TrackQuery::default()
-        })?;
-        for track in &page.tracks {
-            let relative = track
-                .relative_path
-                .to_str()
-                .ok_or(MusicError::Invalid("catalog path is not UTF-8"))?;
-            let index = library
-                .tracks()
-                .binary_search_by(|candidate| candidate.relative_path.cmp(&track.relative_path))
-                .map_err(|_| MusicError::Invalid("catalog track index is inconsistent"))?;
-            output.push_str("track\t");
-            use std::fmt::Write as _;
-            write!(output, "{}\t{}\t", index, container_name(track.container))
-                .expect("writing to String cannot fail");
-            append_hex(&mut output, track.display_title());
-            output.push('\t');
-            append_hex(
-                &mut output,
-                track
-                    .tags
-                    .as_ref()
-                    .and_then(|tags| tags.artist())
-                    .unwrap_or(""),
-            );
-            output.push('\t');
-            append_hex(
-                &mut output,
-                track
-                    .tags
-                    .as_ref()
-                    .and_then(|tags| tags.album())
-                    .unwrap_or(""),
-            );
-            output.push('\t');
-            append_hex(&mut output, relative);
-            output.push('\n');
-            emitted = emitted.saturating_add(1);
-            if output.len() > MAX_CATALOG_OUTPUT_BYTES {
-                return Err(MusicError::Limit("catalog output exceeds its size bound"));
+    let mut append_track = |index: usize, track: &Track| -> Result<()> {
+        let relative = track
+            .relative_path
+            .to_str()
+            .ok_or(MusicError::Invalid("catalog path is not UTF-8"))?;
+        output.push_str("track\t");
+        use std::fmt::Write as _;
+        write!(output, "{}\t{}\t", index, container_name(track.container))
+            .expect("writing to String cannot fail");
+        append_hex(&mut output, track.display_title());
+        output.push('\t');
+        append_hex(
+            &mut output,
+            track
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.artist())
+                .unwrap_or(""),
+        );
+        output.push('\t');
+        append_hex(
+            &mut output,
+            track
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.album())
+                .unwrap_or(""),
+        );
+        output.push('\t');
+        append_hex(&mut output, relative);
+        output.push('\n');
+        emitted = emitted.saturating_add(1);
+        if output.len() > MAX_CATALOG_OUTPUT_BYTES {
+            return Err(MusicError::Limit("catalog output exceeds its size bound"));
+        }
+        Ok(())
+    };
+
+    if query_text.is_empty() {
+        // Library tracks are already path-sorted. Avoid rescanning and
+        // resorting all 20k rows once per 200-row page during desktop import.
+        for (index, track) in library.tracks().iter().enumerate() {
+            append_track(index, track)?;
+        }
+    } else {
+        let mut offset = 0usize;
+        loop {
+            let page = library.query(&TrackQuery {
+                text: query_text.to_owned(),
+                sort_by: TrackSort::Path,
+                offset,
+                limit: MAX_PAGE_SIZE,
+                ..TrackQuery::default()
+            })?;
+            for track in &page.tracks {
+                let index = library
+                    .tracks()
+                    .binary_search_by(|candidate| candidate.relative_path.cmp(&track.relative_path))
+                    .map_err(|_| MusicError::Invalid("catalog track index is inconsistent"))?;
+                append_track(index, track)?;
             }
+            if offset.saturating_add(page.tracks.len()) >= page.total_matches {
+                break;
+            }
+            offset = offset.saturating_add(page.tracks.len());
         }
-        if offset.saturating_add(page.tracks.len()) >= page.total_matches {
-            break;
-        }
-        offset = offset.saturating_add(page.tracks.len());
     }
+    drop(append_track);
     use std::fmt::Write as _;
     writeln!(
         output,
@@ -144,7 +165,7 @@ fn resolve_library_track(
     root: &std::path::Path,
     relative: &std::path::Path,
 ) -> Result<std::path::PathBuf> {
-    use rust_music_library::{scan, ScanLimits};
+    use rust_music_library::scan;
     use std::path::Component;
 
     if relative.as_os_str().is_empty()
@@ -156,7 +177,7 @@ fn resolve_library_track(
             "managed library path must be relative and safe",
         ));
     }
-    let library = scan(root, ScanLimits::default())?;
+    let library = scan(root, STANDALONE_SCAN_LIMITS)?;
     let index = library
         .tracks()
         .iter()
@@ -1020,17 +1041,22 @@ impl AudioFocus for ProcessFocus {
 }
 
 #[cfg(all(target_os = "macos", feature = "macos-output"))]
-fn serve(device: Option<&str>) -> Result<()> {
+fn serve(device: Option<&str>, desktop: bool) -> Result<()> {
     if device.is_some() {
         return Err(MusicError::Invalid(
             "macOS process unit does not accept a device argument",
         ));
     }
-    serve_with_sink(|| Ok(rust_music::MacAudioQueueSink::default()))
+    let limits = if desktop {
+        STANDALONE_SCAN_LIMITS
+    } else {
+        ScanLimits::default()
+    };
+    serve_with_sink_and_limits(|| Ok(rust_music::MacAudioQueueSink::default()), limits)
 }
 
 #[cfg(all(target_os = "linux", feature = "alsa-output"))]
-fn serve(device: Option<&str>) -> Result<()> {
+fn serve(device: Option<&str>, desktop: bool) -> Result<()> {
     let device = device.ok_or(MusicError::Invalid(
         "Linux package process requires explicit hw:CARD,DEVICE",
     ))?;
@@ -1040,14 +1066,19 @@ fn serve(device: Option<&str>) -> Result<()> {
         ));
     }
     let device = device.to_owned();
-    serve_with_sink(move || rust_music::AlsaSink::new(&device, true))
+    let limits = if desktop {
+        STANDALONE_SCAN_LIMITS
+    } else {
+        ScanLimits::default()
+    };
+    serve_with_sink_and_limits(move || rust_music::AlsaSink::new(&device, true), limits)
 }
 
 #[cfg(not(any(
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 )))]
-fn serve(_device: Option<&str>) -> Result<()> {
+fn serve(_device: Option<&str>, _desktop: bool) -> Result<()> {
     Err(MusicError::Unsupported(
         "package process playback needs macos-output or alsa-output",
     ))
@@ -1057,21 +1088,45 @@ fn serve(_device: Option<&str>) -> Result<()> {
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 ))]
-fn serve_with_sink<S, F>(make_sink: F) -> Result<()>
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn serve_with_sink_and_limits<S, F>(make_sink: F, scan_limits: ScanLimits) -> Result<()>
 where
     S: PcmSink + 'static,
     F: FnOnce() -> Result<S> + Send + 'static,
 {
     let input = std::io::stdin();
     let output = std::io::stdout();
-    serve_stream(make_sink, input.lock(), output.lock())
+    serve_stream_with_limits(make_sink, input.lock(), output.lock(), scan_limits)
 }
 
 #[cfg(any(
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 ))]
-fn serve_stream<S, F, I, O>(make_sink: F, mut input: I, mut output: O) -> Result<()>
+#[cfg(test)]
+fn serve_stream<S, F, I, O>(make_sink: F, input: I, output: O) -> Result<()>
+where
+    S: PcmSink + 'static,
+    F: FnOnce() -> Result<S> + Send + 'static,
+    I: std::io::Read,
+    O: Write,
+{
+    serve_stream_with_limits(make_sink, input, output, ScanLimits::default())
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn serve_stream_with_limits<S, F, I, O>(
+    make_sink: F,
+    mut input: I,
+    mut output: O,
+    scan_limits: ScanLimits,
+) -> Result<()>
 where
     S: PcmSink + 'static,
     F: FnOnce() -> Result<S> + Send + 'static,
@@ -1080,7 +1135,8 @@ where
 {
     let (request_tx, request_rx) = mpsc::sync_channel::<UnitRequest>(1);
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
-    let worker = thread::spawn(move || process_worker(make_sink, request_rx, reply_tx));
+    let worker =
+        thread::spawn(move || process_worker(make_sink, request_rx, reply_tx, scan_limits));
     let mut negotiated = false;
     let mut last_request_id = 0u64;
 
@@ -1168,6 +1224,7 @@ fn process_worker<S, F>(
     make_sink: F,
     requests: mpsc::Receiver<UnitRequest>,
     replies: SyncSender<std::result::Result<Reply, rust_music_ipc::ProtocolError>>,
+    scan_limits: ScanLimits,
 ) -> Result<()>
 where
     S: PcmSink,
@@ -1186,7 +1243,8 @@ where
             }
             Ok(UnitRequest::Message(request)) => {
                 let is_shutdown = request.body == Request::Shutdown;
-                let reply = handle_unit_request(&mut slot, &focus, request);
+                let reply =
+                    handle_unit_request_with_limits(&mut slot, &focus, request, scan_limits);
                 let _ = replies.send(Ok(reply));
                 if is_shutdown {
                     focus.grant.store(false, Ordering::Release);
@@ -1209,10 +1267,24 @@ where
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 ))]
+#[cfg(test)]
 fn handle_unit_request<S: PcmSink>(
     slot: &mut MusicSlot<S>,
     focus: &ProcessFocus,
     request: Envelope<Request>,
+) -> Reply {
+    handle_unit_request_with_limits(slot, focus, request, ScanLimits::default())
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn handle_unit_request_with_limits<S: PcmSink>(
+    slot: &mut MusicSlot<S>,
+    focus: &ProcessFocus,
+    request: Envelope<Request>,
+    scan_limits: ScanLimits,
 ) -> Reply {
     let page = match &request.body {
         Request::Snapshot { page } => *page,
@@ -1243,8 +1315,7 @@ fn handle_unit_request<S: PcmSink>(
             if !root.is_absolute() {
                 return process_error(ErrorCode::InvalidRequest, "library root must be absolute");
             }
-            scan(root, ScanLimits::default())
-                .and_then(|library| slot.replace_library(library).map(|_| ()))
+            scan(root, scan_limits).and_then(|library| slot.replace_library(library).map(|_| ()))
         }
         Request::Select { index } => slot
             .handle(Command::Select(usize::from(index)), focus)
@@ -1479,7 +1550,7 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | state queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | state queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
     #[cfg(all(
         debug_assertions,
         feature = "test-support",
@@ -1510,14 +1581,19 @@ fn run() -> Result<()> {
                 "unexpected paced-null server test arguments",
             ));
         }
-        return serve_with_sink(|| Ok(TestPacedNullSink(NullSink::default())));
+        return serve_with_sink_and_limits(
+            || Ok(TestPacedNullSink(NullSink::default())),
+            ScanLimits::default(),
+        );
     }
     if action == "serve" {
-        let device = args.next();
+        let first = args.next();
+        let desktop = first.as_deref() == Some("--desktop");
+        let device = if desktop { args.next() } else { first };
         if args.next().is_some() {
             return Err(MusicError::Invalid("too many package process arguments"));
         }
-        return serve(device.as_deref());
+        return serve(device.as_deref(), desktop);
     }
     if action == "play-managed" {
         let path = args.next().ok_or(MusicError::Invalid(
@@ -1699,6 +1775,20 @@ mod tests {
         assert!(!output.contains(root.to_str().unwrap()));
         assert!(catalog_tsv(&root, "bad\nquery").is_err());
         assert!(catalog_tsv(&root, &"x".repeat(513)).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn desktop_catalog_reaches_twenty_thousand_tracks_with_stable_indexes() {
+        let root = temp_root("catalog-20k");
+        for index in 0..STANDALONE_MAX_TRACKS {
+            fs::write(root.join(format!("track-{index:05}.wav")), b"RIFF1234WAVE").unwrap();
+        }
+
+        let output = catalog_tsv(&root, "").unwrap();
+        assert!(output.contains("track\t19999\twave\t"));
+        assert!(output.ends_with("summary\t20000\t20000\t0\n"));
+        assert!(output.len() < MAX_CATALOG_OUTPUT_BYTES);
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -2265,6 +2355,58 @@ mod tests {
         );
         assert_eq!(replies[7].body, Reply::Ack);
         assert_eq!(read_frame(&mut frames).unwrap(), None);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn desktop_ipc_scan_accepts_twenty_thousand_while_host_scan_stays_small() {
+        let root = temp_root("ipc-track-bound");
+        for index in 0..2_049 {
+            fs::write(root.join(format!("track-{index:04}.wav")), b"RIFF1234WAVE").unwrap();
+        }
+        let focus = ProcessFocus {
+            grant: Arc::new(AtomicBool::new(false)),
+        };
+        let mut host_slot = MusicSlot::new(NullSink::default(), Library::empty());
+        let request = |request_id, body| Envelope {
+            package_id: rust_music_host::MUSIC_PACKAGE_ID.into(),
+            request_id,
+            body,
+        };
+        let scan_request = || Request::ScanLibrary {
+            root: root.to_string_lossy().into_owned(),
+        };
+
+        let host_reply = handle_unit_request(&mut host_slot, &focus, request(1, scan_request()));
+        assert!(matches!(host_reply, Reply::Error { .. }));
+
+        let mut desktop_slot = MusicSlot::new(NullSink::default(), Library::empty());
+        let desktop_reply = handle_unit_request_with_limits(
+            &mut desktop_slot,
+            &focus,
+            request(2, scan_request()),
+            STANDALONE_SCAN_LIMITS,
+        );
+        let Reply::View(view) = desktop_reply else {
+            panic!("desktop scan should accept its 20k bound");
+        };
+        assert_eq!(view.track_count, 2_049);
+
+        let selected = handle_unit_request_with_limits(
+            &mut desktop_slot,
+            &focus,
+            request(3, Request::Select { index: 2_048 }),
+            STANDALONE_SCAN_LIMITS,
+        );
+        let Reply::View(view) = selected else {
+            panic!("desktop should select the last host-addressable track");
+        };
+        assert_eq!(view.selected, Some(2_048));
+        assert!(!view.audio_claimed);
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -400,3 +400,36 @@ p95 medians/ranges were 0.084 µs (0.084–0.125), 0.709 µs (0.292–7.583),
 (743.125–748.292) respectively. The 20k build-time and one-track p95 spreads
 are substantial. This is core-only measurement; SwiftUI search/render, app
 startup, full-app memory, and real tagged-library performance remain open.
+
+### Standalone desktop catalog bound and 20k UI run (2026-10-31)
+
+The desktop catalog TSV path and standalone `serve --desktop` mode now opt into
+an explicit 20,000-track / 100,000-entry / depth-6 scan limit. The shared
+library and ordinary host `serve` path retain the 2,048-track default. IPC
+views accept at most 20,000 tracks, while retaining 32 rows per page and
+u16-compatible indexes. The Swift receiver reads at most 20 MiB plus one byte,
+terminates the child on overflow, and reports read errors separately. Parsing
+requires sequential stable indexes while enforcing the 20k row count.
+Empty-query export walks the already path-sorted catalog once rather than
+re-querying and sorting it once per page.
+
+Evidence: the final full offline gate passed after the implementation with the
+20,000 synthetic catalog regression; focused macOS CLI tests passed 21/21
+unit and 3/3 package-process tests; IPC passed 9/9. A further test passed
+showing the ordinary host scan rejects 2,049 tracks while desktop IPC scans
+them, selects index 2,048, and keeps audio focus unclaimed. The rebuilt app
+loaded 20,000 generated 12-byte RIFF/WAVE signatures in about 10 seconds,
+reported 20,000 tracks, found exactly one result for `track-19999`, and
+selected it at track 20,000 while playback remained stopped. No generated
+signature fixture was played. The SwiftUI interaction was responsive, but
+CUA/accessibility round-trip timing was not isolated as UI compute latency.
+
+The release CLI catalog command measured 2.70 seconds cold and 2.22 seconds
+with a one-match query, each including a full scan. Python child `ru_maxrss`
+reported 11,059,200 bytes for the catalog process on this run; this is a
+single CLI-process peak estimate, not app-wide or incremental UI memory. The
+full-app 20k footprint, real tagged libraries, cold startup, and a repeatable
+search latency profile remain open. `sh scripts/build-macos-app.sh` exited 0
+with strict ad-hoc signature validation and the Swift index/output-bound
+tests passed. No private media was opened and no artwork/image/visualizer code
+was added. RM-020 remains in progress.
