@@ -5,25 +5,10 @@ APP="$ROOT/target/macos/RustMusic.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 
-# The bundle is a generated artifact, but several commands below replace its
-# contents. Refuse symlinked path components so a redirected target tree cannot
-# make cleanup/copy/sign operations mutate a location outside this checkout.
-for path in \
-  "$ROOT/target" \
-  "$ROOT/target/macos" \
-  "$APP" \
-  "$CONTENTS" \
-  "$MACOS"
-do
-  if [ -L "$path" ]; then
-    echo "Refusing symlinked app build path: $path" >&2
-    exit 2
-  fi
-  if [ -e "$path" ] && [ ! -d "$path" ]; then
-    echo "Refusing non-directory app build path: $path" >&2
-    exit 2
-  fi
-done
+# The bundle is generated, but cp/redirection/compiler output paths can follow
+# a symlink at the final filename as well as in a directory component.
+sh "$ROOT/scripts/test_macos_app_build_path_guard.sh"
+sh "$ROOT/scripts/check_macos_app_build_paths.sh" "$ROOT"
 
 cd "$ROOT"
 CARGO_NET_OFFLINE=true cargo build --locked --offline --release -p rust-music-cli --features macos-output
