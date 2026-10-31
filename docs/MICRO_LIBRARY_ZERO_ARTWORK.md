@@ -94,7 +94,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model, versioned `.rmp` persistence, CLI CRUD, and standalone text UI for create/rename/delete/add/queue; host workflow and import/export remain |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, CLI/UI queue editing, queue navigation, repeat and seeded shuffle; explicit queue selection is non-autoplay; standalone process focus does not prove Rust Boy shared focus |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | partial: explicit folder selection, cancellable bounded catalog load, text search/list, queue and named-playlist controls, Play/Pause/Resume/Stop/Next/Previous and software volume; fixed panel is implemented, physical input/display and host workflow remain |
-| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: catalog build/search profiled at 0/1/100/2k/20k; cold app startup, incremental memory, restart/corruption remain |
+| ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: build/search profiled at 0/1/100/2k/20k; 20k process RSS delta below 8 MiB at no/10%/all-tagged mixes; full-app RSS, cold system startup and real-library qualification remain |
 
 Profile synthetic catalogs at 0, 1, 100, 2,000 and 20,000 entries. Initial
 engineering target: under 8 MiB additional idle catalog memory for a defined
