@@ -12,7 +12,7 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. Synthetic silent short-track UI checks verified Repeat One continues and Repeat All loops; Repeat Off finishes at the final item instead of replaying it. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / HOST LAUNCH AND ACTIVE PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | On 2026-10-31, the current rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. Before Cmd-Q, process inspection showed the Rust Music app and `rust-music-cli`; after quit, `cua.listApps()` reported `isRunning=false`, and refreshed host process/LaunchServices queries found neither app nor child. The absolute bundle launched through host LaunchServices using `open -n` with exit 0; `lsappinfo` showed bundle ID `dev.rustmusic.standalone` and expected executable. Normal quit was observed, but no new force-close, playback-error, or device-disconnect scenario was exercised in this pass. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / NORMAL AND FORCED ACTIVE-PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. Normal Cmd-Q had already shown no app or child process. On 2026-10-31, app PID 16381 was SIGKILLed while UI reported Playing through AudioQueue; its `rust-music-cli serve` child PID 16556 disappeared within the 8-second process deadline, and CUA reported `isRunning=false`. The absolute bundle also launches through host LaunchServices with `open -n` exit 0 and the expected bundle ID/executable. Separate process tests verify playback-error cleanup and three repeated serve launch/exit cycles. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links. Focused CLI tests passed twice: 19/19 unit tests and 7/7 subprocess tests each run. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc `codesign --verify --deep --strict` exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Repeat-boundary fix received independent read-only safety review with no blocker. Repeatable incremental-memory profiles, transition latency, device recovery and distribution acceptance remain open. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | At `31d0059306ed85b7d1fcf185b4c5bc68a6c61bb2`, clean local branch `build/native-codecs-g0` is 36 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; local `origin/main` ancestry has not been freshly rechecked in this pass. This local-ref comparison is not a fresh GitHub comparison. No push was made; PR #1 remains draft per last recorded remote inspection. Preserve backup branches and stash through post-merge verification. |
 
@@ -126,6 +126,21 @@ with the real CLI child and test output sink; the SIGKILL harness is not an
 end-to-end forced termination of the SwiftUI app while AudioQueue has an open
 device. Physical device loss/recovery and OS-level active-playback force-close
 remain unverified.
+
+### 2026-10-31 actual app SIGKILL during silent playback
+
+Using only the generated silent fixtures under
+`/private/tmp/rust-music-repeat-regression`, the rebuilt app loaded two
+16-bit/44.1 kHz WAV tracks and visibly entered
+`PLAYING … THROUGH RUST MUSIC AND MACOS AUDIOQUEUE`. Host process inspection
+identified app PID 16381 and its `rust-music-cli serve` child PID 16556. The
+app was sent SIGKILL; both PIDs became non-existent within the 8-second
+deadline, and the CUA app inventory reported `dev.rustmusic.standalone` as not
+running. The app was launched from the current committed code tree
+`a2614087e032f34c88d555e0f1045958b573b39a` (the intervening commits since the
+tested app binary changed documentation only). This directly verifies the
+SwiftUI parent/CLI child close path during AudioQueue playback on silent PCM;
+it does not test a physical device disconnect or acoustic output.
 
 
 - No artwork, image extraction/decoding/caching, visualizers, remote metadata,
