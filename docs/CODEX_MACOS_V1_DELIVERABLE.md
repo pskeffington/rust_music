@@ -1253,3 +1253,17 @@ ms; search p50/p95 was 5,799.250 / 6,040.750 µs; cached-index payload was
 source/test evidence supplemented by the GUI force-close observation in MAC-02.
 Physical device-error recovery, acoustic/DAC acceptance, panel acceptance, and
 live Rust Boy focus remain open.
+
+### 2026-10-31 queue-mode controls in the rebuilt app
+
+The rebuilt standalone app loaded three generated one-second stereo 16-bit /
+44.1 kHz silent WAVs. On the Queue screen, the Repeat control visibly advanced
+Off → One → All → Off, and Shuffle visibly toggled Off → On → Off. The transport
+remained stopped throughout; no audio was started. The queue was empty for
+this check, so it verifies UI command/state reflection only, not track
+advancement at repeat boundaries or a shuffled playback session. The test
+fixture was removed and repeat/shuffle were reset to Off. The app window was
+closed and Rust Music was quit from its application menu; the desktop inventory
+then reported `isRunning=false`. Shell process listing was unavailable because
+`sysmond` process-list access failed. No playback child was created in this
+pass. RM-020 remains in progress.
