@@ -235,6 +235,16 @@ fault/teardown tests passed. The gate does not compile the SwiftUI app or
 certify a physical audio device; the separate temporary Swift compilation
 above covers source compilation only.
 
+At merge commit `f8052f28cf187143b54aa15e80779ff3b8db841f`, an initial run of
+`python3 scripts/test_macos_parent_exit.py --binary target/debug/rust-music-cli`
+exited 1 because the pre-existing debug executable exited before the RBPK hello
+reply. After `cargo build --locked --offline -p rust-music-cli --features
+macos-output` exited 0, the same subprocess-cleanup script exited 0: it observed
+real child exits for normal EOF (0), malformed protocol (1), three repeated
+launch/exit cycles, and forced termination of an app-like parent. This verifies
+the CLI process lifecycle, not the SwiftUI window-close callback; app-level
+close observation remains unverified.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.

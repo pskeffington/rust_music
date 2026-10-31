@@ -93,3 +93,26 @@ The new `crates/rust-music-library/src/sync_plan.rs` module exports `MediaEntry`
 The `rust-music-library::sync_manifest` source now defines an offline binary `RMSYNC01` snapshot encoding with little-endian generation/count fields, entries canonicalized by portable 16-byte ID, UTF-8 bounded relative paths, u64 sizes, and caller-provided 32-byte SHA-256 digests. Decoder rejects oversized input, incorrect magic, truncated records, duplicate/noncanonical IDs, invalid/duplicate paths and trailing bytes. Unit fixtures cover empty golden encoding, deterministic reordering, truncation, malicious paths and corruption. This is **pure catalog serialization**, not a cryptographically authenticated package or a working transfer pipeline.
 
 Limitations: the manifest currently stores only basic track identity/location/length/digest, **not** playlists, favorites or full media metadata. Caller must compute trustworthy SHA-256 from actual media, validate decoded files on destination and perform safe transactional publication. Full Unicode filename normalization, symlink-safe opening, replay/rollback persistence, power-loss recovery and on-device acceptance remain required. Source and tests have been committed but **Cargo tests were not run** in this pass because a Rust toolchain was unavailable in the execution environment. RM-022/023 remain open and PR #1 remains draft.
+
+### Integrated planner verification — 2026-10-31
+
+At merge commit `f8052f28cf187143b54aa15e80779ff3b8db841f`,
+`cargo test --locked --offline -p rust-music-library` passed 35/35 tests,
+warnings-denied library Clippy passed, and `sh scripts/offline-gate.sh` exited
+0 across all 17 local crates (32 path-only edges; zero registry/Git crates or
+third-party system links). The gate includes the 15 macOS AudioQueue
+fault/teardown tests. The workspace gate does not exercise a physical target
+volume or turn this planner into an exporter.
+
+Integration repaired the `sync_plan` module declaration, rejects Windows
+reserved device names including extension and superscript COM/LPT forms, and
+uses bounded ordered-set lookups for stale-path planning; a 20,000-entry per
+snapshot regression passes. The planner and manifest remain pure metadata
+logic. `MediaEntry` has no codec identity, `sha256` is caller-supplied and is
+not calculated or authenticated, and a path suffix does not prove losslessness.
+Before any publisher is implemented, it must admit only media verified by the
+local lossless catalog/decoder, hash bytes read from the source, use
+symlink-safe operations and transactional staging, and validate the destination
+before publication. Unicode path normalization and collision handling beyond
+ASCII case-folding remain open. `stale_managed_paths` is advisory only and must
+never be executed as a deletion command.
