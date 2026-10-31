@@ -69,7 +69,7 @@ active synthetic silent AudioQueue playback. No private corpus was rerun.
 | Volume | User-visible functional native volume | Implemented as bounded software attenuation (0–100), with strict 100% integer-sample bypass. It is not hardware gain or bit-perfect processing. The app slider changed 100→95→100 during the two-tone output smoke. |
 | Application | Valid bundle, LaunchServices and shutdown | Local bundle build/plist/ad-hoc code-sign validation and LaunchServices launch evidence are in PR readiness ledger. Revalidate after binary/UI changes; distribution signature/notarization remains open. |
 | Security | Bounded parsers, safe paths, no network/artwork | Workspace-local Cargo edges and fail-closed bounded inputs are enforced by offline gate. Maintain no image/artwork/visualizer functionality and never modify source audio during library operations. |
-| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Five fresh-process launch-to-Ready accessibility samples took 891, 858, 753, 798 and 779 ms (median 798 ms, range 753–891 ms); all showed Ready / No Track with no scan/autoplay, and each app process exited before the next run. One separate idle sample showed 28.2 MB Activity Monitor anonymous memory with no CLI child. The new same-process profile measured 20k synthetic catalog RSS deltas below 8 MiB at no, 10%, and 100% metadata mixes; this does not measure SwiftUI app RSS or exact heap allocation. These are not system-boot cold-start profiles or performance guarantees. Transition latency and attenuation processing cost remain unmeasured. |
+| Performance | Startup, memory, search, transitions | Search/scan profile at 0/1/100/2k/20k exists. One interactive 2k-entry UI sample completed in <1 s; same-process RSS increased 1,568 KiB from the pre-scan snapshot. Five fresh-process launch-to-Ready accessibility samples took 891, 858, 753, 798 and 779 ms (median 798 ms, range 753–891 ms); all showed Ready / No Track with no scan/autoplay, and each app process exited before the next run. One separate idle sample showed 28.2 MB Activity Monitor anonymous memory with no CLI child. The new same-process profile measured 20k synthetic catalog RSS deltas below 8 MiB at no, 10%, and 100% metadata mixes; this does not measure SwiftUI app RSS or exact heap allocation. Four active synthetic silent-track Next/Previous transitions measured 729–1,093 ms (median 886 ms) from UI click through settled accessibility state, including UI automation overhead. This is not a qualified latency threshold or acoustic output measurement. These are not system-boot cold-start profiles or performance guarantees; attenuation processing cost remains unmeasured. |
 | Release | Reproducible build and independent acceptance | Local offline/app build evidence exists at recorded commits. Require fresh build evidence at candidate SHA, independent code/security review, operator hardware record, clean mainline build and app launch before declaring v1.0 ready. |
 
 ### 2026-10-31 fresh-process startup and idle-memory sample
@@ -148,6 +148,22 @@ WAV signatures; no user audio is read or played. One optional `/usr/bin/time
 `kern.clockrate` query failed; the successful direct runs make no peak-RSS
 claim. These are warm local synthetic process samples, not interactive SwiftUI
 search latency or a performance threshold qualification.
+
+### 2026-10-31 interactive track-transition sample at `4d11059`
+
+The rebuilt standalone app explicitly loaded three generated 60-second silent
+stereo WAV fixtures (16-bit/44.1 kHz), started Track 001 through the native
+AudioQueue path, and completed four active-playback transitions: Next to Track
+003, Previous to Track 002, Next to Track 003, and Previous to Track 002. Each
+result showed the expected track and returned to “Playing through Rust Music
+and macOS AudioQueue.” UI-click-to-settled-accessibility timings were **729.4,
+1,093.1, 887.5 and 884.6 ms** (median **886.1 ms**). This includes CUA and
+accessibility polling overhead and is a small sample without a selected
+performance threshold. Playback was stopped, the fresh UI returned to Ready /
+No Track, no CLI child remained in process inspection, and the generated
+fixture directory was removed. The sample proves the interactive native path
+changed tracks during silent playback; it is not audible-output, DAC, or
+hardware-recovery evidence.
 
 ### 2026-10-31 repeatable synthetic library profile
 
