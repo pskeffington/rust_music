@@ -117,6 +117,23 @@ the full macOS app's incremental memory. The all-tagged case is 320 KiB under
 before calling the product memory target fully qualified. Cold startup,
 transition latency, and app-wide RSS delta remain open.
 
+### 2026-10-31 fresh catalog RSS sample at `01ac0e6`
+
+The current release-profile probe was rebuilt with
+`cargo build --locked --offline --release -p rust-music-library --example
+profile_micro_library_memory` (exit 0), then measured using
+`python3 scripts/profile_catalog_memory.py
+target/release/examples/profile_micro_library_memory --counts 2000 20000
+--repeats 3` (exit 0 with process-inspection access). It creates only
+synthetic 12-byte WAV signatures, keeps the catalog alive between RSS samples,
+and reads RSS three times at each phase. Three 2,000-entry runs measured
+incremental RSS estimates **800 KiB median** (784–816 KiB); three 20,000-entry
+runs measured **5,232 KiB median** (5,216–5,280 KiB). No user files or playback
+were involved. These samples refresh the catalog-core measurement only; they
+do not measure the SwiftUI app's retained catalog memory, real tagged-library
+behavior, total application RSS, or cold launch. The full app memory and cold
+startup gates remain open.
+
 ### 2026-10-31 repeatable synthetic library profile
 
 At code source `a40758d53b27d63673697dc68595cb680050b5f5`, the unchanged
