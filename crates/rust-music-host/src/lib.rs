@@ -451,6 +451,37 @@ mod tests {
         }
     }
 
+    struct RecoveringSink {
+        available: Arc<AtomicBool>,
+        open_attempts: usize,
+        successful_writes: usize,
+        finish_attempts: usize,
+        opened: bool,
+    }
+    impl PcmSink for RecoveringSink {
+        fn open(&mut self, _format: rust_music::AudioFormat) -> Result<()> {
+            self.open_attempts += 1;
+            if !self.available.load(Ordering::Acquire) {
+                return Err(MusicError::Output("injected unavailable device".into()));
+            }
+            self.opened = true;
+            Ok(())
+        }
+        fn write(&mut self, _block: &rust_music::PcmBlock) -> Result<()> {
+            if !self.available.load(Ordering::Acquire) {
+                self.opened = false;
+                return Err(MusicError::Output("injected device disconnect".into()));
+            }
+            self.successful_writes += 1;
+            Ok(())
+        }
+        fn finish(&mut self) -> Result<()> {
+            self.finish_attempts += 1;
+            self.opened = false;
+            Ok(())
+        }
+    }
+
     #[derive(Default)]
     struct FailFinishSink {
         finish_attempts: usize,
@@ -736,6 +767,51 @@ mod tests {
         assert!(!focus.claimed.load(Ordering::Acquire));
         assert_eq!(slot.sink().finish_attempts, 1);
         assert_eq!(slot.sink().opened, None);
+    }
+
+    #[test]
+    fn device_write_failure_recovers_after_device_return_and_explicit_play() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let available = Arc::new(AtomicBool::new(true));
+        let sink = RecoveringSink {
+            available: available.clone(),
+            open_attempts: 0,
+            successful_writes: 0,
+            finish_attempts: 0,
+            opened: false,
+        };
+        let mut slot = MusicSlot::new(sink, temp.scan());
+
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(focus.claimed.load(Ordering::Acquire));
+        available.store(false, Ordering::Release);
+        assert!(matches!(
+            slot.handle(Command::Poll, &focus),
+            Err(MusicError::Output(_))
+        ));
+        assert_eq!(slot.status().playback.state, PlaybackState::Failed);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(slot.sink().open_attempts, 1);
+        assert_eq!(slot.sink().finish_attempts, 1);
+
+        available.store(true, Ordering::Release);
+        slot.handle(Command::Play, &focus).unwrap();
+        assert_eq!(slot.sink().open_attempts, 2);
+        assert!(focus.claimed.load(Ordering::Acquire));
+        slot.handle(Command::Poll, &focus).unwrap();
+        assert_eq!(slot.sink().successful_writes, 1);
+        assert_eq!(slot.status().playback.state, PlaybackState::Playing);
+        assert!(slot.status().has_audio_focus);
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        slot.handle(Command::Poll, &focus).unwrap();
+        assert_eq!(slot.status().playback.state, PlaybackState::Finished);
+        assert!(!slot.status().has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert_eq!(slot.sink().finish_attempts, 2);
     }
 
     #[test]

@@ -31,6 +31,27 @@ strict ad-hoc signature validation. These automated results do not establish
 physical acoustic continuity or DAC fidelity; the separate headphone route
 observation above only proves macOS default-route switching and return.
 
+### 2026-10-31 simulated output-device recovery regression
+
+At source candidate `ae0478003fc796a3ad73a5c743eda3312b759365` plus the
+uncommitted test changes being verified for this entry, the engine regression
+`output_device_error_releases_sink_and_recovers_after_reload_and_explicit_play`
+and host regression
+`device_write_failure_recovers_after_device_return_and_explicit_play` each
+passed (1/1). They inject a write/disconnect failure, assert teardown and host
+audio-focus release, restore the fake device, and require an explicit Play to
+reopen output and reacquire focus; EOF releases it again. The full
+`sh scripts/offline-gate.sh` exited **0**, including 17/17 simulated macOS
+AudioQueue tests, 18 host tests and 12 engine tests. Formatting and
+`git diff --check` passed. This closes a deterministic software regression
+gap, not physical invalid-device callback or audible recovery qualification.
+
+The short operator-assisted generated-tone attempt on Shure headphones in
+this pass is **inconclusive**: the tone reached Playback Finished before an
+unplug event was observed, so no device-loss result is recorded. The earlier
+route-switch observation in MAC-02 remains valid, while real AudioQueue
+error/reopen behavior and DAC/acoustic measurement remain open.
+
 At current pre-recording docs candidate `153ccced8444345e3340917ca65e1c8c2234300e`,
 the focused subprocess regression was rerun against unchanged current CLI
 source: `cargo test --locked --offline -p rust-music-cli --features

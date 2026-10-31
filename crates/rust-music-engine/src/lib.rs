@@ -564,6 +564,96 @@ mod tests {
         assert_eq!(player.status().state, PlaybackState::Stopped);
         assert!(!player.sink().opened);
     }
+
+    #[derive(Default)]
+    struct RetrySinkState {
+        device_available: bool,
+        fail_first_write: bool,
+        opened: bool,
+        open_calls: usize,
+        write_calls: usize,
+        finish_calls: usize,
+    }
+
+    struct RetrySink(std::sync::Arc<std::sync::Mutex<RetrySinkState>>);
+
+    impl PcmSink for RetrySink {
+        fn open(&mut self, _: AudioFormat) -> Result<()> {
+            let mut state = self.0.lock().unwrap();
+            state.open_calls += 1;
+            if !state.device_available {
+                return Err(MusicError::Output(
+                    "simulated output device unavailable".into(),
+                ));
+            }
+            state.opened = true;
+            Ok(())
+        }
+
+        fn write(&mut self, _: &PcmBlock) -> Result<()> {
+            let mut state = self.0.lock().unwrap();
+            state.write_calls += 1;
+            if state.fail_first_write {
+                state.fail_first_write = false;
+                state.device_available = false;
+                return Err(MusicError::Output("simulated output device lost".into()));
+            }
+            assert!(state.opened, "sink write requires an open output device");
+            Ok(())
+        }
+
+        fn finish(&mut self) -> Result<()> {
+            let mut state = self.0.lock().unwrap();
+            state.finish_calls += 1;
+            state.opened = false;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn output_device_error_releases_sink_and_recovers_after_reload_and_explicit_play() {
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let state = std::sync::Arc::new(std::sync::Mutex::new(RetrySinkState {
+            device_available: true,
+            fail_first_write: true,
+            ..RetrySinkState::default()
+        }));
+        let mut player = Player::new(RetrySink(state.clone()));
+
+        player.load(Box::new(OneBlock { format, step: 0 })).unwrap();
+        player.play().unwrap();
+        assert!(matches!(
+            player.step(),
+            Err(MusicError::Output(message)) if message.contains("device lost")
+        ));
+        assert_eq!(player.status().state, PlaybackState::Failed);
+        {
+            let state = state.lock().unwrap();
+            assert!(!state.opened, "failed output must be finished and released");
+            assert!(!state.device_available);
+            assert_eq!(state.open_calls, 1);
+            assert_eq!(state.write_calls, 1);
+            assert_eq!(state.finish_calls, 1);
+        }
+
+        // Model the device becoming available again. Recovery requires a fresh
+        // decoder load and a separate explicit Play; it never resumes by itself.
+        state.lock().unwrap().device_available = true;
+        player.load(Box::new(OneBlock { format, step: 0 })).unwrap();
+        assert_eq!(player.status().state, PlaybackState::Ready);
+        assert!(matches!(player.step(), Err(MusicError::Invalid(_))));
+        assert_eq!(state.lock().unwrap().open_calls, 1);
+
+        player.play().unwrap();
+        assert_eq!(player.step().unwrap().state, PlaybackState::Playing);
+        assert_eq!(player.step().unwrap().state, PlaybackState::Finished);
+        let state = state.lock().unwrap();
+        assert!(!state.opened);
+        assert_eq!(state.open_calls, 2);
+        assert_eq!(state.write_calls, 2);
+        assert_eq!(state.finish_calls, 2);
+    }
+
     #[derive(Default)]
     struct CaptureSink {
         last_samples: Vec<i32>,
