@@ -548,3 +548,11 @@ the built-in speakers and headphones plus a two-channel HDMI output, all
 reported at 48 kHz; the built-in speakers were the default output. This is a
 current device-inventory observation only. It does not establish Music's
 AudioQueue playback on each route or device-disconnect recovery.
+
+An independent read-only `safety_reviewer` review of the SwiftUI chassis and
+launch/inventory evidence found no blocker: the wrapper is static SwiftUI,
+preserves the existing transport and shutdown callback, and adds no assets,
+audio-reactive visualization, or dependency. The review did not run tests or
+recheck runtime state; empty-state screenshot coverage does not qualify
+active-playback close, physical output, device recovery, DAC, or panel
+acceptance.
