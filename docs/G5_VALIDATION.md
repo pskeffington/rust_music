@@ -4,7 +4,7 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
 
 | Check | Result | Evidence / reproducible command |
 | --- | --- | --- |
-| Workspace closure | PASS (static and offline audit) | 16 Cargo workspace crates; 29 internal path edges; no registry/Git crates |
+| Workspace closure | PASS (static and offline audit) | `sh scripts/offline-gate.sh` at `23a1427`: 17 local crates, 32 path-only internal edges, no registry/Git crates, one Apple OS framework link |
 | Literature matrix integrity | PASS | `python3 scripts/check_literature.py` (21 sources, 16 rules, exact generated markdown parity) |
 | Reference FLAC fixture validity | PASS (reference-only) | `python3 scripts/test_flac_reference.py --fixtures-only` (seven FLAC files, 8/16/24/32-bit mono/stereo/six-channel, reference MD5) |
 | Bounded library tests | PASS | Local `sh scripts/offline-gate.sh`; symlink avoidance, scan limits, stable ordering |
@@ -43,8 +43,25 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
   AIFF evidence remains tied to the earlier recorded checkpoint. No new
   LaunchServices UI or physical device test was performed in this pass.
 | Audible Rust Music shared lease bridge / TV ownership | PENDING | The separate Pip-Boy regression proves host broker ownership around a real inert Rust Music child, including MUSIC/RADIO suspend/resume handoff. Audible MUSIC output, Rust Music sink/lease bridge, and live TV ownership/contention remain unverified. |
-| AudioQueue OSStatus failure and teardown recovery | PASS (simulated API failures) | `cargo test --locked --offline -p rust-music-native --features macos` passed 12/12 after adding an injectable API seam. Cases include create/partial-allocation failure, enqueue/start/stop/dispose errors, retained-orphan retry before a later open, graceful buffer callback drain before synchronous disposal, and timeout escalation to immediate stop/dispose. Independent review found no blocking synchronization or registry defect. The fake callback executes synchronously; this does not simulate physical device loss, a callback already running on another thread, disconnect/reconnect, audible output, or DAC behavior. |
+| AudioQueue OSStatus failure and teardown recovery | PASS (simulated API failures) | At `23a1427`, `cargo test --locked --offline -p rust-music-native --features macos` passed 16/16. Coverage includes create/partial-allocation failure, enqueue/start/stop/dispose errors, retained-orphan retry, graceful callback drain, timeout escalation, and `simulated_synchronous_invalid_device_enqueue_failure_recovers_after_device_returns`: an active fake queue returns Apple's `kAudioQueueErr_InvalidDevice` (`-66680`), cleanup releases queue capacity, and a fresh queue opens after fake availability is restored. The OSStatus matches the installed macOS SDK's `AudioQueue.h:171`; see [Apple's InvalidDevice reference](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueerr_invaliddevice). This is synchronous error injection only; asynchronous route/device-loss detection, physical disconnect/reconnect, audible output and DAC behavior remain untested. |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink or structural tests |
+
+## 2026-10-31 simulated InvalidDevice recovery and offline gate
+
+- Source commit `23a1427dbe35e4867ca319cc70de2933473cce77` adds a serialized
+  AudioQueue test that starts a fake queue, injects `kAudioQueueErr_InvalidDevice`
+  (`-66680`) on a later active enqueue, verifies failed-slot cleanup and queue
+  registry release, then restores fake availability and opens, writes and
+  finishes a fresh queue.
+- `cargo test --locked --offline -p rust-music-native --features macos` exited
+  **0**, **16/16**; independent verification also exited **0** with 16/16.
+  `sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+  internal edges, zero registry/Git crates, one Apple OS framework link, and
+  all workspace offline checks passed.
+- This simulates a synchronous AudioQueue error, not a physical unplug or
+  asynchronous route-change notification. No private corpus or hardware test
+  was run; physical device disconnect/recovery and DAC qualification remain
+  pending. The current adapter has no asynchronous route-loss observer.
 
 ## 2026-10-31 restricted-shell device query
 
@@ -54,7 +71,7 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
 - After the latest backend change, `sh scripts/build-macos-app.sh` exited 0;
   `plutil -lint target/macos/RustMusic.app/Contents/Info.plist` and
   `codesign --verify --deep --strict` also exited 0. This verifies packaging,
-  packaging, not device loss/recovery or DAC fidelity.
+  not device loss/recovery or DAC fidelity.
 
 ## 2026-10-31 queue and integrated offline gate
 
