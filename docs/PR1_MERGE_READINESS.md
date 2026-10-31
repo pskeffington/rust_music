@@ -1,6 +1,6 @@
 # PR #1 merge-readiness and evidence gate — 2026-10-31
 
-**Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
+**Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, physical panel/DAC acceptance, distribution signing and detached release approval remain open. Shure headphone unplug/reconnect now has active AudioQueue route-transition evidence, but no measured acoustic continuity or invalid-device failure/reopen was observed. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
 ## Current local candidate and remote PR recheck — 2026-10-31
 
@@ -21,14 +21,17 @@ edges, no registry/Git crates or third-party system links) and
 playback-state regression, strict ad-hoc signature verification). The
 SwiftUI library panel now shares one filtered-track result between its count
 and list; a generated 2,000-track UI search returned expected result counts.
-System Settings showed External Headphones selected while Rust Music reported
-AudioQueue playback of its explicit test tone, but playback finished before a
-physical disconnect/reconnect was observed. The feature-gated
-`package_process` suite was rerun at source-equivalent HEAD `0e2bc78` and
-passed 7/7. A focused path-containment review found no further finding in its
-reviewed scope. A host-level, low-amplitude synthetic WAV
-through the app-bundled CLI exited 0 against the default output route;
-physical disconnect/recovery and acoustic/DAC fidelity remain untested.
+During active AudioQueue playback, operator-assisted removal of Shure analog
+headphones changed macOS's selected route from External Headphones to
+MacBook Air Speakers, then returned to External Headphones when reconnected;
+Rust Music stayed in PLAYING state throughout and showed no error; explicit
+Stop then Quit succeeded. This confirms default-route transition and return,
+not acoustic continuity or a device-error/reopen path. The feature-gated
+`package_process` suite was rerun at source-equivalent HEAD `0e2bc78` and passed
+7/7. A focused path-containment review found no further finding in its
+reviewed scope. A host-level, low-amplitude synthetic WAV through the
+app-bundled CLI exited 0 against the default output route; acoustic/DAC
+fidelity remain untested.
 Five synthetic catalog-core runs are recorded in the MAC v1.0 ledger; they do
 not close app-wide performance acceptance. Existing private parity evidence
 was not rerun. Keep PR #1 draft and unpushed while host focus, hardware and

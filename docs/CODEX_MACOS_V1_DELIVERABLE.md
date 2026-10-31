@@ -12,7 +12,7 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Current rebuilt-app UI loaded two generated 60-second, 16-bit/44.1 kHz WAV tracks, showed search narrowing to one result without playback, then explicit Play, Pause/Resume, active Next/Previous, volume 99%→98% while active, and Stop. No queue or playlist records were changed. Earlier queue/playlist restart persistence and repeat behavior remain separately verified. The app-bundled CLI host tone exited 0; prior app UI output was operator-reported audible. No acoustic loopback or DAC bit-perfect evidence. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / ACTIVE GUI CLOSE VERIFIED; DEVICE RECOVERY OPEN** | Current app PID 28923 and `rust-music-cli` child PID 33396 were visible in Activity Monitor during generated AudioQueue playback. After Cmd-Q, a fresh Ready/No Track instance appeared as PID 33445 with no CLI child; after closing it, `cua.listApps()` reported Rust Music stopped and Activity Monitor's refreshed Rust filter showed no Rust Music or CLI process. Normal/forced close and 7/7 feature-gated subprocess cleanup tests also pass. The host AudioQueue tone exited 0; restricted-shell `-66680` was followed by successful host retry. Physical disconnect/recovery, DAC measurement, and Developer ID/notarization remain open. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / ACTIVE CLOSE AND PHYSICAL ROUTE RECOVERY OBSERVED** | Prior active-playback close evidence shows Rust Music and its `rust-music-cli` child exiting after Cmd-Q, with no matching Activity Monitor rows after refresh. The 7/7 feature-gated subprocess cleanup suite passes. New operator-assisted unplug/reconnect of Shure headphones on the analog port during generated AudioQueue playback changed the macOS output selection from External Headphones to built-in speakers and back; Rust Music remained PLAYING throughout and surfaced no playback error. Explicit Stop reached Playback Stopped, then Quit resulted in `cua.listApps()` reporting Rust Music stopped. This verifies the physical route transition and return, not an AudioQueue invalid-device error, acoustic loopback, or DAC measurement. Developer ID/notarization remain open. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | Product source candidate `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` passes `sh scripts/offline-gate.sh` (exit 0; 17 local crates, 32 path-only edges, zero registry/Git crates and third-party system links) and `sh scripts/build-macos-app.sh` (exit 0; 18/18 path-guard cases, Swift UI-state check and strict ad-hoc signature validation). Focused subprocess cleanup remains 7/7 at unchanged CLI source. Five synthetic Rust catalog-core runs measured 20k build median 599 ms (344–672) and search p95 median 745.625 µs (743.125–748.292); this is not SwiftUI/full-app qualification. The current 2k UI search sample returned correct counts, but timings include CUA and accessibility overhead and have no accepted threshold. App-wide incremental memory, direct search/transition latency, device recovery, DAC/panel and distribution acceptance remain open. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | Fresh GitHub read: PR #1 is open, draft and unmerged (`mergeable=true`), remote PR head `2947e6737622c3c668003130006823df0bdde3e0`, base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. Local HEAD `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` contains the PR head (ancestor check exit 0); local `origin/main` is also an ancestor (exit 0). The local branch is 92 commits ahead of its stale tracking ref, 0 behind. Mergeability is ancestry only. No push or merge; preserve backups and stash until release acceptance and post-merge validation. |
 
@@ -60,7 +60,7 @@ active synthetic silent AudioQueue playback. No private corpus was rerun.
 
 | System | Requirement | State / next acceptance |
 | --- | --- | --- |
-| Native audio | macOS native output, safe teardown, device error/recovery | AudioQueue adapter and injected failure/cleanup tests exist. Add transport-safe pause/volume support if API permits; operator must disconnect/reconnect a real output device during playback and verify cleanup plus explicit recovery. |
+| Native audio | macOS native output, safe teardown, device error/recovery | AudioQueue adapter and injected failure/cleanup tests exist (17/17 native macOS tests). During operator-assisted Shure headphone unplug/reconnect while the generated test tone was playing, macOS switched External Headphones → MacBook Air Speakers (46%) → External Headphones (93%); the app stayed in PLAYING and showed no error. Stop then quit cleanly. This verifies real route change and return through the active app path; an actual AudioQueue error callback/reopen path, measured output/acoustic capture and DAC fidelity remain unverified. |
 | Decoders | Lossless-only admission and validated PCM | Native decoders and offline parity evidence are tracked by G2/G7/G8/G10/G11/G12. Retain existing evidence; run full codec gate only when release procedure requires it, and never include private media in Git. |
 | Library | Explicit scan, indexing, metadata, search | Text-only explicit folder load, cancellation, catalog search and bounded metadata exist. The current library suite also rejects missing, non-directory and Unix symlink roots, and invalidates catalog paths after the selected root is deleted (38/38 library tests; full offline gate exit 0 at the current source change). Synthetic catalog RSS and app launch/search snapshots exist, but full-app incremental memory and system-boot cold startup are not qualified; physical removable-volume eject/recovery remains untested. |
 | Playlists | Named persistence and M3U8 support | Bounded versioned named playlist storage and CLI/UI CRUD exist. Complete import/export and restart/error acceptance if required by v1 scope. |
@@ -950,4 +950,27 @@ at 79%, and showed “PLAYING THROUGH RUST MUSIC AND MACOS AUDIOQUEUE.” Playba
 later reached `PLAYBACK FINISHED` before a physical unplug/reconnect was
 observed, so this does **not** count as device-loss or recovery evidence. The
 synthetic fixture directories were removed and Rust Music was quit. Physical
-disconnect/reconnect, error detection and explicit recovery remain open.
+disconnect/reconnect was later tested during active playback; see the next
+section. That later route test did not trigger an AudioQueue error state.
+
+### 2026-10-31 active headphone-route loss and return
+
+With Shure headphones connected to the analog port, System Settings showed
+External Headphones selected at 93%. Rust Music explicitly played a generated
+120-second stereo, 16-bit/44.1 kHz 330 Hz tone (peak sample 983/32767, about
+-30.5 dBFS). While the app reported PLAYING through AudioQueue, the operator
+unplugged the headphones. System Settings changed the selected route to
+MacBook Air Speakers at 46%; Rust Music continued to report PLAYING and showed
+no error. After the operator reconnected the headphones, System Settings
+showed External Headphones selected again at 93%, and Rust Music still
+reported PLAYING. The app was explicitly stopped (UI showed Playback Stopped)
+and quit (`cua.listApps()` reported `isRunning=false`). No system output
+settings were changed by the test; the observed per-route selection/volume
+changes followed the physical jack state. The synthetic file was removed.
+
+This demonstrates an active macOS route change and return without a visible
+transport error or process restart. It does not prove uninterrupted acoustic
+output, negotiated PCM at either route, a physical DAC response, or the
+AudioQueue invalid-device error/reopen path: the OS followed the default route
+automatically and no output capture was made. Keep those acceptance items
+open.
