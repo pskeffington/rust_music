@@ -4,17 +4,18 @@
 
 ## 2026-10-31 catalog and package hardening pass
 
-At this recording, local `build/native-codecs-g0` is at `1603cc7` (latest
-feature commit `f660053127f5fe899c11479833fdea0aa720a5a6`) and a documentation
-update for this host evidence is pending. The checkout was clean at 1603cc7;
-local `origin/main` (`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`) is an
-ancestor, and HEAD was 50 commits ahead of local
+At this recording, local `build/native-codecs-g0` is clean at
+`d93c1af0ce57f9aa5dc81ca1a9aafcfb8598758b`. Local `origin/main`
+(`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`) is an ancestor, and HEAD is 53
+commits ahead of local
 `origin/build/native-codecs-g0` tracking ref (`4e3d24a8fe6bea68b4cd40736ddd4b7db6368011`).
 That tracking ref is known to be stale; this is not a fresh GitHub comparison
-and is not authorization to push. The catalog adds bounded text search,
-deterministic sort/pagination and root-scoped IDs. `sh scripts/offline-gate.sh`
-and the app bundle rebuild passed locally; private corpus parity was not
-rerun. Host playback contention, hardware device recovery, physical panel/DAC,
+and is not authorization to push. Recent commits add bounded text search,
+deterministic sort/pagination, root-scoped IDs, a bounded non-persistent M3U8
+model, and simulated AudioQueue failure/teardown handling. The full
+`sh scripts/offline-gate.sh` exited 0 at this source, and the app bundle build
+passed locally; private corpus parity was not rerun. Audible Rust Music host
+contention, live TV, physical device disconnect/recovery, panel/DAC,
 distribution signing and release approval still block merge.
 
 A separate Pip-Boy commit `bfbb9c76d147911feb6d359ba0f2342a8a0cd97e` adds
