@@ -340,6 +340,10 @@ mod tests {
             selection: None,
             tracks: 0,
             has_audio_focus: false,
+            queue_entries: 0,
+            queue_selection: None,
+            repeat_mode: rust_music_library::queue::RepeatMode::Off,
+            shuffle_seed: None,
             playback: PlaybackSnapshot {
                 state: PlaybackState::Empty,
                 generation: 0,
