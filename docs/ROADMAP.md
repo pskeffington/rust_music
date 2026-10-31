@@ -1,5 +1,10 @@
 # Rust Music — phased engineering roadmap
 
+## Active priority — MAC-07 desktop GUI playback and Winamp-style management (2026-10-31)
+
+**Observed by operator:** real FLAC audible with native CLI, silent/not playing in GUI; queue loading is difficult. These are operator-reported observations, not a verified fix. The primary engineering schedule and functional acceptance contract is [MAC-07 Winamp UI alignment](MAC07_WINAMP_UI_ALIGNMENT.md). **P0:** trace and repair GUI managed-process playback (MAC07-00/01) and truthful progress (02). **P1:** persistent player/library/queue layout (03), immediate playback and queue semantics (04), drag/drop playlists and persistence (05), A/B gate (06) and evidence/index closeout (07). A real FLAC must be heard through the GUI before releasing. Keep MAC-05/MAC-06 as underlying investigation references and preserve all prior evidence.
+
+
 The **machine-readable task, gate and agent registry** is [roadmap-index.json](roadmap-index.json). Keep this file readable for operators; let the registry own stable RM task IDs, gate states, dependencies and Codex routing. Do not infer test results from a commit, source review or a filename.
 
 ## Current integration checkpoint — 2026-10-31
