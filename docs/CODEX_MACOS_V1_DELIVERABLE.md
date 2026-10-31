@@ -529,3 +529,16 @@ commits. `mergeable=true` only
 describes GitHub's mergeability result; it does not satisfy release acceptance.
 No push or merge was performed. Hardware acceptance and the LaunchServices
 shell-launch result remain open.
+
+### 2026-10-31 host LaunchServices revalidation
+
+At SwiftUI source commit `d65efc16f5e694ba40acdac6b4662ae94542b88d`, the exact
+bundle was launched with `/usr/bin/open -n` through the unsandboxed host
+command path; it exited **0**. This supersedes the earlier restricted-shell
+`kLSNoExecutableErr` observation, which did not establish host LaunchServices
+behavior. CUA showed the Pip-Boy chassis UI at Ready / No Track, with no scan
+or playback. Host `ps` inspection showed Rust Music process IDs **20761** and
+**21395** running the expected bundle executable and no `rust-music-cli` child.
+Thus exact-path LaunchServices launch and the idle no-child state pass; this
+does not test playback output, device loss/recovery, or normal-close child
+teardown.
