@@ -535,7 +535,7 @@
       ],
       "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "Generated FFmpeg 9.0.2 PCM parity passes for 882-frame mono and joint-stereo one-block streams; 4,410-frame mono, mixed joint/true-stereo, all-true-stereo, and deterministic pseudorandom 16-bit stereo multiblock streams; padded-24-bit mono/stereo streams with exact INT32_INFO [0,8,0,0]; and a high-entropy padded-24-bit stereo stream covering signed extrema. Independent WavPack Tiny Encoder 4.40 fast-mode vectors pass exact packed-16/24-bit high-entropy stereo PCM parity; default-, high- and very-high-quality-mode 20,000-frame packed-16-bit stereo streams also pass exact parity; the high-mode terms [18,18,18,-2,2,3,5,-1,17,4] extend support to cross-channel terms -2/-1 and lag predictors 2\u20135. A deterministic synthetic 1,063,147-frame packed-24-bit stereo stream passes exact parity against its generated PCM golden and FFmpeg decode; this does not establish compatibility with native real-world WavPack files. Supporting packed-24-bit resolves the observed 3-byte sample layout; known optional metadata is skipped while unknown mandatory metadata still fails closed. Decoded block checksums pass. Removing the unsupported \u00b11024 clamp on positive-term adaptive weights restored exact stereo parity; the bounded 24-bit path checksums reconstructed PCM before validating its 24-bit range. Encoded-block checksum tests reject bit flips and missing declared metadata. Native real-world WavPack source files, further independent-encoder parity, predictor terms other than -2/-1/2/3/4/5/17/18, other integer layouts/depths, trailing tags, and validated hybrid .wvc pairing remain. Keep WavPack unregistered and unadmitted."
+      "blocker": "Generated FFmpeg 9.0.2 PCM parity passes for 882-frame mono and joint-stereo one-block streams; 4,410-frame mono, mixed joint/true-stereo, all-true-stereo, and deterministic pseudorandom 16-bit stereo multiblock streams; padded-24-bit mono/stereo streams with exact INT32_INFO [0,8,0,0]; and a high-entropy padded-24-bit stereo stream covering signed extrema. Independent WavPack Tiny Encoder 4.40 fast-mode vectors pass exact packed-16/24-bit high-entropy stereo PCM parity; default-, high- and very-high-quality-mode 20,000-frame packed-16-bit stereo streams also pass exact parity; the high-mode terms [18,18,18,-2,2,3,5,-1,17,4] extend support to cross-channel terms -2/-1 and lag predictors 2–5. A deterministic synthetic 1,063,147-frame packed-24-bit stereo stream passes exact parity against its generated PCM golden and FFmpeg decode; this does not establish compatibility with native real-world WavPack files. Supporting packed-24-bit resolves the observed 3-byte sample layout; known optional metadata is skipped while unknown mandatory metadata still fails closed. Decoded block checksums pass. Removing the unsupported ±1024 clamp on positive-term adaptive weights restored exact stereo parity; the bounded 24-bit path checksums reconstructed PCM before validating its 24-bit range. Encoded-block checksum tests reject bit flips and missing declared metadata. Native real-world WavPack source files, further independent-encoder parity, predictor terms other than -2/-1/2/3/4/5/17/18, other integer layouts/depths, trailing tags, and validated hybrid .wvc pairing remain. Keep WavPack unregistered and unadmitted."
     },
     {
       "id": "RM-015",
@@ -665,6 +665,166 @@
       "create_paths": [],
       "acceptance": "Provide explicit-root browsing, stable root-scoped track IDs, bounded metadata indexing and text search, deterministic sorting/pagination, named persistent playlists, persistent queue, repeat and shuffle. Add optional persistent autoplay only after explicit user library load, default off, focus grant, and never on startup/refresh/reconnect. Add a native bypassable 10-band EQ with bypass PCM identity and reproducible response/clipping/channel tests; processed EQ is not bit-perfect. Keep user audio read-only, skip image payloads without allocation, and add no artwork/image extraction/cache/visualizers or third-party runtime dependencies. Benchmark startup, memory and search across synthetic 0/1/100/2k/20k-track catalogs.",
       "blocker": "ML-01/ML-07 partial: stable canonical-root/relative-path IDs, bounded text/container filtering, deterministic sorting/pagination, a cancel-aware scan API that returns no partial catalog, text-only M3U8 editing, versioned queue state with Unix atomic save/load/repeat/seeded shuffle, named-playlist CRUD with bounded versioned .rmp persistence, and a standalone text UI connecting explicit folder load/search, queue/playlist controls, explicit Play/Stop, and selection-only Previous/Next are implemented. At commit 2546cae, sh scripts/offline-gate.sh passed on 17 local crates/32 path-only edges with zero registry/Git crates; full tests, release build, warnings-denied Clippy, formatting and macOS feature checks passed. CLI state persistence tests passed 12/12; sh scripts/build-macos-app.sh exited 0 with local ad-hoc bundle signature verification. Roadmap/literature checks and source image-symbol search exited 0/no matches. An initial synthetic 0/1/100/2k/20k scan/search profile is recorded, but cold startup and incremental memory are not isolated. IDs are local identity, not authentication. Multiple roots/reconciliation, standalone queue-to-host playback/focus workflow, Pause/volume, optional explicit-load autoplay setting/focus tests, and the 10-band EQ remain. Queue paths are revalidated through the selected library before managed playback; non-Unix persistent queue support remains unavailable. Physical DAC, panel, live Radio/TV contention, signing/notarization, and private corpus gates are separate."
+    },
+    {
+      "id": "RM-021",
+      "gate": "G15",
+      "title": "Inventory desktop library, RBPK and Pip-Boy socket interfaces",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "planned",
+      "depends_on": [],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Map actual source contracts and capability gaps without changing deployed RBPK; record source-versus-tested evidence.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-022",
+      "gate": "G15",
+      "title": "Versioned portable library manifest and deterministic sort test vectors",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-021"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Define bounded portable catalog, stable IDs, canonical paths, sorted views and golden malformed-input tests; zero third-party runtime dependencies.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-023",
+      "gate": "G15",
+      "title": "Bounded portable packager, integrity validation and atomic import",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-022"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Implement deterministic complete package and incremental delta plan; reject traversal and corruption; verify atomic recovery, cancellation and source media untouched.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-024",
+      "gate": "G15",
+      "title": "Desktop deploy/export workflow on macOS",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-023"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Explicit device folder selection, subset and capacity preview, safe transfer, progress/cancel and repeated incremental sync; no autoplay.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-025",
+      "gate": "G5",
+      "title": "Pip-Boy MUSIC socket consumes validated preloaded catalog",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-022"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Use existing RBPK v1 and host audio-focus; validate lifecycle, browse/sort/playlist and no scan/audio on mount; live hardware status separate.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-026",
+      "gate": "G15",
+      "title": "Cross-platform Linux and Windows library-manager adapters",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "planned",
+      "depends_on": [
+        "RM-023"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Build and verify platform-local GUI, native output, cross-platform package parity and storage path edge cases; do not claim platform support from schema alone.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-027",
+      "gate": "G5",
+      "title": "Physical Pi/Pip-Boy portable-library field acceptance",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "planned",
+      "depends_on": [
+        "RM-024",
+        "RM-025"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [
+        "docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md"
+      ],
+      "acceptance": "Measured on-device copy, disconnect, power-loss recovery, scan startup, RAM, 1024-byte panel, playback and RADIO/TV audio-focus contention.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
     }
   ]
 }
