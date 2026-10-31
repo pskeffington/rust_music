@@ -217,6 +217,32 @@ under-8-MiB additional-memory target remains unverified. The exact fixture
 generator and query are in
 [`examples/profile_micro_library.rs`](../crates/rust-music-library/examples/profile_micro_library.rs).
 
+### Repeated synthetic profile — current catalog implementation
+
+At source code `b03c592ec67d102325c4b0af0adc93acc71e9651`,
+`cargo build --release --locked --offline -p rust-music-library --example
+profile_micro_library` exited 0. Two direct runs of
+`target/release/examples/profile_micro_library` each exited 0. The fixture is
+still signature-only WAV names; the profile scans generated temporary
+directories and does not generate, inspect or play user media.
+
+| Tracks | Build ms (run A / B) | Search p50 µs (A / B) | Search p95 µs (A / B) |
+| ---: | ---: | ---: | ---: |
+| 0 | 0 / 0 | 0.083 / 0.083 | 0.084 / 0.125 |
+| 1 | 0 / 0 | 0.125 / 0.125 | 0.292 / 0.750 |
+| 100 | 1 / 3 | 4.000 / 4.042 | 5.708 / 8.833 |
+| 2,000 | 34 / 38 | 74.042 / 74.250 | 92.209 / 79.917 |
+| 20,000 | 519 / 636 | 697.958 / 724.792 | 733.542 / 802.334 |
+
+An attempted `/usr/bin/time -l target/release/examples/profile_micro_library`
+completed all five profile rows but the wrapper exited 1 when its RSS reporting
+called `sysctl kern.clockrate`, which the sandbox denied (`Operation not
+permitted`). Peak RSS and total wall time are therefore not accepted from that
+attempt. The two direct profile runs show 20,000-entry build time varying from
+519 to 636 ms; search p95 varied from 734 to 802 µs. These are two local
+samples, not performance thresholds. Cold app startup, peak RSS and incremental
+catalog memory remain unmeasured.
+
 ### Integrated standalone transport continuation (2026-10-31)
 
 The standalone UI now keeps one persistent RBPK child process for transport

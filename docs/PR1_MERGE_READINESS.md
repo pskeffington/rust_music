@@ -230,3 +230,38 @@ disconnect/recovery, Rust Boy shared focus, physical panel/DAC, and
 distribution approval remain open. Local HEAD remains 24 commits ahead of its
 local development-branch tracking ref (not refreshed this pass); no push or
 merge was performed. PR #1 remains draft and ineligible for merge.
+
+## 2026-10-31 follow-up current-app close and startup observation
+
+After the operator closed the library picker, the current rebuilt app showed
+its loaded catalog and `PLAYBACK FINISHED`. Without starting or selecting a
+track, Activity Monitor showed Rust Music PID 95299 and a `rust-music-cli`
+child PID 95500. Cmd-Q closed that app. CUA's subsequent `getApp()` call
+automatically launched a fresh instance (PID 9117) with an empty library;
+the refreshed Activity Monitor list had no old app PID or CLI process. A later
+Quit was followed by `cua.listApps()` reporting `isRunning=false`, and the
+Activity Monitor `rust` filter showed neither Rust Music nor its CLI child.
+This verifies current-candidate idle-child cleanup; there was no active audio
+at close.
+
+The app was reopened once more for startup verification. Activity Monitor
+listed Rust Music PID 9188 and no playback child; the UI displayed Ready / No
+Track, disabled transport, and explicit Load Library. Player, Library, Queue
+and Playlists navigation was exercised; no folder was loaded in this startup
+check. This supports no startup scan/autoplay on the current bundle.
+
+The local catalog example was rebuilt with
+`cargo build --release --locked --offline -p rust-music-library --example
+profile_micro_library` (exit **0**). Two direct profile runs exited **0** at
+0/1/100/2k/20k generated signature-only entries. For 20,000 entries, catalog
+builds took 519/636 ms and search p95 was 734/802 µs. An attempted
+`/usr/bin/time -l` wrapper exited **1** because the sandbox denied its RSS
+`sysctl kern.clockrate` call after all profile rows printed; peak RSS remains
+unmeasured. The exact two-run table is recorded in
+[`MICRO_LIBRARY_ZERO_ARTWORK.md`](MICRO_LIBRARY_ZERO_ARTWORK.md).
+
+RM-019 is now **done for local bundle/idle-child shutdown acceptance**. Active
+playback close, native-device disconnect/recovery, live Rust Boy focus,
+physical panel/DAC and distribution approval remain open. The overall release
+decision is unchanged: local branch is unpushed, PR #1 stays draft, and mainline
+integration remains blocked.

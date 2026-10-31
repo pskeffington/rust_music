@@ -12,9 +12,9 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / CURRENT APP CLOSE AND DEVICE RECOVERY OPEN** | On the earlier app build recorded in the native-output smoke below, unsandboxed `open -n` exited 0; LaunchServices recorded bundle check-in in 0.065434 s. `system_profiler` listed MacBook Air Speakers as the 48 kHz default output and an ASUS VG32V HDMI output. Before Cmd-Q the app PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q neither PID remained and LaunchServices showed the app stopped. This app-level observation predates the navigation/shutdown source change in `31cb4cb`; current-candidate GUI close remains unverified. At `b03c592`, AudioQueue injected failure/teardown tests pass 15/15 and packaged-child lifecycle tests pass, but no real device disconnect/recovery was run. DAC measurement remains open; Developer ID/notarization remains a distribution gate. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / IDLE CHILD CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The current bundle built at code HEAD `b03c592` includes the navigation/shutdown change from `31cb4cb`. With the app open and its CLI child listed in Activity Monitor (app PID 95299, child PID 95500; playback was already finished), Cmd-Q closed the app. Rebinding through CUA launched a fresh empty instance; Activity Monitor then showed the new Rust Music PID 9117 and no `rust-music-cli` row. A later Quit produced `cua.listApps()` `isRunning=false` and a fresh Activity Monitor filter with no Rust Music or CLI process. Reopening the bundle showed the expected Ready/No Track state, disabled transport, and no CLI child (new app PID 9188), so startup did not autoplay or rescan. This confirms current idle-child cleanup, not forced-close during active audio. AudioQueue injected failure/teardown tests pass 15/15. Real device disconnect/recovery, active-playback close, DAC measurement and Developer ID/notarization remain open. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`, `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 local path edges, zero registry/Git crates); macOS AudioQueue failure/teardown tests passed 15/15. A generated nonzero 440 Hz 16-bit/44.1 kHz WAV played through the bundled CLI with exit 0; `system_profiler` listed MacBook Air Speakers as the 48 kHz default output. In the UI, loading 2,000 generated catalog entries returned in <1 s and searching `track-01999` returned one result. Same-process RSS rose 103,312→104,880 KiB (+1,568 KiB); this is one fixture sample, not a threshold pass. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Cold-launch distribution, broader incremental-memory profiles and latency measurements remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
-| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. The current local development branch at `b03c592ec67d102325c4b0af0adc93acc71e9651` is 24 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; that ref was not refreshed during this pass. No push was made because acceptance gates remain open. PR #1 remains draft. Preserve backup branches and stash through post-merge verification. |
+| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. At preceding checkpoint `fa6c192ca0822f685e908531af7fdd5d3d85ca08`, the local branch was 25 commits ahead of its local `origin/build/native-codecs-g0` tracking ref. This pass adds another local documentation commit; the tracking ref was not refreshed and nothing was pushed. PR #1 remains draft. Preserve backup branches and stash through post-merge verification. |
 
 ## Component matrix
 
@@ -288,6 +288,27 @@ current SwiftUI app closing its own child after Cmd-Q/window close. The native
 folder picker remained open during this pass and was left untouched. Device
 disconnect/recovery, physical output measurement, live host audio focus, and
 release authorization remain unverified.
+
+### Current-candidate UI, idle-child shutdown and startup — 2026-10-31
+
+After the user closed the folder picker, the already-running rebuilt app showed
+the loaded library and `PLAYBACK FINISHED`; no track was started or changed.
+Activity Monitor listed Rust Music PID 95299 and its `rust-music-cli` child PID
+95500. Cmd-Q closed that instance. During verification, CUA's `getApp()`
+automatically started a fresh instance (PID 9117) with an empty library; the
+refreshed Activity Monitor list no longer contained the original app or CLI
+child. A subsequent Quit produced `cua.listApps()` `isRunning=false` and an
+Activity Monitor `rust` filter with no Rust Music or CLI rows. This is current
+app idle-child cleanup evidence; playback was already finished, so close during
+active output remains unverified.
+
+Reopening the same bundle produced Rust Music PID 9188 in Activity Monitor,
+with no `rust-music-cli` process. The UI showed Ready / No Track, an explicit
+Load Library button, and disabled transport until a user loads a folder and
+presses Play. Runtime navigation reached Player, Library, Queue and Playlists;
+the screenshot showed the phosphor-green interior within macOS window chrome,
+with transport and software volume in the bottom bar and no artwork or
+visualizer. This runtime check did not scan media.
 
 ## Required handoff
 
