@@ -344,3 +344,16 @@ The approved visual direction is [PRIMARY_UI_DIRECTION](design/PRIMARY_UI_DIRECT
 | RM-027 | P2 | host_integrator + read-only gate_verifier | Physical Pi/Pip-Boy and removable-media acceptance |
 
 RM-022 and RM-023 are **in progress**, with partial bounded manifest and pure delta-planner source/tests included in the offline gate at `f8052f28`. The `RMSYNC01` manifest and deterministic planner are data-model components only; they do not constitute a package writer, exporter, or importer. Playlists/full metadata, trusted computed digests, lossless admission, complete cross-platform Unicode/path policy, safe source hashing/open, atomic publication, cancellation/recovery, and destination validation remain open. RM-021 and RM-024–RM-027 remain **planned**. These documents and source tests do not certify release readiness or publisher behavior. Do not ship ornamental image/skin assets from the approved reference while the text-only/zero-artwork release policy remains in force; any future visual-policy change requires a separate gated decision. Update `docs/roadmap-index.json` together with this section and run the existing index checker before declaring the registry valid.
+
+## RM-020 synthetic library workflow smoke — 2026-10-31
+
+The rebuilt standalone app explicitly loaded three generated one-second,
+stereo, 16-bit/44.1 kHz silent WAVs and displayed all three tracks without
+starting playback. A single click on the visible `Workflow Check` playlist
+selected it and enabled its actions; adding the selected track changed the
+playlist count to one. Queue Playlist added one entry while transport remained
+stopped (Play enabled, Pause disabled). The test playlist and queue entry were
+removed, the app was quit and relaunched to Ready / No Track, and the temporary
+fixture was removed. This verifies a small UI workflow only; RM-020 remains in
+progress, with broader search/restart/performance and release acceptance still
+open.

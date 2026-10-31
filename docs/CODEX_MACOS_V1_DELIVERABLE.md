@@ -1205,6 +1205,19 @@ It is not acoustic loopback, DAC fidelity, proof of audible sound, or an
 AudioQueue invalid-device failure/reopen test. Physical device recovery,
 hardware panel/DAC acceptance and live Rust Boy focus remain open.
 
+### 2026-10-31 synthetic library/playlist/queue UI smoke
+
+The standalone bundle explicitly loaded three generated one-second, stereo,
+16-bit/44.1 kHz silent WAVs and displayed all three catalog rows with Track 001
+selected and playback stopped. In the playlist view, one click on the visible
+`Workflow Check` row selected it and enabled its actions. Adding the selected
+track changed the playlist count from 0 to 1; Queue Playlist produced one queue
+entry. The transport remained stopped (Play enabled, Pause disabled); no audio
+was started. The test queue entry and playlist were removed, Cmd-Q closed the
+app, and a subsequent fresh launch returned to Ready / No Track. The generated
+library directory was removed. This is a synthetic UI workflow check, not
+acoustic or DAC acceptance; the RM-020 performance and feature gaps remain open.
+
 ### 2026-10-31 managed catalog/state child lifetime regression
 
 At source commit `d129c87ba3f8a3030b3234bedcee524041105759`, macOS app catalog and state
