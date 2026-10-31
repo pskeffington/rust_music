@@ -13,6 +13,37 @@ bundle construction, and valid strict ad-hoc signature. This is a fresh local
 verification; it does not clear hardware, host-focus, distribution, review,
 or mainline acceptance.
 
+### Current evidence and GitHub refresh — 2026-10-31
+
+The latest verified product source candidate is `657cb505151fe949800574aa395fce4a1cac40c0`.
+At that tree, `sh scripts/offline-gate.sh` exited **0** (17 local crates,
+32 path-only edges, zero registry/Git crates, 17/17 simulated AudioQueue
+tests); the explicitly enabled package-process suite exited **0** (7/7);
+`sh scripts/build-macos-app.sh` exited **0** with optimized Swift UI/catalog
+harnesses and strict local signature verification. Roadmap/literature checks
+and `git diff --check` also exited **0** after the evidence updates. Existing
+private FLAC, WAVE and AIFF results were preserved; no private corpus was
+rerun.
+
+The app workflow smoke used three generated one-second 16-bit/44.1 kHz silent
+WAVs. The UI explicitly loaded all three without autoplay, created playlist
+`Acceptance Set` with one selected track, and persisted two selected tracks in
+the queue. After the UI returned to Ready / No Track, explicit reload restored
+the playlist and queue. This is not definitive process-exit evidence for the
+intervening Ready state; automated restart tests remain the process-restart
+proof.
+
+A read-only GitHub API check confirms PR #1 is open, draft, unmerged, and
+`mergeable=true` (`mergeable_state=clean`). Its remote head is still
+`2947e6737622c3c668003130006823df0bdde3e0`, base is
+`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`, with **zero status contexts and
+zero check runs** on that remote head. Local source/evidence tip at the time
+of the read was `103fb96f48660769e08f25c9bf573a0de30f7b46`, 116 commits ahead
+of the local tracking ref, with local `origin/main` an ancestor. No push or
+merge was made. Keep draft: live Rust_Boy shared focus, actual AudioQueue
+device-error/reopen, physical DAC/panel, repeatable app-wide memory,
+distribution signing, and release approval remain open.
+
 ## Historical local candidate and remote PR snapshot — 2026-10-31
 
 Local HEAD is `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` on
