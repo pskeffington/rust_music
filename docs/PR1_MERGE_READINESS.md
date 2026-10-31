@@ -4,20 +4,24 @@
 
 ## Current local candidate and remote PR recheck — 2026-10-31
 
-Local HEAD is `17dff9031c0701d1fb6daa857fec83cfffe9ecdb` on
-`build/native-codecs-g0`, clean and 86 commits ahead of the local tracking ref
+Local HEAD is `e1d2aa0f4c0ff8e302906f326f165f30e4465bfe` on
+`build/native-codecs-g0`, clean and 89 commits ahead of the local tracking ref
 `2947e6737622c3c668003130006823df0bdde3e0` (`git rev-list --left-right --count
-origin/build/native-codecs-g0...HEAD` returned `0 84`). Local `origin/main`
-`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf` is an ancestor (exit 0). A live
-GitHub read reports PR #1 open, draft, unmerged, `mergeable=true`, with that
-same remote head and base. No push or merge was made.
+origin/build/native-codecs-g0...HEAD` returned `0 89`). Local `origin/main`
+`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf` is an ancestor (exit 0), and the
+GitHub PR head is an ancestor of this checkout (exit 0). A live GitHub read
+reports PR #1 open, draft, unmerged, `mergeable=true`, with remote head
+`2947e6737622c3c668003130006823df0bdde3e0` and base
+`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. No push or merge was made.
 
-The current code candidate `ab829b3` passed `sh scripts/offline-gate.sh`
-(exit 0), the macOS app bundle build with an external
-`CARGO_TARGET_DIR` override (exit 0), strict ad-hoc signature verification,
-and the 18-case symlink path guard. A focused review found no further
-path-containment finding. At unchanged app/CLI code, the feature-gated
-`package_process` suite passed 7/7. A host-level, low-amplitude synthetic WAV
+The current product source candidate `d46599c` passed
+`sh scripts/offline-gate.sh` (exit 0; 17 local crates, 32 path-only internal
+edges, no registry/Git crates or third-party system links) and
+`sh scripts/build-macos-app.sh` (exit 0; 18 symlink-path refusal cases, Swift
+playback-state regression, strict ad-hoc signature verification). The
+feature-gated `package_process` suite was rerun at source-equivalent HEAD
+`0e2bc78` and passed 7/7. A focused path-containment review found no further
+finding in its reviewed scope. A host-level, low-amplitude synthetic WAV
 through the app-bundled CLI exited 0 against the default output route;
 physical disconnect/recovery and acoustic/DAC fidelity remain untested.
 Five synthetic catalog-core runs are recorded in the MAC v1.0 ledger; they do
