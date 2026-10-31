@@ -6,6 +6,10 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 
 PR #1 has **merged**. The prior draft-PR and README-only-main handoffs below are historical snapshots, not instructions to merge or block PR #1 now. `main` and `build/native-codecs-g0` matched at `deb6f879` before the latest documentation commits. Verify the current refs on every pass. Read [the operator quickstart](docs/START_HERE.md) and [the current README](README.md) before using dated task notes. Continue remaining Mac hardware, recovery, performance and distribution acceptance independently; do not claim production release from a passing offline gate. Do not rewrite or erase historical validation ledgers: add dated corrections. Preserve local work, require observed test evidence and keep all proprietary audio outside Git.
 
+## ACTIVE CODEX IMPLEMENTATION KICKOFF — MAC-06
+
+Execute [docs/CODEX_MAC06_EXECUTION.md](docs/CODEX_MAC06_EXECUTION.md) for the operator-observed silent playback, playback progress and Winamp-like UI repair. Follow its pass order, baseline-vs-candidate A/B validation and stop conditions. This is an active tasking document, **not** implementation evidence. No release-ready claim without real audible operator verification and the full offline/macOS gates.
+
 ## CURRENT UX RESEARCH DIRECTIVE — 2026-10-31
 
 Read [docs/WINAMP_UI_AGENT_RESEARCH.md](docs/WINAMP_UI_AGENT_RESEARCH.md) and [docs/MAC06_DIAGNOSIS_UI_AB_PLAN.md](docs/MAC06_DIAGNOSIS_UI_AB_PLAN.md) before any desktop usability changes. Winamp is a behavioral comparison (library, queue, transport), not a skin, asset or dependency source. Preserve offline-only playback, no artwork, exact existing RBPK wire contract, macOS accessibility, and honest progress/audio status. Assign the existing host_integrator as the only SwiftUI writer; audio_backend owns sink changes. Require paired A/B results and independent gate review.
