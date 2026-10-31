@@ -134,6 +134,21 @@ do not measure the SwiftUI app's retained catalog memory, real tagged-library
 behavior, total application RSS, or cold launch. The full app memory and cold
 startup gates remain open.
 
+### 2026-10-31 fresh synthetic search profile at `01ac0e6`
+
+The release example was built with `cargo build --locked --offline --release
+-p rust-music-library --example profile_micro_library` (exit 0). Two serial
+direct runs of `target/release/examples/profile_micro_library` exited **0**.
+At 20,000 synthetic entries, catalog construction was **419 ms / 313 ms**,
+search p50 was **717,000 / 688,750 ns**, and search p95 was **739,000 / 728,291
+ns**. At 2,000 entries, catalog construction was **30 / 25 ms** and search
+p95 was **142,458 / 77,292 ns**. The profiler's fixtures contain only 12-byte
+WAV signatures; no user audio is read or played. One optional `/usr/bin/time
+-l` wrapped run printed timings but exited **1** because a sandbox-denied
+`kern.clockrate` query failed; the successful direct runs make no peak-RSS
+claim. These are warm local synthetic process samples, not interactive SwiftUI
+search latency or a performance threshold qualification.
+
 ### 2026-10-31 repeatable synthetic library profile
 
 At code source `a40758d53b27d63673697dc68595cb680050b5f5`, the unchanged
