@@ -263,7 +263,7 @@
       "title": "Desktop micro-library browsing and playback controls",
       "owner_agent": "host_integrator",
       "status": "partial_evidence",
-      "next_evidence": "The exact rebuilt app exercised Play, Pause/Resume, Stop, active Next/Previous and software volume with generated nonzero WAVs; the user confirms audible output, and the offline Rust gate passed at 258ecec. Runtime verification of the new navigation and SwiftUI close path, device disconnect/recovery, live Rust Boy shared audio focus, repeatable startup/memory/latency profiles, and physical DAC/panel acceptance remain open.",
+      "next_evidence": "The rebuilt app previously exercised Play, Pause/Resume, Stop, active Next/Previous and software volume with generated nonzero WAVs; the user confirms audible output. At b03c592 the offline gate and app bundle build/signature passed; AudioQueue fault/teardown tests pass 15/15. The packaged CLI passed normal EOF, malformed protocol, repeated launch and forced-parent-kill cleanup checks, and package_process passed 5/5 after one transient parallel timeout run. The current SwiftUI navigation and close callback still need visible runtime verification, along with device disconnect/recovery, live Rust Boy shared focus, repeatable startup/memory/latency profiles, and physical DAC/panel acceptance.",
       "evidence_doc": "docs/CODEX_MACOS_V1_DELIVERABLE.md"
     }
   ],
@@ -637,7 +637,7 @@
       "owner_agent": "host_integrator",
       "review_agent": "gate_verifier",
       "priority": "P1",
-      "status": "done",
+      "status": "in_progress",
       "depends_on": [
         "RM-001"
       ],
@@ -651,7 +651,7 @@
       ],
       "create_paths": [],
       "acceptance": "Build the standalone app bundle from a clean offline macOS checkout; launch it, inspect supported and rejected files, verify explicit Play/Stop and window-close child cleanup, and confirm no network or background scan. Record actual output-device checks separately; this task cannot certify bit-perfect hardware.",
-      "blocker": "Local acceptance completed at clean source commit bbd5dc3c52d3e187a1a332010f07d2a72906766c: offline bundle build, macOS 13.0 target, final ad-hoc bundle signature and strict signature verification pass. After unregistering the generated bundle, unsandboxed `open -n` by path auto-registered and launched it (exit 0; LaunchServices CHECKIN observed). UI supported-WAV inspection, Play/Stop, generated-MP3 refusal and window-close child cleanup were observed; Activity Monitor showed no rust-music-cli child after close. Sandboxed LaunchServices diagnostics are blocked by the sandbox, while local `spctl` rejects ad-hoc signatures; Developer ID/notarization/distribution and graceful AudioQueue teardown under watchdog escalation are not claimed. Physical device failure/disconnect/recovery and DAC acceptance are separate hardware tasks."
+      "blocker": "Earlier app-level window-close cleanup was observed on source commit bbd5dc3c52d3e187a1a332010f07d2a72906766c. The current SwiftUI navigation and strong-retain serialized shutdown change landed in 31cb4cb; current offline gate, bundle build/signature and packaged CLI child-process regressions pass at b03c592ec67d102325c4b0af0adc93acc71e9651, but the current app-level Cmd-Q/window-close child exit has not been re-observed. The folder picker remained open during the latest runtime pass. Reverify the current app callback before returning this task to done. Developer ID/notarization, physical device failure/disconnect/recovery and DAC acceptance remain separate."
     },
     {
       "id": "RM-020",

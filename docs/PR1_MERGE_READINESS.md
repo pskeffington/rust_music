@@ -199,3 +199,34 @@ Stop returned to Stopped. Before Cmd-Q, the app was PID 93068 and its real
 app or CLI processes, and LaunchServices reported the app stopped. Device
 disconnect/recovery, DAC capture, Rust Boy Radio/TV focus, and notarized
 distribution remain unverified.
+
+## 2026-10-31 current-candidate offline and child-process checks
+
+At source HEAD `b03c592ec67d102325c4b0af0adc93acc71e9651`, the offline gate
+exited **0** (17 local crates, 32 path-only edges, zero registry/Git crates,
+zero third-party system links; 15/15 injected AudioQueue failure/teardown
+tests passed). `sh scripts/build-macos-app.sh` exited **0** and the bundle
+passed strict ad-hoc signature validation. Roadmap-index, literature and
+`git diff --check` validators exited **0**.
+
+The current bundle's CLI child passed the default
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` run (5/5, 0.24 s), after
+one initial parallel run timed out in all five tests; a serialized rerun also
+passed 5/5 (0.28 s). `scripts/test_macos_parent_exit.py` observed normal EOF,
+malformed-protocol exit, three repeated launch/exit cycles, and child exit
+after an app-like parent was force-killed. `scripts/test_release_package_process.py`
+passed the bundled CLI RBPK lifecycle check (SHA-256
+`2f4adc33ef8a29c0b282c34307f6e0b33530d775d14dc73e2aa5c9ed417d655e`). These
+are child-process tests; they do not launch the SwiftUI app or stop active
+AudioQueue playback.
+
+The app-level Cmd-Q observation in the earlier native-output smoke belongs to
+the older app source before the navigation/shutdown change at `31cb4cb`. The
+current app's close-path child exit must be re-observed; the native folder
+picker remained open during this pass and was left untouched. RM-019 is
+reopened as `in_progress` for that current-candidate evidence. Device
+disconnect/recovery, Rust Boy shared focus, physical panel/DAC, and
+distribution approval remain open. Local HEAD remains 24 commits ahead of its
+local development-branch tracking ref (not refreshed this pass); no push or
+merge was performed. PR #1 remains draft and ineligible for merge.

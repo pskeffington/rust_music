@@ -12,9 +12,9 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / DEVICE RECOVERY OPEN** | Unsandboxed `open -n` exited 0; LaunchServices recorded bundle check-in in 0.065434 s. `system_profiler` listed MacBook Air Speakers as the 48 kHz default output and an ASUS VG32V HDMI output. Before Cmd-Q the app PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q neither PID remained and LaunchServices showed the app stopped. AudioQueue injected failure/teardown tests pass 15/15. Physical disconnect/recovery and DAC measurement remain open; Developer ID/notarization remains a distribution gate. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / CURRENT APP CLOSE AND DEVICE RECOVERY OPEN** | On the earlier app build recorded in the native-output smoke below, unsandboxed `open -n` exited 0; LaunchServices recorded bundle check-in in 0.065434 s. `system_profiler` listed MacBook Air Speakers as the 48 kHz default output and an ASUS VG32V HDMI output. Before Cmd-Q the app PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q neither PID remained and LaunchServices showed the app stopped. This app-level observation predates the navigation/shutdown source change in `31cb4cb`; current-candidate GUI close remains unverified. At `b03c592`, AudioQueue injected failure/teardown tests pass 15/15 and packaged-child lifecycle tests pass, but no real device disconnect/recovery was run. DAC measurement remains open; Developer ID/notarization remains a distribution gate. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source `9d1141975d5fa54c31fa2a7ce25c622c4218ebba`, `sh scripts/offline-gate.sh` exited 0 (17 local crates, 32 local path edges, zero registry/Git crates); macOS AudioQueue failure/teardown tests passed 15/15. A generated nonzero 440 Hz 16-bit/44.1 kHz WAV played through the bundled CLI with exit 0; `system_profiler` listed MacBook Air Speakers as the 48 kHz default output. In the UI, loading 2,000 generated catalog entries returned in <1 s and searching `track-01999` returned one result. Same-process RSS rose 103,312→104,880 KiB (+1,568 KiB); this is one fixture sample, not a threshold pass. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Cold-launch distribution, broader incremental-memory profiles and latency measurements remain open. Independent Swift and security reviews found no actionable finding after the paused-navigation fix. |
-| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. Local transport/app and evidence commits remain preserved; the development branch is nine commits ahead of the refreshed remote. No push was made because other acceptance gates remain open. PR #1 remains draft. Preserve backup branch and stash through post-merge verification. |
+| MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | `origin/main` is an ancestor. The current local development branch at `b03c592ec67d102325c4b0af0adc93acc71e9651` is 24 commits ahead of its local `origin/build/native-codecs-g0` tracking ref; that ref was not refreshed during this pass. No push was made because acceptance gates remain open. PR #1 remains draft. Preserve backup branches and stash through post-merge verification. |
 
 ## Component matrix
 
@@ -257,6 +257,37 @@ and CLI minimum 11.0; the bundle identifier is `dev.rustmusic.standalone` and
 This is a staged package-structure/signature check only; production build
 script execution, LaunchServices launch, visible layout and app-close cleanup
 remain pending.
+
+### Fresh automated gates and packaged-child lifecycle — `b03c592ec67d102325c4b0af0adc93acc71e9651`
+
+On the clean checkout at this exact HEAD, `sh scripts/offline-gate.sh`
+exited **0** (17 local crates, 32 path-only edges, zero registry/Git crates,
+zero third-party system links, all workspace tests/builds and macOS feature
+checks; injected AudioQueue failure/teardown tests passed 15/15).
+`sh scripts/build-macos-app.sh` exited **0**; the generated local bundle passed
+strict ad-hoc signature validation. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, and `git diff --check` each exited **0**.
+
+The packaged `Contents/MacOS/rust-music-cli` was exercised directly.
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` passed **5/5** on the default
+parallel run (0.24 s); an immediately preceding parallel attempt timed out in
+all five cases, while a serialized rerun passed 5/5 in 0.28 s. Preserve that
+transient failure in the evidence rather than treating it as a clean-only
+history. `python3 scripts/test_macos_parent_exit.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0** and
+observed normal EOF exit 0, malformed-protocol exit 1, three repeated
+launch/exit cycles, and a real serve child exit after its app-like parent was
+SIGKILLed. `python3 scripts/test_release_package_process.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0**; the
+bundled CLI SHA-256 was
+`2f4adc33ef8a29c0b282c34307f6e0b33530d775d14dc73e2aa5c9ed417d655e`.
+
+These are packaged-child cleanup checks, but they do **not** observe the
+current SwiftUI app closing its own child after Cmd-Q/window close. The native
+folder picker remained open during this pass and was left untouched. Device
+disconnect/recovery, physical output measurement, live host audio focus, and
+release authorization remain unverified.
 
 ## Required handoff
 
