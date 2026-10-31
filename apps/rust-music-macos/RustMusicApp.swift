@@ -254,21 +254,7 @@ private final class PackageProcessClient {
             _ = try? request(.shutdown)
         }
         try? input.close()
-        if !waitForExit(timeout: 2) {
-            process.terminate()
-            if !waitForExit(timeout: 1) {
-                _ = kill(process.processIdentifier, SIGKILL)
-                process.waitUntilExit()
-            }
-        }
-    }
-
-    private func waitForExit(timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.01)
-        }
-        return !process.isRunning
+        ProcessTermination.drainAndReap(process, gracefulTimeout: 2, forcedTimeout: 1)
     }
 
     private func readExact(_ count: Int) throws -> Data {
@@ -293,6 +279,8 @@ private enum PackageResponse {
 
 @main
 struct RustMusicApp: App {
+    @NSApplicationDelegateAdaptor(RustMusicApplicationDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             PlayerView()
@@ -302,6 +290,61 @@ struct RustMusicApp: App {
                 .tint(RustMusicPalette.phosphor)
         }
         .windowResizability(.contentSize)
+    }
+}
+
+@MainActor
+private final class RustMusicApplicationDelegate: NSObject, NSApplicationDelegate {
+    private var terminationPending = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationPending else { return .terminateLater }
+        terminationPending = true
+        RustMusicPlayerRegistry.shutdownAll {
+            // AppKit expects this reply after applicationShouldTerminate exits,
+            // even when every model was already idle and finished synchronously.
+            DispatchQueue.main.async {
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
+    }
+}
+
+@MainActor
+private final class WeakRustMusicPlayerModel {
+    weak var value: PlayerModel?
+    init(_ value: PlayerModel) { self.value = value }
+}
+
+@MainActor
+private enum RustMusicPlayerRegistry {
+    private static var models: [WeakRustMusicPlayerModel] = []
+
+    private static var liveModels: [PlayerModel] {
+        models = models.filter { $0.value != nil }
+        return models.compactMap(\.value)
+    }
+
+    static func register(_ model: PlayerModel) {
+        let live = liveModels
+        guard !live.contains(where: { $0 === model }) else { return }
+        models.append(WeakRustMusicPlayerModel(model))
+    }
+
+    static func shutdownAll(completion: @escaping () -> Void) {
+        let live = liveModels
+        guard !live.isEmpty else {
+            completion()
+            return
+        }
+        var remaining = live.count
+        for model in live {
+            model.shutdownPackage {
+                remaining -= 1
+                if remaining == 0 { completion() }
+            }
+        }
     }
 }
 
@@ -335,6 +378,12 @@ final class PlayerModel: ObservableObject {
     nonisolated(unsafe) private var packageRootPath: String?
     private var snapshotPollScheduled = false
     private var pendingStateReload = false
+    private let shutdownGate = ShutdownCompletionGate()
+    private let transientChildOperations = DispatchGroup()
+
+    init() {
+        RustMusicPlayerRegistry.register(self)
+    }
 
     private var decoderURL: URL {
         Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/rust-music-cli")
@@ -360,7 +409,7 @@ final class PlayerModel: ObservableObject {
         _ arguments: [String],
         completion: @escaping (Result<Data, RustMusicFailure>) -> Void
     ) {
-        guard libraryRoot != nil, !isStateBusy, !isTransportBusy else { return }
+        guard shutdownGate.acceptsWork, libraryRoot != nil, !isStateBusy, !isTransportBusy else { return }
         let process = Process()
         process.executableURL = decoderURL
         process.arguments = ["state", "--managed-parent-stdin"] + arguments
@@ -380,6 +429,8 @@ final class PlayerModel: ObservableObject {
         }
         stateProcess = process
         isStateBusy = true
+        let childOperations = transientChildOperations
+        childOperations.enter()
         Task { [weak self] in
             let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
                 defer { try? input.fileHandleForWriting.close() }
@@ -404,6 +455,7 @@ final class PlayerModel: ObservableObject {
                     outputFailure = "Could not read Rust Music state output: \(error.localizedDescription)"
                 }
                 process.waitUntilExit()
+                childOperations.leave()
                 return (bytes, outputFailure, process.terminationStatus)
             }.value
             guard let self, self.stateProcess === process else { return }
@@ -679,7 +731,7 @@ final class PlayerModel: ObservableObject {
     }
 
     private func loadLibrary(at root: URL) {
-        guard !isScanning, !isStateBusy, !isTransportBusy else { return }
+        guard shutdownGate.acceptsWork, !isScanning, !isStateBusy, !isTransportBusy else { return }
         stop()
         let process = Process()
         process.executableURL = decoderURL
@@ -700,6 +752,8 @@ final class PlayerModel: ObservableObject {
         isScanning = true
         scanCancellationRequested = false
         status = "Scanning the selected folder… playback will not start."
+        let childOperations = transientChildOperations
+        childOperations.enter()
         Task { [weak self] in
             let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
                 defer { try? input.fileHandleForWriting.close() }
@@ -724,6 +778,7 @@ final class PlayerModel: ObservableObject {
                     outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
                 }
                 process.waitUntilExit()
+                childOperations.leave()
                 return (bytes, outputFailure, process.terminationStatus)
             }.value
             guard let self, self.scanProcess === process else { return }
@@ -809,7 +864,7 @@ final class PlayerModel: ObservableObject {
         label: String,
         completion: @escaping (PackageResponse) -> Void
     ) {
-        guard let root = libraryRoot, !isTransportBusy, !isStateBusy else { return }
+        guard shutdownGate.acceptsWork, let root = libraryRoot, !isTransportBusy, !isStateBusy else { return }
         isTransportBusy = true
         status = label
         let executable = decoderURL
@@ -911,22 +966,36 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    func shutdownPackage() {
-        cancelScan(); cancelStateOperation()
-        isTransportBusy = true
-        // Retain the model through the serialized cleanup. A weak capture here
-        // can drop the Shutdown/Stop request if SwiftUI releases the view model
-        // immediately after the window closes.
-        packageQueue.async { [self] in
-            self.packageClient?.shutdown()
-            self.packageClient = nil
-            self.packageRootPath = nil
-            DispatchQueue.main.async {
-                self.isTransportBusy = false
-                self.isPlaying = false
-                self.isPaused = false
+    func shutdownPackage(completion: (() -> Void)? = nil) {
+        shutdownGate.run(completion: completion) { [self] finish in
+            cancelScan(); cancelStateOperation()
+            isTransportBusy = true
+            let transientProcesses = [scanProcess, stateProcess].compactMap { $0 }
+            let childOperations = transientChildOperations
+            // Retain the model through serialized cleanup. Window close and
+            // app termination join this one operation and receive completion.
+            packageQueue.async { [self] in
+                self.packageClient?.shutdown()
+                self.packageClient = nil
+                self.packageRootPath = nil
+                for process in transientProcesses {
+                    ProcessTermination.ensureStopped(process, gracefulTimeout: 2, terminationTimeout: 1)
+                }
+                // Scan/state reader tasks own their waitUntilExit calls. Do not
+                // let AppKit terminate until their output readers also finish.
+                childOperations.wait()
+                DispatchQueue.main.async {
+                    self.isTransportBusy = false
+                    self.isPlaying = false
+                    self.isPaused = false
+                    finish()
+                }
             }
         }
+    }
+
+    func prepareForPresentation() {
+        shutdownGate.prepareForReuse()
     }
 
     func selectTrackManually(_ id: Int?) {
@@ -1182,6 +1251,7 @@ struct PlayerView: View {
         .preferredColorScheme(.dark)
         .tint(RustMusicPalette.phosphor)
         .onChange(of: model.searchText) { _ in model.boundSearchText() }
+        .onAppear { model.prepareForPresentation() }
         .onDisappear { model.shutdownPackage() }
     }
 

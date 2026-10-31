@@ -1365,6 +1365,14 @@ source/test evidence supplemented by the GUI force-close observation in MAC-02.
 Physical device-error recovery, acoustic/DAC acceptance, panel acceptance, and
 live Rust Boy focus remain open.
 
+Review note: shutdown has bounded graceful and TERM intervals, followed by
+SIGKILL and a wait/reap before AppKit is allowed to exit. The final wait is
+intentionally not time-bounded, so an OS process stuck in an uninterruptible
+kernel wait could leave Quit pending indefinitely. The automated forced-parent
+case kills a test supervisor, not the actual GUI app; current GUI evidence is
+for normal Cmd-Q during active playback. Do not treat it as GUI Force Quit or
+physical device-failure evidence.
+
 ### 2026-10-31 queue-mode controls in the rebuilt app
 
 The rebuilt standalone app loaded three generated one-second stereo 16-bit /
@@ -1397,3 +1405,26 @@ audibility or DAC output. Both queue entries were removed, Repeat and Shuffle
 were reset Off, Rust Music was quit (`isRunning=false` in desktop inventory),
 and the synthetic fixture was removed. `sysmond` process listing was
 unavailable, so no separate playback-child PID check was made in this pass.
+
+### 2026-10-31 AppKit application-termination barrier and active-child proof
+
+At the current uncommitted candidate, `sh scripts/build-macos-app.sh` exited
+0, including lifecycle regression harnesses and strict ad-hoc bundle signature
+validation. `cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited 0 (9/9), and
+`sh scripts/offline-gate.sh` exited 0 across 17 local crates, 32 path-only
+edges, zero registry/Git crates, and zero third-party system links.
+
+The Swift app now defers AppKit termination until each live player model has
+joined its idempotent package shutdown; managed catalog/state child readers
+are reaped before completion. Regression coverage exercises graceful child
+shutdown, malformed protocol, repeated launch/exit, forced escalation, and
+parent-death process-group cleanup. For the exact rebuilt bundle, generated
+silent playback was active with Rust Music PID 61713 and `rust-music-cli` PID
+61739. Cmd-Q returned an app-quit signal; a subsequent refreshed Activity
+Monitor listing contained neither PID nor any Rust Music/CLI row. This is
+observable process-exit evidence for normal application termination during
+active playback. It is not proof of real AudioQueue device-error recovery or
+physical audio output. Those gates, device disconnect/reconnect recovery,
+physical DAC/panel, live Rust Boy focus, distribution signing, and app-wide
+performance acceptance remain open. Private decoder corpora were not rerun.

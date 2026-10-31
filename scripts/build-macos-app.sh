@@ -20,6 +20,12 @@ rm -rf "$CONTENTS/_CodeSignature"
 cp apps/rust-music-macos/Info.plist "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 cp target/release/rust-music-cli "$MACOS/rust-music-cli"
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+  -O \
+  apps/rust-music-macos/ProcessTermination.swift \
+  apps/rust-music-macos/ProcessTerminationTests.swift \
+  -o "$ROOT/target/macos/ProcessTerminationTests"
+"$ROOT/target/macos/ProcessTerminationTests" "$MACOS/rust-music-cli"
 SWIFT_ARCH=$(uname -m)
 case "$SWIFT_ARCH" in
   arm64|x86_64) ;;
@@ -42,7 +48,7 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   -o "$ROOT/target/macos/CatalogValidationTests"
 "$ROOT/target/macos/CatalogValidationTests"
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
-  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
+  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/ProcessTermination.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 printf 'Built native app: %s\n' "$APP"
