@@ -122,6 +122,14 @@ This adds current graceful-close evidence to RM-019; device disconnect/recovery,
 physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
 remain open. No private corpus was rerun.
 
+**MAC-02 host output check (2026-10-31):** host `system_profiler` exited 0 and
+listed MacBook Air Speakers as the 48 kHz default output. A generated
+low-amplitude 440 Hz WAV played by the app-bundled CLI outside the restricted
+shell exited 0. The sandboxed attempt returned AudioQueueStart `-66680`
+(`kAudioQueueErr_InvalidDevice`); the host retry passed. This records the
+execution boundary and native output path, not an acoustic/DAC measurement or
+disconnect/recovery test. The physical-device gate remains open.
+
 **Native transport and current sandbox launch recheck (2026-10-31, source HEAD
 `713c7e9`):** rebuilt bundle, Info.plist path, and strict ad-hoc signature
 verified. With two generated silent 16-bit/44.1 kHz WAVs, the UI reached active

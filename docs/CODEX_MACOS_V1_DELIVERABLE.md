@@ -824,3 +824,19 @@ The 20k build-time spread is substantial and needs more repeated profiles.
 These measure the Rust catalog core, not SwiftUI filtering/rendering, app
 startup, full-app memory, or real tagged-library behavior; those MAC-03
 measurements remain open.
+
+### 2026-10-31 host AudioQueue output check
+
+The host-level `system_profiler SPAudioDataType -detailLevel mini` query exited
+**0** and listed MacBook Air Speakers as the default output at 48 kHz, plus
+ASUS VG32V HDMI and External Headphones. A temporary generated 0.25-second,
+stereo, 16-bit, 44.1 kHz, 440 Hz low-amplitude WAV was played with the
+app-bundled `rust-music-cli play` command outside the restricted shell; it
+exited **0** and the fixture was removed. No user media was accessed. This
+observes native queue playback on the available default route, not measured
+acoustic output, DAC sample fidelity, other-device negotiation, or device
+disconnect/recovery.
+
+The same command in the restricted shell exited **1** with AudioQueueStart
+OSStatus `-66680`, which Apple's Audio Toolbox documentation identifies as
+`kAudioQueueErr_InvalidDevice` ([Apple result code](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueerr_invaliddevice)). The host-level retry passed. This indicates an environment-specific output restriction; the error is preserved rather than counted as a product pass or ignored. Physical device loss/recovery remains untested.
