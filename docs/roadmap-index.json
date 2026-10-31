@@ -257,6 +257,14 @@
       "status": "planned",
       "next_evidence": "Platform-local compile, focus and physical output acceptance needed",
       "evidence_doc": "docs/ARCHITECTURE.md"
+    },
+    {
+      "id": "G15",
+      "title": "Desktop micro-library browsing and playback controls",
+      "owner_agent": "host_integrator",
+      "status": "partial_evidence",
+      "next_evidence": "The exact rebuilt app exercised Play, Pause/Resume, Stop, active Next/Previous and software volume with generated nonzero WAVs; the user confirms audible output, and the offline Rust gate passed at 258ecec. Runtime verification of the new navigation and SwiftUI close path, device disconnect/recovery, live Rust Boy shared audio focus, repeatable startup/memory/latency profiles, and physical DAC/panel acceptance remain open.",
+      "evidence_doc": "docs/CODEX_MACOS_V1_DELIVERABLE.md"
     }
   ],
   "tasks": [
@@ -665,6 +673,152 @@
       "create_paths": [],
       "acceptance": "For the macOS v1 workflow, provide explicit-root browsing, stable root-scoped IDs, bounded metadata/search, deterministic sorting, named persistent playlists, persistent queue, repeat/shuffle, and real Play/Pause/Resume/Stop/Next/Previous plus bounded volume in the standalone app. Queue selection never plays. Keep user audio read-only and skip image payloads without allocation; add no artwork/image extraction/cache/visualizers or third-party runtime dependencies. Benchmark scan/search at 0/1/100/2k/20k; record cold startup and incremental memory. Optional autoplay and native bypassable 10-band EQ remain separately gated follow-on work unless implemented and independently verified.",
       "blocker": "At source 0b1263c (Rust source through 7ae312b): stable root-scoped IDs, bounded text search/catalog, cancelable scan, versioned queue/repeat/shuffle, bounded named playlists, and standalone text UI are implemented. Exact app UI smoke covered silent-WAV library/search/queue/playlist persistence across restart and no-autoplay after reload. A later unsandboxed smoke loaded two generated nonzero 10-second 16-bit/44.1 kHz WAVs and exercised Play, active Next/Previous between titles, Pause/Resume, volume 100→95→100 and Stop; the bundled CLI played a generated 440 Hz WAV through AudioQueue and exited 0, with the user confirming audible output. Outside the restricted shell, `system_profiler` listed MacBook Air Speakers as the 48 kHz default output plus HDMI and headphone outputs. `open -n` exited 0 and LaunchServices check-in was 0.065434 s. App PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q both were absent. At 9d11419, the full offline gate exited 0 (17 local crates, 32 path-only edges), AudioQueue failure/teardown passed 15/15, and a fresh bundled CLI tone playback exited 0 with the default MacBook output listed. The UI loaded a generated 2,000-entry catalog in <1 s, and `track-01999` search showed one result; same-process RSS increased 1,568 KiB in one sample. Cmd-Q removed app PID 93393 and no serve child remained. These are one-sample responsiveness/memory observations, not release thresholds. A spawned-process regression now removes a cataloged track before Play and verifies a bounded decoder error, Stopped/no-audio-claim snapshot, and clean Shutdown/child exit (5/5 package-process tests at working tree based on 110bfed). At `fb5e70d`, the compact text-only phosphor UI was rebuilt, strictly verified, launched through LaunchServices (0.0901999 s check-in), and visually checked with all panels and transport visible at 974×620. A synthetic two-track folder loaded and playlist create/delete worked while playback remained stopped; the user confirms audio output/library loading. Device disconnect/recovery during playback, acoustic loopback/DAC measurement, Rust Boy shared focus, cold-start distribution/repeatable incremental memory, multiple-root reconciliation and non-Unix queue persistence remain open. Independent security and Swift reviews found no actionable finding. Autoplay and native EQ still need indexed follow-on gates; no private corpus was rerun and existing parity evidence is retained."
+    },
+    {
+      "id": "RM-021",
+      "gate": "G15",
+      "title": "Existing library, IPC and RBPK contract inventory",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P0",
+      "status": "planned",
+      "depends_on": [],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Map actual source contracts and capability gaps without changing deployed RBPK; record source-versus-tested evidence.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-022",
+      "gate": "G15",
+      "title": "Versioned bounded portable manifest, stable ID and sort fixtures",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-021"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Define bounded portable catalog, stable IDs, canonical paths, sorted views and golden malformed-input tests; zero third-party runtime dependencies.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-023",
+      "gate": "G15",
+      "title": "Atomic portable export/import and validated incremental plan",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-022"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Implement deterministic complete package and incremental delta plan; reject traversal and corruption; verify atomic recovery, cancellation and source media untouched.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-024",
+      "gate": "G15",
+      "title": "macOS deploy-to-device flow",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-023"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Explicit device folder selection, subset and capacity preview, safe transfer, progress/cancel and repeated incremental sync; no autoplay.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-025",
+      "gate": "G5",
+      "title": "Pip-Boy socket consumption with host-owned audio focus",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-022"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Use existing RBPK v1 and host audio-focus; validate lifecycle, browse/sort/playlist and no scan/audio on mount; live hardware status separate.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-026",
+      "gate": "G15",
+      "title": "Linux and Windows desktop adapters",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "planned",
+      "depends_on": [
+        "RM-023"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Build and verify platform-local GUI, native output, cross-platform package parity and storage path edge cases; do not claim platform support from schema alone.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "id": "RM-027",
+      "gate": "G5",
+      "title": "Physical Pi/Pip-Boy and removable-media acceptance",
+      "owner_agent": "host_integrator",
+      "review_agent": "safety_reviewer",
+      "priority": "P2",
+      "status": "planned",
+      "depends_on": [
+        "RM-024",
+        "RM-025"
+      ],
+      "focus_paths": [
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "crates/rust-music-ipc/",
+        "apps/rust-music-macos/"
+      ],
+      "create_paths": [],
+      "acceptance": "Measured on-device copy, disconnect, power-loss recovery, scan startup, RAM, 1024-byte panel, playback and RADIO/TV audio-focus contention.",
+      "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
     }
   ]
 }

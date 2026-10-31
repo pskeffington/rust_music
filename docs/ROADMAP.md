@@ -101,3 +101,21 @@ sh scripts/offline-gate.sh
 ```
 
 The first two are optional maintenance validators. The last is the authoritative Rust-only release gate and must not imply a PASS until it actually completes.
+
+## Portable library and Pip-Boy socket — 2026-10-31 roadmap update
+
+The approved visual direction is [PRIMARY_UI_DIRECTION](design/PRIMARY_UI_DIRECTION.md); the portable socket contract is [PIPBOY_SOCKET_SCHEMA](design/PIPBOY_SOCKET_SCHEMA.md), and the desktop-to-device export protocol is [PORTABLE_LIBRARY_DEPLOYMENT](design/PORTABLE_LIBRARY_DEPLOYMENT.md). These specifications do **not** certify source implementation.
+
+**Delivery dependency:** finish the outstanding RM-020/macOS v1.0 playback and audio-focus work first. Parallel read-only socket/manifest inventory is acceptable; do not conflate standalone Mac release and live Pip-Boy hardware certification.
+
+| Task | Priority | Route | Deliverable |
+| --- | --- | --- | --- |
+| RM-021 | P0 | host_integrator | Existing library, IPC and RBPK contract inventory |
+| RM-022 | P1 | host_integrator | Versioned bounded portable manifest, stable ID and sort fixtures |
+| RM-023 | P1 | host_integrator | Atomic portable export/import and validated incremental plan |
+| RM-024 | P1 | host_integrator | macOS deploy-to-device flow |
+| RM-025 | P1 | host_integrator | Pip-Boy socket consumption with host-owned audio focus |
+| RM-026 | P2 | host_integrator initially; split platform ownership later | Linux and Windows desktop adapters |
+| RM-027 | P2 | host_integrator + read-only gate_verifier | Physical Pi/Pip-Boy and removable-media acceptance |
+
+All newly registered tasks remain **planned** pending code and observed tests. Do not ship ornamental image/skin assets from the approved reference while the current text-only/zero-artwork release policy remains in force. A future visual policy revision requires a separate gated decision. Update `docs/roadmap-index.json` together with this section; verify using the existing index checker before declaring the registry valid.

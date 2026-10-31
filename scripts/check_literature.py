@@ -16,7 +16,7 @@ def check():
     assert payload["schema_version"] == 1
     roadmap = json.loads((DOCS / "roadmap-index.json").read_text(encoding="utf-8"))
     valid_gates = {gate["id"] for gate in roadmap["gates"]}
-    assert valid_gates == {f"G{i}" for i in range(15)}, "roadmap and literature gate catalogs differ"
+    assert valid_gates == {f"G{i}" for i in range(16)}, "roadmap and literature gate catalogs differ"
     ids = [s["id"] for s in payload["sources"]]
     assert ids == [f"LIT-{i:03d}" for i in range(1, len(ids)+1)]
     for s in payload["sources"]:

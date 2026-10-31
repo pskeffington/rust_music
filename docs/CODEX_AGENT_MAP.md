@@ -54,3 +54,11 @@ and keep PR #1 draft and unmerged.
 ## Maintaining the index
 
 Update `docs/roadmap-index.json` when introducing a gate, task, agent, path or dependency. Keep stable IDs; do not renumber past tasks. Synchronize the readable tables and role files, then run the read-only [index checker](../scripts/check_roadmap_index.py). Do not hand-edit generated [LITERATURE_INDEX.md](LITERATURE_INDEX.md) because `scripts/build_literature.py` owns it.
+
+## 2026-10-31 portable library task routing
+
+Route RM-021 through RM-027 using the canonical [roadmap index](roadmap-index.json) and [portable deployment contract](design/PORTABLE_LIBRARY_DEPLOYMENT.md). Initially retain the existing `host_integrator` as **the sole writer** for library/socket/IPC/desktop application paths; no additional agent writes those overlapping trees concurrently. `index_curator` owns roadmap/index updates serially. `gate_verifier` and `safety_reviewer` independently validate tests and security (read-only).
+
+Task order: read-only RM-021 API inventory -> RM-022 manifest and corpus fixtures -> RM-023 pack/verify/import -> RM-024 macOS deploy UI + RM-025 host consumer on explicitly non-overlapping files -> RM-026 Linux/Windows adapters -> RM-027 physical field testing. Preserve RM-020/macOS v1.0 as the highest immediate production priority; no automatic cross-platform declaration. Only add specialized platform agents after actual code ownership is split and indexed.
+
+Under agent_skills orchestration, assign software-delivery-orchestrator to integration scheduling, code-implementation to one scoped writing lane, build-integration to offline build evidence, test-verification to separately observed results, security-assurance to path traversal/hash/staging reviews, independent-code-review to compatibility, and documentation-maintenance to registry synchronization. Pin and verify the actual upstream agent_skills revision; never infer it was loaded.

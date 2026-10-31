@@ -21,6 +21,10 @@ pub mod playlist;
 pub mod playlist_store;
 /// Bounded, persistent text-only queue state and navigation model.
 pub mod queue;
+/// Canonical, bounded portable snapshot manifest serialization.
+pub mod sync_manifest;
+/// Read-only, bounded offline package delta planning; no writes or hashing.
+pub mod sync_plan;
 
 const MAX_TAG_BLOCKS: usize = 128;
 const MAX_TAG_BLOCK_BYTES: u32 = 16 * 1024 * 1024;

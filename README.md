@@ -4,6 +4,25 @@
 
 All runtime codecs are ours. All Cargo dependencies are local workspace paths. No external playback/decoder libraries, registry packages, network or downloaded assets are required. The OS and preinstalled Rust standard toolchain are the only platform prerequisites. MIT licensed.
 
+## Product direction: desktop library manager + Pip-Boy MUSIC socket
+
+**Primary design:** [Rust Music 2000 interface direction](docs/design/PRIMARY_UI_DIRECTION.md) and [portable MUSIC socket schema](docs/design/PIPBOY_SOCKET_SCHEMA.md). The approved reference specifies the phosphor-green visual hierarchy and a mountable MUSIC content surface. It does **not** replace the native lossless engine or require the Pip-Boy to render a desktop-sized ornamental chassis. The image attachment itself has not yet been committed to this repository; the design decision is documented.
+
+**Intended operator workflow:** organize, search and sort a local lossless music library on the desktop; save favorites, queue and named playlists; explicitly export a whole library or selected tracks/playlists as a verified offline package; mount the preloaded catalog and music in the Rust Boy 2000 MUSIC module. Subsequent syncs should transmit deltas rather than copying unchanged FLAC files. Source media stays untouched. The Pip-Boy remains usable without an active desktop, cloud service or network.
+
+| Target | Role | Current release status |
+| --- | --- | --- |
+| **macOS** | First standalone manager/player, native audio output and eventual export UI | Native app/library and text queue/playlist workflow exists; Play, Pause/Resume, Stop, Next, Previous and software volume were exercised, and the user confirms audible output. Device recovery, DAC measurement, live host audio-focus, and hardware release evidence remain open |
+| **Linux** | Future standalone manager/player with same portable catalog | Core Rust and experimental kernel ALSA output exist; desktop GUI and portable export are planned |
+| **Windows** | Future standalone manager/player with same portable catalog | GUI, native WASAPI output and package conformance remain planned |
+| **Rust Boy / Pip-Boy** | Host-mounted offline MUSIC socket, preloaded catalog, micro panel, shared audio focus | Socket and 128x64 panel foundations exist; live trusted host integration, deployment and physical acceptance remain open |
+
+**Architecture:** one Rust decoder/player and authoritative session; versioned, bounded catalog/command snapshots; macOS desktop and Pip-Boy presentation adapters. Rust Boy owns audio arbitration alongside Radio/TV, navigation, settings, storage permissions, and physical display. The existing micro frame is exactly 1,024 bytes. Package writing, incremental validation and mount-on-device are specified, **not yet implemented**.
+
+**Implementation sequence:** finish [standalone macOS v1.0 acceptance](docs/CODEX_MACOS_V1_DELIVERABLE.md) and RM-020 while doing read-only socket inventory; then RM-021–027 cover manifest, packager, macOS export, Pip-Boy mounting, Linux/Windows adapters and on-device tests. See [phased roadmap](docs/ROADMAP.md), [machine-readable tasks](docs/roadmap-index.json), [agent map](docs/CODEX_AGENT_MAP.md), and [portable deployment protocol](docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md). PR #1 remains gated; design documents are not build or hardware evidence.
+
+**Release scope:** macOS v1.0 is intentionally text-only, with no album art, visualizers or decorative image assets. The approved design guides information hierarchy, phosphor styling and socket layout. Optional Curie animation and advanced desktop presentation require later policy review and separate resource/accessibility gates. All playback remains local, offline, lossless-only with locally authored Rust components.
+
 ## G6 micro display
 
 The new `rust-music-panel` crate renders a 128x64 monochrome MUSIC view into a

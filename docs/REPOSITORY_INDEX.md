@@ -7,6 +7,16 @@ at the end indexes repository instructions, documents, scripts, tests and CI.
 `git ls-files` remains the exact tracked-file listing; update this navigation
 index whenever a crate, document, script, test or workflow is added or removed.
 
+## Current product and agent entrypoints (2026-10-31)
+
+- **Top-level product direction:** [README](../README.md), [primary UI direction](design/PRIMARY_UI_DIRECTION.md).
+- **Shared macOS/Pip-Boy surface:** [portable socket schema](design/PIPBOY_SOCKET_SCHEMA.md), existing [host contract](HOST_CONTRACT.md), [package process](PACKAGE_PROCESS.md).
+- **Desktop-managed offline music:** [portable library deployment](design/PORTABLE_LIBRARY_DEPLOYMENT.md), with future macOS/Linux/Windows package interchange.
+- **Task routing and verification:** [roadmap index](roadmap-index.json) RM-020–RM-027, [roadmap](ROADMAP.md), [agent ownership](CODEX_AGENT_MAP.md) and root [AGENTS.md](../AGENTS.md).
+- **Immediate release priority:** [macOS v1.0](CODEX_MACOS_V1_DELIVERABLE.md), currently distinct from Linux/Windows and physical Pip-Boy release certification.
+
+All portable export, delta sync and cross-platform GUI functions in the new design documents are **planned**, not verified as implemented. Preserve the zero-artwork macOS v1.0 release policy and single host audio-focus contract.
+
 ## Authority by question
 
 - **What to build next, which gate is blocked, who owns it?** [Roadmap JSON](roadmap-index.json), [human roadmap](ROADMAP.md), [Codex agent map](CODEX_AGENT_MAP.md).

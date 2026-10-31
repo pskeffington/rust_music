@@ -122,9 +122,9 @@ def validate_registry(data: dict, root: Path = ROOT, check_files: bool = True) -
                         f"overlapping writing scopes: {a_role}:{a} vs {b_role}:{b}")
 
     gates = data.get("gates")
-    require(isinstance(gates, list) and len(gates) == 15, "expected G0-G14 gates")
+    require(isinstance(gates, list) and len(gates) == 16, "expected G0-G15 gates")
     gate_ids = [nonempty(g.get("id"), "gate ID") for g in gates]
-    require(gate_ids == [f"G{i}" for i in range(15)], "gates must be unique, ordered G0..G14")
+    require(gate_ids == [f"G{i}" for i in range(16)], "gates must be unique, ordered G0..G15")
     for gate in gates:
         gid = gate["id"]
         require(gate.get("status") in GATE_STATES, f"{gid}: unknown status")
@@ -206,7 +206,11 @@ def validate_registry(data: dict, root: Path = ROOT, check_files: bool = True) -
                     and gate["title"] in docs["roadmap"],
                     f"{gate['id']}: roadmap gate table stale")
         for task in tasks:
-            require(f"`{task['id']}`" in docs["roadmap"]
+            task_id_is_listed = (
+                f"`{task['id']}`" in docs["roadmap"]
+                or re.search(rf"(?m)^\|\s*{re.escape(task['id'])}\s*\|", docs["roadmap"])
+            )
+            require(task_id_is_listed
                     and task["title"] in docs["roadmap"],
                     f"{task['id']}: roadmap task table stale")
         for agent in agents:
