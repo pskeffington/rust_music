@@ -488,3 +488,15 @@ catalog child-process estimates and do not qualify full-app memory.
 The full Rust offline gate exited 0 in the same worktree: 17 local crates,
 32 path-only edges, zero registry/Git crates, and 17/17 simulated AudioQueue
 tests.
+
+**RM-020 repeated full-app synthetic catalog footprint (2026-10-31):** three
+fresh-process runs measured settled physical-footprint deltas of +2.625 MiB,
++2.984 MiB, and +2.094 MiB after an explicit 2,000-track metadata-only
+synthetic FLAC scan; median delta was +2.625 MiB. Fixtures had bounded
+TITLE/ARTIST/ALBUM comments and no audio frames, and playback stayed stopped.
+Sampling used the local `proc_pid_rusage(RUSAGE_INFO_V4)` helper. Resident-size
+readings fluctuated substantially while the host reported about 14 GB memory
+use and 9.4 GB swap. This supports a bounded 2k synthetic profile only; a
+representative library and 20k app profile remain unmeasured, so app-wide
+memory acceptance stays open. The app exited and its final PID no longer
+existed; temporary fixtures and helper were removed.

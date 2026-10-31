@@ -1658,3 +1658,25 @@ app-wide memory acceptance remains open. The full
 `sh scripts/offline-gate.sh` run with this profiler change in the worktree
 exited **0**: 17 local crates, 32 path-only edges, zero registry/Git crates,
 zero third-party system links, and 17/17 simulated AudioQueue tests.
+
+### 2026-10-31 repeated full-app synthetic catalog footprint
+
+Three fresh Rust Music processes were sampled before and after explicitly
+loading the same synthetic 2,000-track catalog. Each fixture file was a
+175-byte FLAC metadata signature with bounded TITLE/ARTIST/ALBUM comments and
+no audio frames; playback remained stopped. The local C helper used
+`proc_pid_rusage(RUSAGE_INFO_V4)` to read resident size and physical footprint.
+Settled five-sample physical-footprint medians changed from 31,179,664 B to
+33,932,176 B (**+2,752,512 B / 2.625 MiB**), from 30,491,536 B to 33,620,880 B
+(**+3,129,344 B / 2.984 MiB**), and from 30,606,248 B to 32,801,704 B
+(**+2,195,456 B / 2.094 MiB**). The median of the three deltas is **2.625
+MiB**. Resident-size samples varied substantially and sometimes moved in the
+opposite direction under high host memory pressure (about 14 GB used and 9.4
+GB swap); physical-footprint deltas are recorded as the more stable signal.
+
+This is repeatable evidence for one 2,000-entry, metadata-only synthetic
+profile, not a representative user library, 20,000-track full-app profile,
+exact heap measurement, or overall app-memory acceptance. After the final
+run, CUA reported the app stopped and the process sampler returned “No such
+process” for its PID. The temporary fixture directory and C helper were
+removed. No private or user media was used.
