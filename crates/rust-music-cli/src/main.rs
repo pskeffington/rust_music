@@ -1326,6 +1326,10 @@ where
         grant: Arc::new(AtomicBool::new(false)),
     };
     let mut slot = MusicSlot::new(LazySink::new(make_sink), Library::empty());
+    // Preserve the first asynchronous playback failure for the next Snapshot.
+    // RBPK v1 already has a bounded Error reply; this surfaces native details
+    // without extending the View layout or changing the protocol version.
+    let mut playback_error: Option<Reply> = None;
     loop {
         match requests.recv_timeout(Duration::from_millis(10)) {
             Ok(UnitRequest::Eof) | Err(RecvTimeoutError::Disconnected) => {
@@ -1335,8 +1339,23 @@ where
             }
             Ok(UnitRequest::Message(request)) => {
                 let is_shutdown = request.body == Request::Shutdown;
-                let reply =
-                    handle_unit_request_with_limits(&mut slot, &focus, request, scan_limits);
+                let retry_or_stop = matches!(
+                    &request.body,
+                    Request::ScanLibrary { .. }
+                        | Request::Select { .. }
+                        | Request::Play
+                        | Request::ResumePlayback
+                        | Request::Stop
+                );
+                if retry_or_stop {
+                    playback_error = None;
+                }
+                let reply = match &request.body {
+                    Request::Snapshot { .. } if playback_error.is_some() => {
+                        playback_error.clone().expect("checked playback error")
+                    }
+                    _ => handle_unit_request_with_limits(&mut slot, &focus, request, scan_limits),
+                };
                 let _ = replies.send(Ok(reply));
                 if is_shutdown {
                     focus.grant.store(false, Ordering::Release);
@@ -1345,10 +1364,11 @@ where
                 }
             }
             Err(RecvTimeoutError::Timeout) => {
-                if slot.status().playback.state == rust_music::PlaybackState::Playing
-                    && slot.handle(Command::Poll, &focus).is_err()
-                {
-                    focus.grant.store(false, Ordering::Release);
+                if slot.status().playback.state == rust_music::PlaybackState::Playing {
+                    if let Err(error) = slot.handle(Command::Poll, &focus) {
+                        focus.grant.store(false, Ordering::Release);
+                        playback_error = Some(error_reply(error));
+                    }
                 }
             }
         }
@@ -1564,8 +1584,8 @@ fn error_reply(error: MusicError) -> Reply {
         MusicError::Io(_) => {
             process_error(ErrorCode::Decoder, "local music file could not be read")
         }
-        MusicError::Output(_) => {
-            process_error(ErrorCode::Output, "audio output could not start or stop")
+        MusicError::Output(message) => {
+            process_error(ErrorCode::Output, &format!("audio output: {message}"))
         }
     }
 }

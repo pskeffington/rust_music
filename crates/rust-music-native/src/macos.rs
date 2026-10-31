@@ -658,6 +658,7 @@ mod tests {
         stop_modes: Vec<u8>,
         dispose_modes: Vec<u8>,
         events: Vec<&'static str>,
+        enqueued_pcm: Vec<Vec<u8>>,
         buffers: Vec<FakeBuffer>,
     }
 
@@ -715,6 +716,10 @@ mod tests {
                 state.enqueue_status
             };
             if status == 0 {
+                let size = unsafe { (*buffer).data_size as usize };
+                let bytes =
+                    unsafe { std::slice::from_raw_parts((*buffer).data.cast::<u8>(), size) };
+                state.enqueued_pcm.push(bytes.to_vec());
                 state.pending_buffers.push(buffer as usize);
             }
             status
@@ -798,6 +803,26 @@ mod tests {
             format: valid_format(),
             samples: vec![123],
         }
+    }
+
+    #[test]
+    fn nonzero_16_bit_pcm_is_copied_little_endian_and_enqueued_before_start() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.open(valid_format()).unwrap();
+        sink.write(&PcmBlock {
+            format: valid_format(),
+            samples: vec![0x1234, -2, i16::MIN.into(), i16::MAX.into()],
+        })
+        .unwrap();
+
+        let state = api.0.lock().unwrap();
+        assert_eq!(
+            state.enqueued_pcm,
+            vec![vec![0x34, 0x12, 0xfe, 0xff, 0x00, 0x80, 0xff, 0x7f]]
+        );
+        assert_eq!(state.events, vec!["enqueue", "start"]);
+        assert_eq!(state.pending_buffers.len(), 1);
     }
 
     #[test]
@@ -886,6 +911,9 @@ mod tests {
         sink.finish().unwrap();
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+        let state = api.0.lock().unwrap();
+        assert_eq!(state.events.first(), Some(&"enqueue"));
+        assert!(state.enqueued_pcm.is_empty());
     }
 
     #[test]
@@ -1057,10 +1085,19 @@ mod tests {
             Err(MusicError::Output(_))
         ));
         assert!(!sink.started);
+        {
+            let state = api.0.lock().unwrap();
+            assert_eq!(state.events, vec!["enqueue", "start"]);
+            assert_eq!(state.enqueued_pcm, vec![vec![123, 0]]);
+            assert_eq!(state.pending_buffers.len(), 1);
+        }
         api.0.lock().unwrap().start_status = 0;
         sink.finish().unwrap();
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+        let state = api.0.lock().unwrap();
+        assert_eq!(state.stop_modes, vec![1]);
+        assert_eq!(state.dispose_modes, vec![1]);
     }
 
     #[test]

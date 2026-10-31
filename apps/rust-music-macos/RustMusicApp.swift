@@ -14,11 +14,6 @@ private enum RustMusicPalette {
     static let brassHighlight = Color(red: 0.61, green: 0.49, blue: 0.28)
 }
 
-struct RustMusicFailure: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
-}
-
 struct QueueEntry: Identifiable, Equatable {
     let index: Int
     let isSelected: Bool
@@ -85,42 +80,6 @@ private enum PackageRequest {
         payload.append(body)
         guard payload.count <= 16_384 else { throw RustMusicFailure(message: "Package request exceeds the frame limit.") }
         return payload
-    }
-}
-
-private struct PackageReader {
-    let bytes: [UInt8]
-    var offset = 0
-
-    mutating func take(_ count: Int) throws -> [UInt8] {
-        guard count >= 0, count <= 16_384, offset <= bytes.count, count <= bytes.count - offset else {
-            throw RustMusicFailure(message: "Rust Music returned a truncated package frame.")
-        }
-        defer { offset += count }
-        return Array(bytes[offset..<(offset + count)])
-    }
-
-    mutating func byte() throws -> UInt8 { try take(1)[0] }
-    mutating func u16() throws -> UInt16 {
-        let value = try take(2)
-        return (UInt16(value[0]) << 8) | UInt16(value[1])
-    }
-    mutating func u32() throws -> UInt32 {
-        let value = try take(4)
-        return value.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-    }
-    mutating func u64() throws -> UInt64 {
-        let value = try take(8)
-        return value.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
-    }
-    mutating func text(max: Int) throws -> String {
-        let count = Int(try u16())
-        guard count <= max else { throw RustMusicFailure(message: "Rust Music returned oversized package text.") }
-        guard let value = String(bytes: try take(count), encoding: .utf8),
-              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw RustMusicFailure(message: "Rust Music returned invalid package text.")
-        }
-        return value
     }
 }
 
@@ -217,27 +176,7 @@ private final class PackageProcessClient {
         case 1:
             reply = .ack
         case 2:
-            let state = try reader.byte()
-            guard state <= 6 else { throw RustMusicFailure(message: "Rust Music returned an unknown playback state.") }
-            let selectedPresent = try reader.byte()
-            guard selectedPresent <= 1 else { throw RustMusicFailure(message: "Rust Music returned an invalid selection flag.") }
-            if selectedPresent == 1 { _ = try reader.u16() }
-            _ = try reader.u16() // track count
-            _ = try reader.u16() // page offset
-            let count = Int(try reader.byte())
-            guard count <= 32 else { throw RustMusicFailure(message: "Rust Music returned too many package tracks.") }
-            for _ in 0..<count {
-                _ = try reader.u16(); _ = try reader.text(max: 128); _ = try reader.byte()
-            }
-            let formatPresent = try reader.byte()
-            guard formatPresent <= 1 else { throw RustMusicFailure(message: "Rust Music returned an invalid PCM format flag.") }
-            if formatPresent == 1 { _ = try reader.u32(); _ = try reader.byte(); _ = try reader.byte() }
-            _ = try reader.u64()
-            let totalPresent = try reader.byte()
-            guard totalPresent <= 1 else { throw RustMusicFailure(message: "Rust Music returned an invalid frame-count flag.") }
-            if totalPresent == 1 { _ = try reader.u64() }
-            guard try reader.byte() <= 1 else { throw RustMusicFailure(message: "Rust Music returned an invalid audio-claim flag.") }
-            reply = .view(state)
+            reply = .view(try PackagePlaybackSnapshot.decode(from: &reader))
         case 3:
             _ = try reader.byte() // error code
             reply = .failure(try reader.text(max: 256))
@@ -273,7 +212,7 @@ private final class PackageProcessClient {
 private enum PackageResponse {
     case hello(UInt16)
     case ack
-    case view(UInt8)
+    case view(PackagePlaybackSnapshot)
     case failure(String)
 }
 
@@ -352,11 +291,16 @@ private enum RustMusicPlayerRegistry {
 final class PlayerModel: ObservableObject {
     @Published var libraryRoot: URL?
     @Published var tracks: [CatalogTrack] = []
-    @Published var selectedIndex: Int?
+    @Published var selectedIndex: Int? {
+        didSet {
+            if oldValue != selectedIndex { playbackSnapshot = nil }
+        }
+    }
     @Published var searchText = ""
     @Published var status = "Choose a local library folder."
     @Published var isPlaying = false
     @Published var isPaused = false
+    @Published var playbackSnapshot: PackagePlaybackSnapshot?
     @Published var isTransportBusy = false
     @Published var volumePercent = 100
     @Published var isScanning = false
@@ -732,6 +676,7 @@ final class PlayerModel: ObservableObject {
 
     private func loadLibrary(at root: URL) {
         guard shutdownGate.acceptsWork, !isScanning, !isStateBusy, !isTransportBusy else { return }
+        playbackSnapshot = nil
         stop()
         let process = Process()
         process.executableURL = decoderURL
@@ -897,6 +842,7 @@ final class PlayerModel: ObservableObject {
                     self.finishTransportOperation()
                     self.isPlaying = false
                     self.isPaused = false
+                    self.playbackSnapshot = nil
                     self.status = "Rust Music playback failed: \(error.localizedDescription)"
                 }
             }
@@ -909,17 +855,28 @@ final class PlayerModel: ObservableObject {
         retryStateAfterError: Bool = true
     ) {
         switch response {
-        case .view(let state):
+        case .view(let snapshot):
+            if PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+                playbackSnapshot = nil
+            } else {
+                playbackSnapshot = snapshot
+            }
+            let state = snapshot.state
             let flags = PlaybackUIState.flags(for: state)
             isPlaying = flags.playing
             isPaused = flags.paused
             if state != 2 { snapshotPollScheduled = false }
             switch state {
-            case 2: status = "Playing through Rust Music and macOS AudioQueue."
+            case 2 where !snapshot.audioClaimed:
+                status = "Playback state is active, but Rust Music has no output claim. Audible output is unconfirmed."
+            case 2 where snapshot.framesDelivered == 0:
+                status = "Output is claimed; waiting for PCM frames. This does not confirm audible output."
+            case 2:
+                status = "AudioQueue accepted \(snapshot.framesDelivered) PCM frames. This does not confirm audible output."
             case 6: status = "Paused. Audio focus is released until Resume is requested."
             case 3: status = "Playback stopped."
             case 4: status = "Playback finished."
-            case 5: status = "Playback failed."
+            case 5: status = "Playback failed. Check the macOS sound output and retry."
             default: status = fallback
             }
             // A failed native output must release the UI's transport lockout
@@ -931,7 +888,9 @@ final class PlayerModel: ObservableObject {
             }
             if isPlaying { scheduleSnapshotPoll() }
         case .failure(let message):
-            let shouldReconcileState = isPlaying || isPaused
+            playbackSnapshot = nil
+            let shouldReconcileState = (isPlaying || isPaused) &&
+                !message.lowercased().hasPrefix("audio output:")
             status = message
             isPlaying = false
             isPaused = false
@@ -955,7 +914,10 @@ final class PlayerModel: ObservableObject {
             guard self.isPlaying, !self.isTransportBusy else { return }
             self.runPackageCommands([.snapshot(0)], label: "") { [weak self] response in
                 guard let self else { return }
-                if case .view(let state) = response, state == 4 {
+                if case .view(let snapshot) = response, snapshot.state == 4 {
+                    if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: self.selectedIndex) {
+                        self.playbackSnapshot = snapshot
+                    }
                     self.isPlaying = false
                     self.advanceQueueAfterEnd()
                     return
@@ -988,6 +950,7 @@ final class PlayerModel: ObservableObject {
                     self.isTransportBusy = false
                     self.isPlaying = false
                     self.isPaused = false
+                    self.playbackSnapshot = nil
                     finish()
                 }
             }
@@ -1347,6 +1310,35 @@ struct PlayerView: View {
                     .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .lineLimit(1)
                     .foregroundStyle(RustMusicPalette.muted)
+                HStack {
+                    Text(model.playbackSnapshot?.elapsedText ?? "--:--")
+                    Spacer()
+                    Text(model.playbackSnapshot?.durationText ?? "--:--")
+                }
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(RustMusicPalette.muted)
+                if let snapshot = model.playbackSnapshot,
+                   let progress = snapshot.progressPerMille {
+                    ProgressView(value: Double(progress), total: 1000)
+                        .accessibilityLabel("Playback progress")
+                        .accessibilityValue(snapshot.progressAccessibilityValue)
+                        .accessibilityIdentifier("playback-progress")
+                } else if model.playbackSnapshot != nil {
+                    ProgressView()
+                        .accessibilityLabel("Playback progress")
+                        .accessibilityValue(model.playbackSnapshot?.progressAccessibilityValue ?? "Unknown duration")
+                        .accessibilityIdentifier("playback-progress")
+                } else {
+                    ProgressView(value: 0, total: 1)
+                        .accessibilityLabel("Playback progress")
+                        .accessibilityValue("No playback snapshot")
+                        .accessibilityIdentifier("playback-progress")
+                }
+                Text(model.playbackSnapshot?.outputSummary ?? "NO OUTPUT SNAPSHOT · AUDIO NOT CONFIRMED")
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .lineLimit(2)
+                    .foregroundStyle(RustMusicPalette.muted)
+                    .accessibilityIdentifier("playback-output-diagnostics")
                 Spacer(minLength: 0)
                 Text(model.status.uppercased())
                     .font(.system(size: 10, weight: .regular, design: .monospaced))
