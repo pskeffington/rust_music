@@ -249,6 +249,31 @@ accessibility round-trips ranged **854–1,443 ms** (median **1,099 ms**).
 Automation/accessibility overhead is included; this is not direct search
 latency or p95. No test entry was played.
 
+**RM-020 same-process physical-footprint profile (2026-10-31):** a temporary
+local helper using macOS `proc_pid_rusage(RUSAGE_INFO_V4)` sampled the same
+fresh Rust Music PID before and after an explicit generated signature-only
+library load. The settled idle physical-footprint median was 31,425,424 bytes;
+after loading 20,000 synthetic 12-byte WAV-signature entries it was
+50,938,768 bytes, a sampled delta of 19,513,344 bytes (18.61 MiB). The
+post-search median was 71,992,256 bytes; that UI/accessibility interaction
+adds transient work and is not a catalog-only figure. Last-entry search
+returned one result; playback remained stopped and no CLI child was present.
+Samples were taken under host memory pressure, from one process/run, without a
+repeatable acceptance threshold or representative tagged audio. This is
+exploratory full-app process-footprint evidence, not a memory-gate pass. The
+portable-in-repo probe is `scripts/profile_macos_process_memory.c`; process
+inspection can be denied by macOS privacy policy (`proc_pid_rusage` returned
+EPERM for PID 1). The 20k fixture and temporary compiled helpers were removed.
+
+**Candidate gate refresh (2026-10-31, code HEAD `de7c5642`):**
+`sh scripts/offline-gate.sh` exited **0** with 17 local crates, 32 path-only
+edges, and 17/17 simulated AudioQueue tests. `sh scripts/build-macos-app.sh`
+exited **0**, including Swift UI/catalog-state tests and strict local bundle
+signature validation. Roadmap/literature validators and `git diff --check`
+also exited **0**. Private decoder parity suites were not rerun. These checks
+do not close the open host, physical-output, device-error, or full-app
+performance acceptance gates.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

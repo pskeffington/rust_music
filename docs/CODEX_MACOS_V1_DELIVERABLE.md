@@ -1122,3 +1122,38 @@ exited **72** because `xctrace` is not installed; `vmmap -summary 43650`
 exited **255** because the shell lacks process-inspection privileges. No
 privileged inspection was attempted. Activity Monitor remains the available
 coarse process-memory observation in this environment.
+
+### 2026-10-31 same-process process-footprint sample
+
+A small local C probe, `scripts/profile_macos_process_memory.c`, reads
+`resident_bytes` and `physical_footprint_bytes` with macOS
+`proc_pid_rusage(RUSAGE_INFO_V4)`. It does not request task-port access or
+elevated privileges; macOS may still deny access to a target process. It
+compiled with `clang -Wall -Wextra -Werror -O2` (exit **0**), and a sample of
+the active Rust Music process returned exit **0**. A PID 1 probe returned
+`EPERM` (exit **1**), and malformed PID input returned exit **2**.
+
+For a fresh app process, five settled idle samples had a median physical
+footprint of **31,425,424 bytes**. After explicitly loading 20,000 generated
+12-byte WAV-signature files in that same process, five settled samples had a
+median of **50,938,768 bytes**, or **19,513,344 bytes (18.61 MiB)** above the
+idle median. The app showed all 20,000 tracks and stayed stopped. Searching
+for `track-19999` returned one result; the subsequent post-search median was
+**71,992,256 bytes**. That sample includes the active Library UI and
+accessibility interaction, so it is not a clean incremental catalog figure.
+The helper readback was validated against the still-running app PID. The host
+was under memory pressure, the result is from one synthetic run, and there is
+no accepted threshold; this does **not** close the app-memory/performance gate.
+The generated fixture and temporary binaries were removed. Direct search
+latency, representative tagged-library behavior, repeatability, and
+system-boot cold start remain unqualified.
+
+At code HEAD `de7c5642fe4bf8030c9c21c24e3b612c32c6f25f`, the refreshed
+`sh scripts/offline-gate.sh` exited **0** (17 local crates, 32 path-only edges,
+17/17 simulated AudioQueue tests) and `sh scripts/build-macos-app.sh` exited
+**0**, including Swift UI/catalog-state tests and strict local bundle
+signature validation. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, and `git diff --check` exited **0**.
+Private FLAC/WAV/AIFF decoder parity was not rerun. This refreshed automated
+gate does not satisfy live Rust Boy focus, physical DAC/panel, real device
+error/recovery, or the open app-memory/direct-latency acceptance criteria.
