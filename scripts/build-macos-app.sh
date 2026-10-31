@@ -11,7 +11,7 @@ sh "$ROOT/scripts/test_macos_app_build_path_guard.sh"
 sh "$ROOT/scripts/check_macos_app_build_paths.sh" "$ROOT"
 
 cd "$ROOT"
-CARGO_NET_OFFLINE=true cargo build --locked --offline --release -p rust-music-cli --features macos-output
+CARGO_TARGET_DIR="$ROOT/target" CARGO_NET_OFFLINE=true cargo build --locked --offline --release -p rust-music-cli --features macos-output
 mkdir -p "$MACOS"
 mkdir -p "$ROOT/target/swift-module-cache"
 # This path is a generated build artifact. Remove only its previous signature

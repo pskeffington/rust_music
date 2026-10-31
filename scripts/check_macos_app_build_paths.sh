@@ -25,6 +25,20 @@ do
   fi
 done
 
+# Build tools create nested directories under these output roots. Refuse any
+# pre-existing symlink below them so a compiler cannot follow one outside the
+# repository even when the top-level directory is safe.
+for path in "$ROOT/target/release" "$ROOT/target/macos" "$ROOT/target/swift-module-cache"
+do
+  if [ -d "$path" ]; then
+    nested=$(find "$path" -type l -print -quit)
+    if [ -n "$nested" ]; then
+      echo "Refusing nested symlink in macOS app build output: $nested" >&2
+      exit 2
+    fi
+  fi
+done
+
 for path in \
   "$CONTENTS/Info.plist" \
   "$CONTENTS/PkgInfo" \

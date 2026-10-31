@@ -45,4 +45,32 @@ do
   fi
 done
 
-echo "PASS: 12 symlinked macOS app build paths refused without changing the external sentinel"
+# Nested output symlinks can redirect compiler-created files despite safe roots.
+for relative in \
+  target/release/deps \
+  target/macos/RustMusic.app/Contents/Resources \
+  target/swift-module-cache/modules
+do
+  TEST_ROOT="$TEMP_ROOT/nested-case"
+  rm -rf "$TEST_ROOT"
+  mkdir -p "$TEST_ROOT/scripts" "$TEST_ROOT/$(dirname "$relative")"
+  cp "$SCRIPT_DIR/check_macos_app_build_paths.sh" "$TEST_ROOT/scripts/"
+  ln -s "$SENTINEL" "$TEST_ROOT/$relative"
+
+  if sh "$TEST_ROOT/scripts/check_macos_app_build_paths.sh" "$TEST_ROOT" >/dev/null 2>&1; then
+    echo "FAIL: accepted nested symlinked build path $relative" >&2
+    exit 1
+  else
+    result=$?
+  fi
+  if [ "$result" -ne 2 ]; then
+    echo "FAIL: nested $relative returned $result instead of refusal status 2" >&2
+    exit 1
+  fi
+  if [ "$(cat "$SENTINEL")" != "preserve-this-file" ]; then
+    echo "FAIL: nested symlink guard altered the external sentinel for $relative" >&2
+    exit 1
+  fi
+done
+
+echo "PASS: 15 symlinked macOS app build paths refused without changing the external sentinel"
