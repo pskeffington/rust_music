@@ -145,13 +145,13 @@ The machine was idle apart from the profile and reported no audio devices.
 
 | Tracks | Catalog scan | Search p50 | Search p95 |
 | ---: | ---: | ---: | ---: |
-| 0 | <1 ms | 83 ns | 125 ns |
-| 1 | <1 ms | 125 ns | 209 ns |
-| 100 | 2 ms | 4.417 µs | 22.125 µs |
-| 2,000 | 30 ms | 73.083 µs | 83.709 µs |
-| 20,000 | 316 ms | 684.083 µs | 732.084 µs |
+| 0 | <1 ms | 83 ns | 84 ns |
+| 1 | <1 ms | 166 ns | 292 ns |
+| 100 | 1 ms | 3.959 µs | 5.083 µs |
+| 2,000 | 26 ms | 68.125 µs | 73.458 µs |
+| 20,000 | 320 ms | 671.625 µs | 717 µs |
 
-The finalized run took 2.92 s including fixture creation, scanning and 51
+The finalized run took 2.93 s including fixture creation, scanning and 51
 searches at each size. Peak process RSS was 11,239,424 bytes (10.72 MiB), which includes
 the executable and profiling harness; it is not incremental catalog memory.
 Cold application startup and incremental idle memory were not isolated, so the

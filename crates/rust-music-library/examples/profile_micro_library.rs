@@ -65,7 +65,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         search_times.sort_unstable();
         let p50 = search_times[SEARCH_SAMPLES / 2];
-        let p95 = search_times[(SEARCH_SAMPLES - 1) * 95 / 100];
+        let p95_index = (SEARCH_SAMPLES * 95).div_ceil(100) - 1;
+        let p95 = search_times[p95_index];
         println!(
             "tracks={size} fixture_ms={} catalog_build_ms={} search_p50_ns={} search_p95_ns={}",
             fixture_time.as_millis(),
