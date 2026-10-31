@@ -476,3 +476,27 @@ visualizer. This runtime check did not scan media.
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
+
+### 2026-10-31 native Pip-Boy chassis visual pass
+
+`apps/rust-music-macos/RustMusicApp.swift` now frames the existing functional
+player in a static native SwiftUI Pip-Boy style chassis: muted brass trim,
+device label, and four small fasteners. The catalog, navigation and transport
+controls remain the existing text UI. There are no image assets, album art,
+audio-reactive bars, or visualizers.
+
+At this pass's Swift source, `sh scripts/build-macos-app.sh`
+exited **0** and strict deep ad-hoc code-signature validation passed. A
+temporary copy at `/private/tmp/RustMusic-theme-smoke.app` launched through CUA;
+the accessibility tree displayed `RUST MUSIC PIP-BOY 2000 · AUDIO`, and the
+screenshot showed the chassis around the Ready / No Track screen. This visual
+smoke did not load a library or start playback.
+
+The shell invocation `/usr/bin/open -n` for both the built bundle and the
+temporary copy exited **1** with LaunchServices `kLSNoExecutableErr` (-10827),
+despite `CFBundleExecutable=RustMusic`, the arm64 executable being present and
+executable, `plutil -lint` passing, and strict deep `codesign --verify`
+passing. A direct executable invocation exited **134**. Attempted
+`lsregister -f` exited **1** with a Spotlight scan error (-10822). CUA launch of
+the temporary app copy worked, but the shell `open -n` path remains
+**UNVERIFIED** and must be resolved before accepting LaunchServices packaging.

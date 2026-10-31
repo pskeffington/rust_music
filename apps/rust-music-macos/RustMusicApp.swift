@@ -10,6 +10,8 @@ private enum RustMusicPalette {
     static let phosphor = Color(red: 0.63, green: 0.98, blue: 0.47)
     static let muted = Color(red: 0.48, green: 0.70, blue: 0.48)
     static let line = Color(red: 0.18, green: 0.36, blue: 0.21)
+    static let brass = Color(red: 0.34, green: 0.27, blue: 0.15)
+    static let brassHighlight = Color(red: 0.61, green: 0.49, blue: 0.28)
 }
 
 struct RustMusicFailure: LocalizedError {
@@ -1108,23 +1110,25 @@ struct PlayerView: View {
     @State private var activeSection: PlayerSection = .nowPlaying
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    header
-                    HStack(alignment: .top, spacing: 12) {
-                        navigationRail
-                            .frame(width: 112)
-                        sectionContent
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
+        PipBoyChassis {
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        header
+                        HStack(alignment: .top, spacing: 12) {
+                            navigationRail
+                                .frame(width: 112)
+                            sectionContent
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
                     }
+                    .padding(12)
+                    .frame(minWidth: 600, alignment: .leading)
                 }
-                .padding(12)
-                .frame(minWidth: 600, alignment: .leading)
-            }
-            .scrollIndicators(.visible)
+                .scrollIndicators(.visible)
 
-            transportBar
+                transportBar
+            }
         }
         .background(RustMusicPalette.background.ignoresSafeArea())
         .foregroundStyle(RustMusicPalette.phosphor)
@@ -1440,6 +1444,88 @@ struct PlayerView: View {
         }
         .background(RustMusicPalette.surface)
         .accessibilityIdentifier("transport-bar")
+    }
+}
+
+/// A lightweight, native SwiftUI chassis that frames the functional player.
+/// It uses only static shapes and text; it contains no artwork or audio meter.
+private struct PipBoyChassis<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 10) {
+                Text("RUST MUSIC")
+                    .font(.system(size: 12, weight: .black, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundStyle(RustMusicPalette.brassHighlight)
+                Rectangle()
+                    .fill(RustMusicPalette.brass)
+                    .frame(height: 1)
+                Text("PIP-BOY 2000 · AUDIO")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .tracking(0.9)
+                    .foregroundStyle(RustMusicPalette.muted)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(RustMusicPalette.background, in: RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(RustMusicPalette.line.opacity(0.8), lineWidth: 1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+        }
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(LinearGradient(
+                    colors: [RustMusicPalette.brassHighlight.opacity(0.82), RustMusicPalette.brass, Color(red: 0.13, green: 0.12, blue: 0.09)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .overlay {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(RustMusicPalette.brassHighlight.opacity(0.75), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 13)
+                            .stroke(RustMusicPalette.brass.opacity(0.85), lineWidth: 1)
+                            .padding(3)
+                    }
+                }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.55), lineWidth: 1)
+        }
+        .overlay(alignment: .topLeading) { ChassisFastener().padding(9) }
+        .overlay(alignment: .topTrailing) { ChassisFastener().padding(9) }
+        .overlay(alignment: .bottomLeading) { ChassisFastener().padding(9) }
+        .overlay(alignment: .bottomTrailing) { ChassisFastener().padding(9) }
+        .padding(10)
+    }
+}
+
+private struct ChassisFastener: View {
+    var body: some View {
+        ZStack {
+            Circle().fill(RustMusicPalette.background.opacity(0.9))
+            Circle().stroke(RustMusicPalette.brassHighlight.opacity(0.8), lineWidth: 1)
+            Rectangle()
+                .fill(RustMusicPalette.brassHighlight.opacity(0.8))
+                .frame(width: 7, height: 1)
+                .rotationEffect(.degrees(-35))
+        }
+        .frame(width: 8, height: 8)
+        .accessibilityHidden(true)
     }
 }
 
