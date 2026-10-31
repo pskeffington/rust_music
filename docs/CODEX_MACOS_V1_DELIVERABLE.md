@@ -1469,4 +1469,6 @@ base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. Local HEAD
 `4d09c77a8c914f8a8c84c0362eea98be3b614c7b` contains that remote head as an
 ancestor and is 135 commits ahead of it. No remote update or merge was made;
 MAC-02 device recovery, DAC/panel, live host-focus, and distribution gates
-remain open.
+remain open. The GitHub combined-status query returned no status contexts and
+the PR-head Actions workflow query returned no workflow runs; absence of
+checks is not a pass.
