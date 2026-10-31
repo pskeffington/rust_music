@@ -1093,3 +1093,17 @@ overhead, so it is not direct search latency. Activity Monitor showed no
 rows; a fresh launch returned to Ready / No Track without scanning or
 autoplay. The generated fixture directory was removed. Repeatable full-app
 memory and direct search latency remain open.
+
+### 2026-10-31 current CLI child-lifecycle regression
+
+At current code commit `3737959c6750ff8280188a3b8dcc6857be965c31`,
+`cargo build --locked --offline -p rust-music-cli --features
+macos-output,test-support` exited **0** and
+`python3 scripts/test_macos_parent_exit.py --binary
+target/debug/rust-music-cli` exited **0**. The harness observed child PID
+43932 exit 0 after normal EOF, PID 43935 exit 1 after malformed protocol,
+three repeated children 43936–43938 exit after EOF, and child PID 43940 exit
+after its app-like parent was force-killed. The test sink does not open a DAC.
+This is fresh CLI process-exit evidence, not a fresh active-audio GUI close or
+device-error test. Earlier GUI active-playback close evidence remains in the
+entries above.

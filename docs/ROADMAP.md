@@ -163,6 +163,16 @@ stopped and no CLI child appeared after scan. Cmd-Q removed the app and CLI
 rows; a fresh launch was Ready / No Track with no autoplay. Generated files
 were removed. Full-app memory and direct UI latency remain open.
 
+**RM-019 current child-exit regression (2026-10-31):** a fresh feature-gated
+debug CLI build exited 0; `python3 scripts/test_macos_parent_exit.py --binary
+target/debug/rust-music-cli` exited 0. Normal EOF reaped child PID 43932
+(exit 0), malformed protocol reaped PID 43935 (exit 1), three repeated EOF
+cycles reaped PIDs 43936–43938, and the real serve child PID 43940 exited
+after its app-like parent received SIGKILL. This verifies CLI child lifecycle
+with the test sink, not a new GUI active-audio close or physical device
+recovery. Earlier GUI active-playback exit evidence remains in the ledger;
+RM-020 and hardware gates remain open.
+
 **MAC-02 host output check (2026-10-31):** host `system_profiler` exited 0 and
 listed MacBook Air Speakers as the 48 kHz default output. A generated
 low-amplitude 440 Hz WAV played by the app-bundled CLI outside the restricted
