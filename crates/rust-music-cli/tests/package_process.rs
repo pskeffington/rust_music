@@ -62,6 +62,69 @@ fn receive_reply(
     Envelope::<Reply>::decode(&payload).expect("decode child reply")
 }
 
+fn wait_for_exit(child: &mut Child) -> std::process::ExitStatus {
+    let deadline = Instant::now() + REPLY_DEADLINE;
+    loop {
+        if let Some(status) = child.try_wait().expect("poll child exit") {
+            return status;
+        }
+        assert!(Instant::now() < deadline, "child exit deadline exceeded");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+#[cfg(feature = "test-support")]
+fn managed_playback_process_exits_when_parent_pipe_closes_repeatedly() {
+    for _ in 0..3 {
+        let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
+            .arg("__test-parent-guard")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn parent-guarded playback worker");
+        let mut child = ChildGuard(child);
+        drop(child.0.stdin.take());
+
+        let status = wait_for_exit(&mut child.0);
+        assert!(status.success(), "parent-guard worker exited with {status}");
+        let mut output = String::new();
+        child
+            .0
+            .stdout
+            .take()
+            .expect("parent-guard output")
+            .read_to_string(&mut output)
+            .expect("read parent-guard exit marker");
+        assert_eq!(output, "parent-stdin-closed\n");
+    }
+}
+
+#[test]
+#[cfg(feature = "test-support")]
+fn managed_playback_error_exits_without_leaving_a_child() {
+    let nonexistent = std::env::temp_dir().join(format!(
+        "rust-music-missing-playback-{}-{}.flac",
+        std::process::id(),
+        Instant::now().elapsed().as_nanos()
+    ));
+    let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))
+        .arg("play-managed")
+        .arg(nonexistent)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn failing managed playback process");
+    let mut child = ChildGuard(child);
+    let status = wait_for_exit(&mut child.0);
+    assert!(
+        !status.success(),
+        "invalid media should report playback failure"
+    );
+}
+
 #[test]
 fn spawned_cli_unit_handshakes_activates_inertly_and_shuts_down() {
     let child = Command::new(env!("CARGO_BIN_EXE_rust-music-cli"))

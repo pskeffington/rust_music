@@ -25,3 +25,11 @@ The app bundle is created under `target/macos/RustMusic.app`; Cargo and Swift
 use only the installed local toolchains and Apple frameworks. No music files
 are bundled. Pause, playlist persistence, artwork, and hardware bit-perfect
 certification are not claimed.
+
+App-managed playback uses the local `play-managed` CLI entry point and a
+private stdin pipe. Stop and window close close the app's pipe writer; if the
+app process is terminated, the operating system closes it. The Rust child
+observes EOF, calls the player stop path, and exits. A five-second watchdog
+exits the child if native output fails to return in time. The watchdog is a
+last-resort process cleanup path and does not prove a graceful AudioQueue
+drain/dispose on hardware.

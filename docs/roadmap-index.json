@@ -535,7 +535,7 @@
       ],
       "create_paths": [],
       "acceptance": "Own WavPack codec with independent parity; hybrid mode rejected without validated correction data",
-      "blocker": "Generated FFmpeg 9.0.2 PCM parity passes for 882-frame mono and joint-stereo one-block streams; 4,410-frame mono, mixed joint/true-stereo, all-true-stereo, and deterministic pseudorandom 16-bit stereo multiblock streams; padded-24-bit mono/stereo streams with exact INT32_INFO [0,8,0,0]; and a high-entropy padded-24-bit stereo stream covering signed extrema. Independent WavPack Tiny Encoder 4.40 fast-mode vectors pass exact packed-16/24-bit high-entropy stereo PCM parity; default-, high- and very-high-quality-mode 20,000-frame packed-16-bit stereo streams also pass exact parity; the high-mode terms [18,18,18,-2,2,3,5,-1,17,4] extend support to cross-channel terms -2/-1 and lag predictors 2–5. A deterministic synthetic 1,063,147-frame packed-24-bit stereo stream passes exact parity against its generated PCM golden and FFmpeg decode; this does not establish compatibility with native real-world WavPack files. Supporting packed-24-bit resolves the observed 3-byte sample layout; known optional metadata is skipped while unknown mandatory metadata still fails closed. Decoded block checksums pass. Removing the unsupported ±1024 clamp on positive-term adaptive weights restored exact stereo parity; the bounded 24-bit path checksums reconstructed PCM before validating its 24-bit range. Encoded-block checksum tests reject bit flips and missing declared metadata. Native real-world WavPack source files, further independent-encoder parity, predictor terms other than -2/-1/2/3/4/5/17/18, other integer layouts/depths, trailing tags, and validated hybrid .wvc pairing remain. Keep WavPack unregistered and unadmitted."
+      "blocker": "Generated FFmpeg 9.0.2 PCM parity passes for 882-frame mono and joint-stereo one-block streams; 4,410-frame mono, mixed joint/true-stereo, all-true-stereo, and deterministic pseudorandom 16-bit stereo multiblock streams; padded-24-bit mono/stereo streams with exact INT32_INFO [0,8,0,0]; and a high-entropy padded-24-bit stereo stream covering signed extrema. Independent WavPack Tiny Encoder 4.40 fast-mode vectors pass exact packed-16/24-bit high-entropy stereo PCM parity; default-, high- and very-high-quality-mode 20,000-frame packed-16-bit stereo streams also pass exact parity; the high-mode terms [18,18,18,-2,2,3,5,-1,17,4] extend support to cross-channel terms -2/-1 and lag predictors 2\u20135. A deterministic synthetic 1,063,147-frame packed-24-bit stereo stream passes exact parity against its generated PCM golden and FFmpeg decode; this does not establish compatibility with native real-world WavPack files. Supporting packed-24-bit resolves the observed 3-byte sample layout; known optional metadata is skipped while unknown mandatory metadata still fails closed. Decoded block checksums pass. Removing the unsupported \u00b11024 clamp on positive-term adaptive weights restored exact stereo parity; the bounded 24-bit path checksums reconstructed PCM before validating its 24-bit range. Encoded-block checksum tests reject bit flips and missing declared metadata. Native real-world WavPack source files, further independent-encoder parity, predictor terms other than -2/-1/2/3/4/5/17/18, other integer layouts/depths, trailing tags, and validated hybrid .wvc pairing remain. Keep WavPack unregistered and unadmitted."
     },
     {
       "id": "RM-015",
@@ -643,7 +643,28 @@
       ],
       "create_paths": [],
       "acceptance": "Build the standalone app bundle from a clean offline macOS checkout; launch it, inspect supported and rejected files, verify explicit Play/Stop and window-close child cleanup, and confirm no network or background scan. Record actual output-device checks separately; this task cannot certify bit-perfect hardware.",
-      "blocker": "The Rust/Swift bundle built and launched locally. UI inspection of a generated supported WAV, explicit Play/Stop, and refusal of a generated MP3 were observed. Closing the window stopped playback, but independent verification that the child process exited was unavailable. The app does not perform a background scan or network request by design; physical AudioQueue/DAC acceptance remains separate. Keep RM-019 in progress until child cleanup is confirmed and packaged release checks are repeated from a clean checkout."
+      "blocker": "A rebuilt bundle was launched directly through the desktop UI; generated WAV inspect, Play/Stop, MP3 refusal and window-close playback cleanup were observed. Activity Monitor showed no rust-music-cli process on subsequent refreshes. Automated tests pass for playback error, repeated parent-pipe closure, and a force-killed app-like supervisor whose child PID exits. However, `open -n target/macos/RustMusic.app` fails with LaunchServices kLSNoExecutableErr, so package launch/install behavior is unresolved. Child watchdog escalation is last-resort cleanup, not proof of graceful AudioQueue teardown. Clean-checkout package verification and actual device availability/failure/disconnect/recovery remain open; keep RM-019 in progress."
+    },
+    {
+      "id": "RM-020",
+      "gate": "G13",
+      "title": "Build zero-artwork micro media library experience",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "priority": "P1",
+      "status": "planned",
+      "depends_on": [
+        "RM-019"
+      ],
+      "focus_paths": [
+        "apps/rust-music-macos/",
+        "crates/rust-music-library/",
+        "crates/rust-music-host/",
+        "docs/MICRO_LIBRARY_ZERO_ARTWORK.md"
+      ],
+      "create_paths": [],
+      "acceptance": "Provide explicit-root user-facing browsing, bounded metadata indexing and search, playlists, persistent queue, repeat and shuffle. Retain zero artwork/image extraction/cache/visualizers and zero third-party runtime dependencies; measure startup, memory and search performance.",
+      "blocker": "Not started; begins after standalone application lifecycle/package RM-019 is closed."
     }
   ]
 }

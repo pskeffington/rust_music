@@ -10,6 +10,7 @@ repository.workspace = true
 default = []
 macos-output = ["rust-music/native-macos"]
 alsa-output = ["rust-music/native-alsa"]
+test-support = []
 
 [dependencies]
 rust-music = { path = "../rust-music" }

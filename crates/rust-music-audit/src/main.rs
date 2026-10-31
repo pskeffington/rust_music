@@ -229,9 +229,9 @@ fn scan_rust(path: &Path, report: &mut Audit) -> Result<(), String> {
                 "snd_pcm_open(",
                 "asound",
             ] {
-                // One exact test-only exception launches Cargo's own built CLI
-                // binary for the RBPK subprocess lifecycle regression. Product
-                // code and every other process-spawn form remain forbidden.
+                // Exact test-only exceptions launch Cargo's own built CLI
+                // binary for process lifecycle regressions. Product code and
+                // every other process-spawn form remain forbidden.
                 let allowed_test_spawn =
                     forbidden == "Command::new(" && allowed_command_spawn(&path, line);
                 requirement(

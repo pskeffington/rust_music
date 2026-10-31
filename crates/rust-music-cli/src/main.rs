@@ -230,35 +230,174 @@ fn inspect(mut decoder: Box<dyn Decoder>) -> Result<()> {
     );
     Ok(())
 }
-#[cfg(all(target_os = "macos", feature = "macos-output"))]
-fn play(input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
-    use rust_music::{MacAudioQueueSink, PlaybackState, Player};
-    let mut player = Player::new(MacAudioQueueSink::default());
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn play_with_sink<S: PcmSink>(
+    input: Box<dyn Decoder>,
+    player: &mut rust_music::Player<S>,
+    parent_watch: Option<&ParentWatch>,
+) -> Result<()> {
+    use rust_music::PlaybackState;
     player.load(input)?;
+    if parent_watch.is_some_and(ParentWatch::is_disconnected) {
+        return player.stop();
+    }
     player.play()?;
-    while player.step()?.state == PlaybackState::Playing {}
+    while player.step()?.state == PlaybackState::Playing {
+        if parent_watch.is_some_and(ParentWatch::is_disconnected) {
+            return player.stop();
+        }
+    }
     Ok(())
 }
+
+#[cfg(all(target_os = "macos", feature = "macos-output"))]
+fn play(
+    input: Box<dyn Decoder>,
+    _device: Option<&str>,
+    parent_watch: Option<&ParentWatch>,
+) -> Result<()> {
+    let mut player = rust_music::Player::new(rust_music::MacAudioQueueSink::default());
+    play_with_sink(input, &mut player, parent_watch)
+}
 #[cfg(all(target_os = "linux", feature = "alsa-output"))]
-fn play(input: Box<dyn Decoder>, device: Option<&str>) -> Result<()> {
-    use rust_music::{AlsaSink, PlaybackState, Player};
+fn play(
+    input: Box<dyn Decoder>,
+    device: Option<&str>,
+    parent_watch: Option<&ParentWatch>,
+) -> Result<()> {
     let device = device.ok_or(MusicError::Invalid(
         "Linux playback requires explicit hw:CARD,DEVICE",
     ))?;
-    let mut player = Player::new(AlsaSink::new(device, device.starts_with("hw:"))?);
-    player.load(input)?;
-    player.play()?;
-    while player.step()?.state == PlaybackState::Playing {}
-    Ok(())
+    let mut player = rust_music::Player::new(rust_music::AlsaSink::new(
+        device,
+        device.starts_with("hw:"),
+    )?);
+    play_with_sink(input, &mut player, parent_watch)
 }
 #[cfg(not(any(
     all(target_os = "macos", feature = "macos-output"),
     all(target_os = "linux", feature = "alsa-output")
 )))]
-fn play(_input: Box<dyn Decoder>, _device: Option<&str>) -> Result<()> {
+fn play(
+    _input: Box<dyn Decoder>,
+    _device: Option<&str>,
+    _parent_watch: Option<&ParentWatch>,
+) -> Result<()> {
     Err(MusicError::Unsupported(
         "native playback needs --features macos-output (macOS) or alsa-output (Linux)",
     ))
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+struct ParentWatch {
+    disconnected: std::sync::Arc<AtomicBool>,
+    playback_finished: std::sync::Arc<AtomicBool>,
+}
+
+#[cfg(not(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+)))]
+struct ParentWatch;
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl ParentWatch {
+    fn is_disconnected(&self) -> bool {
+        self.disconnected.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+impl Drop for ParentWatch {
+    fn drop(&mut self) {
+        self.playback_finished.store(true, Ordering::Release);
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn watch_parent_disconnect<R>(mut reader: R) -> ParentWatch
+where
+    R: std::io::Read + Send + 'static,
+{
+    let disconnected = std::sync::Arc::new(AtomicBool::new(false));
+    let playback_finished = std::sync::Arc::new(AtomicBool::new(false));
+    let signal = std::sync::Arc::clone(&disconnected);
+    let finished = std::sync::Arc::clone(&playback_finished);
+    thread::spawn(move || {
+        let mut bytes = [0u8; 256];
+        loop {
+            match reader.read(&mut bytes) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {}
+            }
+        }
+        signal.store(true, Ordering::Release);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !finished.load(Ordering::Acquire) {
+            if std::time::Instant::now() >= deadline {
+                // The parent is gone and the playback thread did not release
+                // the native sink in time. Process exit closes OS resources
+                // and prevents a detached playback process from surviving.
+                std::process::exit(2);
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    });
+    ParentWatch {
+        disconnected,
+        playback_finished,
+    }
+}
+
+#[cfg(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+))]
+fn play_managed(path: &str, device: Option<&str>) -> Result<()> {
+    let parent_watch = watch_parent_disconnect(std::io::stdin());
+    play(open_file(path)?, device, Some(&parent_watch))
+}
+
+#[cfg(not(any(
+    all(target_os = "macos", feature = "macos-output"),
+    all(target_os = "linux", feature = "alsa-output")
+)))]
+fn play_managed(_path: &str, _device: Option<&str>) -> Result<()> {
+    Err(MusicError::Unsupported(
+        "managed playback needs a native audio output feature",
+    ))
+}
+
+#[cfg(all(
+    debug_assertions,
+    feature = "test-support",
+    any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    )
+))]
+fn run_parent_guard_test() -> Result<()> {
+    let parent_watch = watch_parent_disconnect(std::io::stdin());
+    while !parent_watch.is_disconnected() {
+        thread::sleep(Duration::from_millis(5));
+    }
+    println!("parent-stdin-closed");
+    Ok(())
 }
 
 #[cfg(any(
@@ -739,12 +878,38 @@ fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
     let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
+    #[cfg(all(
+        debug_assertions,
+        feature = "test-support",
+        any(
+            all(target_os = "macos", feature = "macos-output"),
+            all(target_os = "linux", feature = "alsa-output")
+        )
+    ))]
+    if action == "__test-parent-guard" {
+        if args.next().is_some() {
+            return Err(MusicError::Invalid(
+                "unexpected parent guard test arguments",
+            ));
+        }
+        return run_parent_guard_test();
+    }
     if action == "serve" {
         let device = args.next();
         if args.next().is_some() {
             return Err(MusicError::Invalid("too many package process arguments"));
         }
         return serve(device.as_deref());
+    }
+    if action == "play-managed" {
+        let path = args.next().ok_or(MusicError::Invalid(
+            "play-managed requires an input filename",
+        ))?;
+        let device = args.next();
+        if args.next().is_some() {
+            return Err(MusicError::Invalid("too many managed playback arguments"));
+        }
+        return play_managed(&path, device.as_deref());
     }
     let path = args
         .next()
@@ -783,7 +948,7 @@ fn run() -> Result<()> {
         "play" => {
             let device = args.next();
             if args.next().is_some() { return Err(MusicError::Invalid("too many playback arguments")); }
-            play(open_file(path)?, device.as_deref())
+            play(open_file(path)?, device.as_deref(), None)
         }
         "decode" => {
             let output = args.next().ok_or(MusicError::Invalid("missing output .wav filename"))?;

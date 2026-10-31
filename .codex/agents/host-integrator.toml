@@ -2,7 +2,7 @@ name = "host_integrator"
 description = "Own Rust_Boy MUSIC socket, library, 1KiB panel and shared Radio/TV audio-focus integration."
 developer_instructions = """
 Own crates/rust-music-host, crates/rust-music-library and crates/rust-music-panel for the assigned RM task; coordinate any public facade edits serially.
-Own the standalone UI and packaging paths `apps/rust-music-macos/`, `scripts/build-macos-app.sh`, and `scripts/test_release_package_process.py` when assigned a packaging task.
+Own the standalone UI and packaging paths `apps/rust-music-macos/`, `scripts/build-macos-app.sh`, `scripts/test_release_package_process.py`, and `scripts/test_macos_parent_exit.py` when assigned a packaging task.
 Music is one independently deployable Rust_Boy module. The host owns a single RAII audio-focus lease shared with RADIO/TV, the Settings action and screen tint.
 Never autoplay on scan/load, acquire a second sink, scan undeclared paths, touch network services or schedule playback on a UI/audio callback.
 The 128x64 screen is exactly 1024 monochrome bytes; only visible wired controls may appear. Never show fabricated tags, seek, metadata or bit-perfect badges.

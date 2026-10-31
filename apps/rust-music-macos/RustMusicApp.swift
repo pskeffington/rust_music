@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -36,6 +37,9 @@ final class PlayerModel: ObservableObject {
     @Published var isPlaying = false
 
     private var playProcess: Process?
+    private var parentGuardPipe: Pipe?
+    private var escalationScheduledFor: Int32?
+    private var stopRequested = false
 
     private var decoderURL: URL {
         Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/rust-music-cli")
@@ -76,7 +80,9 @@ final class PlayerModel: ObservableObject {
         guard let selectedFile, playProcess == nil else { return }
         let process = Process()
         process.executableURL = decoderURL
-        process.arguments = ["play", selectedFile.path]
+        process.arguments = ["play-managed", selectedFile.path]
+        let parentGuard = Pipe()
+        process.standardInput = parentGuard.fileHandleForReading
         let errors = Pipe()
         process.standardError = errors
         process.terminationHandler = { [weak self] child in
@@ -85,27 +91,57 @@ final class PlayerModel: ObservableObject {
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             Task { @MainActor in
                 guard let self, self.playProcess === child else { return }
+                self.parentGuardPipe?.fileHandleForWriting.closeFile()
+                self.parentGuardPipe = nil
+                self.escalationScheduledFor = nil
                 self.playProcess = nil
                 self.isPlaying = false
-                self.status = child.terminationStatus == 0
-                    ? "Playback finished."
-                    : (errorText.isEmpty ? "Playback stopped." : errorText)
+                if child.terminationStatus == 0 {
+                    self.status = self.stopRequested ? "Playback stopped." : "Playback finished."
+                } else {
+                    self.status = errorText.isEmpty ? "Playback stopped." : errorText
+                }
+                self.stopRequested = false
             }
         }
+        playProcess = process
+        parentGuardPipe = parentGuard
+        stopRequested = false
         do {
             try process.run()
-            playProcess = process
             isPlaying = true
             status = "Playing through Rust Music and macOS AudioQueue."
         } catch {
+            parentGuard.fileHandleForWriting.closeFile()
+            parentGuardPipe = nil
+            playProcess = nil
             status = "Could not start Rust Music: \(error.localizedDescription)"
         }
     }
 
     func stop() {
         guard let playProcess else { return }
-        playProcess.terminate()
+        stopRequested = true
+        if let parentGuardPipe {
+            parentGuardPipe.fileHandleForWriting.closeFile()
+            self.parentGuardPipe = nil
+        }
         status = "Stopping Rust Music playback…"
+        let processID = playProcess.processIdentifier
+        guard escalationScheduledFor != processID else { return }
+        escalationScheduledFor = processID
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak playProcess] in
+            guard let self, let playProcess,
+                  self.playProcess === playProcess,
+                  playProcess.isRunning else { return }
+            playProcess.terminate()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak playProcess] in
+                guard let self, let playProcess,
+                      self.playProcess === playProcess,
+                      playProcess.isRunning else { return }
+                _ = kill(playProcess.processIdentifier, SIGKILL)
+            }
+        }
     }
 
     nonisolated private static func run(decoder: URL, arguments: [String]) -> Result<String, RustMusicFailure> {

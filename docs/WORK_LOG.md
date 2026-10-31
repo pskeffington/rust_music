@@ -1515,3 +1515,31 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   scripts/test_m4a_corpus.py` passed. These report their specific local
   vectors/corpora and do not certify physical output or broad encoder
   compatibility. A final full offline gate is required after this log update.
+
+## 2026-10-31 — RM-019 managed playback child cleanup
+
+- Changed the standalone macOS app to launch `play-managed` with a private
+  stdin pipe. Explicit Stop and window close close the pipe writer; parent
+  process death closes it in the kernel. The child observes EOF and calls the
+  player's normal stop path. A five-second child watchdog and app-side
+  terminate/SIGKILL escalation prevent an unresponsive child from persisting,
+  but escalation is not evidence of graceful AudioQueue teardown.
+- Added opt-in, debug-only `test-support` child instrumentation and automated
+  regressions for repeated parent pipe closure and playback-open failure. The
+  four package-process integration tests passed. The stdlib-only
+  `scripts/test_macos_parent_exit.py` force-killed an app-like supervisor and
+  observed the reported playback child PID exit (exit 0). A desktop UI run
+  exercised generated WAV inspection, Play/Stop, and window close; Activity
+  Monitor showed no `rust-music-cli` process on subsequent refreshes. No private
+  user media was used in these checks.
+- `sh scripts/build-macos-app.sh` and `sh scripts/offline-gate.sh` exited 0.
+  AIFF (7), WAVE (6), CAF (5), WavPack (49 Rust tests), M4A/ALAC (6 parity
+  fixtures plus AAC rejection/ingestion), and FLAC generated fixtures passed.
+  The six-file private FLAC run was not attempted because
+  `PRIVATE_FLAC_DIRECTORY` is unavailable in this environment.
+- `open -n target/macos/RustMusic.app` fails with LaunchServices
+  `kLSNoExecutableErr`; direct bundle-path UI launch did work. RM-019 remains
+  in progress pending clean-checkout package launch/install verification and
+  native device availability/failure/disconnect/recovery tests. Physical DAC
+  qualification and graceful teardown under forced watchdog escalation remain
+  unverified.
