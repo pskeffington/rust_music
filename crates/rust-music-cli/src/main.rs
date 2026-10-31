@@ -47,6 +47,7 @@ const PCM_GUID: [u8; 16] = [
 ];
 
 const MAX_CATALOG_OUTPUT_BYTES: usize = 20 * 1024 * 1024;
+const MAX_STATE_TSV_BYTES: usize = 6 * 1024 * 1024;
 
 fn append_hex(output: &mut String, value: &str) {
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -164,6 +165,392 @@ fn resolve_library_track(
             "selected library track is missing or unsupported",
         ))?;
     library.checked_path(index)
+}
+
+fn platform_state_base() -> Result<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    #[cfg(target_os = "macos")]
+    let base = env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or(MusicError::Invalid("HOME is unavailable for music state"))?
+        .join("Library/Application Support/Rust Music");
+
+    #[cfg(target_os = "windows")]
+    let base = env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .ok_or(MusicError::Invalid(
+            "APPDATA is unavailable for music state",
+        ))?
+        .join("Rust Music");
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let base = if let Some(xdg) = env::var_os("XDG_DATA_HOME") {
+        PathBuf::from(xdg).join("rust-music")
+    } else {
+        env::var_os("HOME")
+            .map(PathBuf::from)
+            .ok_or(MusicError::Invalid("HOME is unavailable for music state"))?
+            .join(".local/share/rust-music")
+    };
+
+    #[cfg(not(any(unix, windows)))]
+    let base = env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or(MusicError::Invalid("HOME is unavailable for music state"))?
+        .join(".local/share/rust-music");
+
+    Ok(base)
+}
+
+fn root_state_key(root: &std::path::Path) -> Result<String> {
+    let metadata = std::fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(MusicError::Invalid(
+            "state root must be a real library directory",
+        ));
+    }
+    let canonical = root.canonicalize()?;
+    let bytes = path_identity_bytes(&canonical);
+    // FNV-1a 128 is used only to keep root paths out of state filenames and
+    // separate per-root records; it is not an authentication primitive.
+    let mut hash = 0x6c62272e07bb014262b821756295c58du128;
+    for byte in bytes {
+        hash ^= u128::from(byte);
+        hash = hash.wrapping_mul(0x0000000001000000000000000000013bu128);
+    }
+    let mut encoded = String::with_capacity(32);
+    use std::fmt::Write as _;
+    write!(&mut encoded, "{hash:032x}").expect("writing to String cannot fail");
+    Ok(encoded)
+}
+
+#[cfg(unix)]
+fn path_identity_bytes(path: &std::path::Path) -> Vec<u8> {
+    use std::os::unix::ffi::OsStrExt;
+    path.as_os_str().as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn path_identity_bytes(path: &std::path::Path) -> Vec<u8> {
+    use std::os::windows::ffi::OsStrExt;
+    path.as_os_str()
+        .encode_wide()
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn path_identity_bytes(path: &std::path::Path) -> Vec<u8> {
+    path.to_string_lossy().as_bytes().to_vec()
+}
+
+fn state_file_path(
+    root: &std::path::Path,
+    base: &std::path::Path,
+    extension: &str,
+) -> Result<std::path::PathBuf> {
+    if !matches!(extension, "rmq" | "rmp") {
+        return Err(MusicError::Invalid("unsupported music state file type"));
+    }
+    let key = root_state_key(root)?;
+    Ok(base.join(format!("root-{key}.{extension}")))
+}
+
+fn load_queue_state(path: &std::path::Path) -> Result<rust_music_library::queue::PlaybackQueue> {
+    use rust_music_library::queue::PlaybackQueue;
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => PlaybackQueue::load_from(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(PlaybackQueue::new()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn load_playlist_state(
+    path: &std::path::Path,
+) -> Result<rust_music_library::playlist_store::PlaylistStore> {
+    use rust_music_library::playlist_store::PlaylistStore;
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => PlaylistStore::load_from(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(PlaylistStore::new()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn ensure_state_base(base: &std::path::Path) -> Result<()> {
+    match std::fs::symlink_metadata(base) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                let mut builder = std::fs::DirBuilder::new();
+                builder.recursive(true).mode(0o700).create(base)?;
+            }
+            #[cfg(not(unix))]
+            std::fs::create_dir_all(base)?;
+        }
+        Err(error) => return Err(error.into()),
+    }
+    let metadata = std::fs::symlink_metadata(base)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(MusicError::Invalid(
+            "music state directory must be a real directory",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_existing_state_base(base: &std::path::Path) -> Result<()> {
+    match std::fs::symlink_metadata(base) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => Err(
+            MusicError::Invalid("music state directory must be a real directory"),
+        ),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn queue_listing(queue: &rust_music_library::queue::PlaybackQueue) -> Result<String> {
+    use rust_music_library::queue::RepeatMode;
+    use std::fmt::Write as _;
+
+    let mut output = String::new();
+    output.push_str("meta\trepeat\t");
+    output.push_str(match queue.repeat_mode() {
+        RepeatMode::Off => "off\n",
+        RepeatMode::One => "one\n",
+        RepeatMode::All => "all\n",
+    });
+    output.push_str("meta\tshuffle\t");
+    match queue.shuffle_seed() {
+        Some(seed) => writeln!(output, "{seed}").expect("writing to String cannot fail"),
+        None => output.push_str("-\n"),
+    }
+    output.push_str("meta\tcurrent\t");
+    match queue.current_index() {
+        Some(index) => writeln!(output, "{index}").expect("writing to String cannot fail"),
+        None => output.push_str("-\n"),
+    }
+    for (index, path) in queue.entries().iter().enumerate() {
+        let path = path
+            .to_str()
+            .ok_or(MusicError::Invalid("queue path is not UTF-8"))?;
+        write!(
+            output,
+            "entry\t{index}\t{}\t",
+            u8::from(queue.current_index() == Some(index))
+        )
+        .expect("writing to String cannot fail");
+        append_hex(&mut output, path);
+        output.push('\n');
+        if output.len() > MAX_STATE_TSV_BYTES {
+            return Err(MusicError::Limit(
+                "music state listing exceeds its size bound",
+            ));
+        }
+    }
+    Ok(output)
+}
+
+fn playlist_listing(store: &rust_music_library::playlist_store::PlaylistStore) -> Result<String> {
+    use std::fmt::Write as _;
+
+    let mut playlists = store.playlists().iter().collect::<Vec<_>>();
+    playlists.sort_by(|left, right| left.name().cmp(right.name()));
+    let mut output = String::new();
+    for item in playlists {
+        output.push_str("playlist\t");
+        append_hex(&mut output, item.name());
+        writeln!(output, "\t{}", item.playlist().len()).expect("writing to String cannot fail");
+        for (index, path) in item.playlist().entries().iter().enumerate() {
+            let path = path
+                .to_str()
+                .ok_or(MusicError::Invalid("playlist path is not UTF-8"))?;
+            output.push_str("entry\t");
+            append_hex(&mut output, item.name());
+            write!(output, "\t{index}\t").expect("writing to String cannot fail");
+            append_hex(&mut output, path);
+            output.push('\n');
+            if output.len() > MAX_STATE_TSV_BYTES {
+                return Err(MusicError::Limit(
+                    "music state listing exceeds its size bound",
+                ));
+            }
+        }
+        if output.len() > MAX_STATE_TSV_BYTES {
+            return Err(MusicError::Limit(
+                "music state listing exceeds its size bound",
+            ));
+        }
+    }
+    Ok(output)
+}
+
+fn parse_state_index(value: &str) -> Result<usize> {
+    if value.is_empty() || value.len() > 10 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(MusicError::Invalid("music state index is invalid"));
+    }
+    value
+        .parse::<usize>()
+        .map_err(|_| MusicError::Invalid("music state index is invalid"))
+}
+
+fn state_command(
+    base: &std::path::Path,
+    category: &str,
+    root: &std::path::Path,
+    operation: &str,
+    arguments: &[String],
+) -> Result<String> {
+    if category.len() > 16 || operation.len() > 32 || root.as_os_str().len() > 4096 {
+        return Err(MusicError::Limit(
+            "music state command exceeds its size bound",
+        ));
+    }
+    validate_existing_state_base(base)?;
+    match category {
+        "queue" => state_queue_command(base, root, operation, arguments),
+        "playlist" => state_playlist_command(base, root, operation, arguments),
+        _ => Err(MusicError::Invalid(
+            "state category must be queue or playlist",
+        )),
+    }
+}
+
+fn state_queue_command(
+    base: &std::path::Path,
+    root: &std::path::Path,
+    operation: &str,
+    arguments: &[String],
+) -> Result<String> {
+    use rust_music_library::queue::{PlaybackQueue, RepeatMode};
+    use std::path::PathBuf;
+
+    let queue_path = state_file_path(root, base, "rmq")?;
+    let mut queue = load_queue_state(&queue_path)?;
+    let mut changed = false;
+    match operation {
+        "list" if arguments.is_empty() => {}
+        "add" if arguments.len() == 1 => {
+            queue.enqueue(PathBuf::from(&arguments[0]))?;
+            changed = true;
+        }
+        "remove" if arguments.len() == 1 => {
+            let index = parse_state_index(&arguments[0])?;
+            queue
+                .remove(index)
+                .ok_or(MusicError::Invalid("queue index is out of bounds"))?;
+            changed = true;
+        }
+        "select" if arguments.len() == 1 => {
+            queue.select(parse_state_index(&arguments[0])?)?;
+            changed = true;
+        }
+        "next" if arguments.is_empty() => {
+            queue.next_candidate();
+            changed = true;
+        }
+        "previous" if arguments.is_empty() => {
+            queue.previous_candidate();
+            changed = true;
+        }
+        "repeat" if arguments.len() == 1 => {
+            queue.set_repeat_mode(match arguments[0].as_str() {
+                "off" => RepeatMode::Off,
+                "one" => RepeatMode::One,
+                "all" => RepeatMode::All,
+                _ => return Err(MusicError::Invalid("repeat must be off, one, or all")),
+            });
+            changed = true;
+        }
+        "shuffle" if arguments.len() == 1 => {
+            if arguments[0].len() > 20 {
+                return Err(MusicError::Invalid("shuffle seed is invalid"));
+            }
+            let seed = arguments[0]
+                .parse::<u64>()
+                .map_err(|_| MusicError::Invalid("shuffle seed is invalid"))?;
+            queue.shuffle(seed);
+            changed = true;
+        }
+        "shuffle-off" if arguments.is_empty() => {
+            queue.clear_shuffle();
+            changed = true;
+        }
+        "clear" if arguments.is_empty() => {
+            queue = PlaybackQueue::new();
+            changed = true;
+        }
+        "add-playlist" if arguments.len() == 1 => {
+            let playlist_path = state_file_path(root, base, "rmp")?;
+            let store = load_playlist_state(&playlist_path)?;
+            let playlist = store
+                .get(&arguments[0])
+                .ok_or(MusicError::Invalid("named playlist does not exist"))?;
+            for path in playlist.entries() {
+                queue.enqueue(path.clone())?;
+            }
+            changed = true;
+        }
+        _ => {
+            return Err(MusicError::Invalid(
+                "invalid queue state command or arguments",
+            ))
+        }
+    }
+    if changed {
+        ensure_state_base(base)?;
+        queue.save_atomic(&queue_path)?;
+    }
+    queue_listing(&queue)
+}
+
+fn state_playlist_command(
+    base: &std::path::Path,
+    root: &std::path::Path,
+    operation: &str,
+    arguments: &[String],
+) -> Result<String> {
+    use std::path::PathBuf;
+
+    let playlist_path = state_file_path(root, base, "rmp")?;
+    let mut store = load_playlist_state(&playlist_path)?;
+    let changed = match operation {
+        "list" if arguments.is_empty() => false,
+        "create" if arguments.len() == 1 => {
+            store.create(&arguments[0])?;
+            true
+        }
+        "rename" if arguments.len() == 2 => {
+            store.rename(&arguments[0], &arguments[1])?;
+            true
+        }
+        "delete" if arguments.len() == 1 => store
+            .remove(&arguments[0])
+            .map(|_| true)
+            .ok_or(MusicError::Invalid("named playlist does not exist"))?,
+        "add" if arguments.len() == 2 => {
+            store.push_entry(&arguments[0], PathBuf::from(&arguments[1]))?;
+            true
+        }
+        "remove" if arguments.len() == 2 => {
+            let index = parse_state_index(&arguments[1])?;
+            store.remove_entry(&arguments[0], index)?;
+            true
+        }
+        _ => {
+            return Err(MusicError::Invalid(
+                "invalid playlist state command or arguments",
+            ))
+        }
+    };
+    if changed {
+        ensure_state_base(base)?;
+        store.save_atomic(&playlist_path)?;
+    }
+    playlist_listing(&store)
 }
 
 fn riff_overhead(format: AudioFormat) -> u32 {
@@ -1001,7 +1388,7 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | state queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]"))?;
     #[cfg(all(
         debug_assertions,
         feature = "test-support",
@@ -1051,6 +1438,33 @@ fn run() -> Result<()> {
         let checked =
             resolve_library_track(std::path::Path::new(&root), std::path::Path::new(&relative))?;
         return play_managed(&checked, device.as_deref());
+    }
+    if action == "state" {
+        let category = args
+            .next()
+            .ok_or(MusicError::Invalid("state requires queue or playlist"))?;
+        let root = args
+            .next()
+            .ok_or(MusicError::Invalid("state requires a library root"))?;
+        let operation = args
+            .next()
+            .ok_or(MusicError::Invalid("state requires a command"))?;
+        let mut arguments = Vec::new();
+        for argument in args {
+            if arguments.len() >= 2 || argument.len() > 4096 {
+                return Err(MusicError::Limit("too many or oversized state arguments"));
+            }
+            arguments.push(argument);
+        }
+        let output = state_command(
+            &platform_state_base()?,
+            &category,
+            std::path::Path::new(&root),
+            &operation,
+            &arguments,
+        )?;
+        print!("{output}");
+        return Ok(());
     }
     let path = args
         .next()
@@ -1123,7 +1537,7 @@ fn run() -> Result<()> {
             }
             export_wav_range(open_file(path)?, start, count, &output)
         }
-        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]")),
+        _ => Err(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog DIRECTORY [QUERY] | state queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [ALSA_DEVICE]")),
     }
 }
 fn main() {
@@ -1192,6 +1606,172 @@ mod tests {
         assert!(resolve_library_track(&root, std::path::Path::new("../song.wav")).is_err());
         assert!(resolve_library_track(&root, std::path::Path::new("missing.wav")).is_err());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    fn state_call(
+        base: &std::path::Path,
+        category: &str,
+        root: &std::path::Path,
+        operation: &str,
+        arguments: &[&str],
+    ) -> Result<String> {
+        let arguments = arguments
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect::<Vec<_>>();
+        state_command(base, category, root, operation, &arguments)
+    }
+
+    #[test]
+    fn queue_and_named_playlist_state_persist_restart_and_expand_playlist_selection_only() {
+        let root = temp_root("state-workflow-root");
+        let base = temp_root("state-workflow-base").join("app-support");
+        fs::write(root.join("one.flac"), b"fLaC").unwrap();
+
+        let empty = state_call(&base, "queue", &root, "list", &[]).unwrap();
+        assert_eq!(
+            empty,
+            "meta\trepeat\toff\nmeta\tshuffle\t-\nmeta\tcurrent\t-\n"
+        );
+        state_call(&base, "playlist", &root, "create", &["Café set"]).unwrap();
+        state_call(
+            &base,
+            "playlist",
+            &root,
+            "add",
+            &["Café set", "Album/one.flac"],
+        )
+        .unwrap();
+        state_call(
+            &base,
+            "playlist",
+            &root,
+            "add",
+            &["Café set", "Album/two.wav"],
+        )
+        .unwrap();
+
+        let playlist = state_call(&base, "playlist", &root, "list", &[]).unwrap();
+        assert_eq!(
+            playlist,
+            "playlist\t436166c3a920736574\t2\nentry\t436166c3a920736574\t0\t416c62756d2f6f6e652e666c6163\nentry\t436166c3a920736574\t1\t416c62756d2f74776f2e776176\n"
+        );
+        let queue = state_call(&base, "queue", &root, "add-playlist", &["Café set"]).unwrap();
+        assert_eq!(
+            queue,
+            "meta\trepeat\toff\nmeta\tshuffle\t-\nmeta\tcurrent\t-\nentry\t0\t0\t416c62756d2f6f6e652e666c6163\nentry\t1\t0\t416c62756d2f74776f2e776176\n"
+        );
+        let repeated = state_call(&base, "queue", &root, "repeat", &["all"]).unwrap();
+        assert!(repeated.contains("meta\trepeat\tall\n"));
+        let shuffled = state_call(&base, "queue", &root, "shuffle", &["12345"]).unwrap();
+        assert!(shuffled.contains("meta\tshuffle\t12345\n"));
+        let unshuffled = state_call(&base, "queue", &root, "shuffle-off", &[]).unwrap();
+        assert!(unshuffled.contains("meta\tshuffle\t-\n"));
+        let selected = state_call(&base, "queue", &root, "next", &[]).unwrap();
+        assert!(selected.contains("meta\tcurrent\t0\n"));
+        assert!(selected
+            .lines()
+            .any(|line| line.starts_with("entry\t0\t1\t")));
+        assert!(!selected.contains(root.to_str().unwrap()));
+
+        assert_eq!(
+            state_call(&base, "queue", &root, "list", &[]).unwrap(),
+            selected
+        );
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            playlist
+        );
+
+        state_call(&base, "playlist", &root, "rename", &["Café set", "renamed"]).unwrap();
+        assert!(state_call(&base, "playlist", &root, "list", &[])
+            .unwrap()
+            .starts_with("playlist\t72656e616d6564\t2\n"));
+        state_call(&base, "playlist", &root, "remove", &["renamed", "0"]).unwrap();
+        assert!(state_call(&base, "playlist", &root, "delete", &["renamed"]).is_ok());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn state_files_are_root_isolated_and_corruption_is_not_overwritten() {
+        let root_a = temp_root("state-root-a");
+        let root_b = temp_root("state-root-b");
+        let base = temp_root("state-isolation-base");
+        state_call(&base, "queue", &root_a, "add", &["a.flac"]).unwrap();
+        let queue_a_path = state_file_path(&root_a, &base, "rmq").unwrap();
+        let queue_b_path = state_file_path(&root_b, &base, "rmq").unwrap();
+        assert_ne!(queue_a_path, queue_b_path);
+        assert!(!queue_a_path
+            .to_string_lossy()
+            .contains(root_a.to_str().unwrap()));
+        assert_eq!(
+            state_call(&base, "queue", &root_b, "list", &[]).unwrap(),
+            "meta\trepeat\toff\nmeta\tshuffle\t-\nmeta\tcurrent\t-\n"
+        );
+
+        fs::write(&queue_a_path, b"not a queue").unwrap();
+        assert!(state_call(&base, "queue", &root_a, "list", &[]).is_err());
+        assert_eq!(fs::read(&queue_a_path).unwrap(), b"not a queue");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let linked_base = base.with_extension("symlink");
+            symlink(&base, &linked_base).unwrap();
+            assert!(state_call(&linked_base, "queue", &root_b, "list", &[]).is_err());
+            fs::remove_file(linked_base).unwrap();
+        }
+        fs::remove_dir_all(root_a).unwrap();
+        fs::remove_dir_all(root_b).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn state_commands_reject_traversal_unsupported_files_and_bad_indices() {
+        let root = temp_root("state-bounds-root");
+        let base = temp_root("state-bounds-base");
+        assert!(state_call(&base, "queue", &root, "add", &["../outside.flac"]).is_err());
+        assert!(state_call(&base, "queue", &root, "add", &["bad.mp3"]).is_err());
+        assert!(state_call(&base, "queue", &root, "remove", &["0"]).is_err());
+        state_call(&base, "playlist", &root, "create", &["safe"]).unwrap();
+        assert!(state_call(&base, "playlist", &root, "add", &["safe", "../outside.wav"]).is_err());
+        assert!(state_call(&base, "playlist", &root, "remove", &["safe", "42949672960"]).is_err());
+        assert!(state_call(&base, "playlist", &root, "create", &["\t"]).is_err());
+        assert!(state_call(&base, "other", &root, "list", &[]).is_err());
+        let playlist = state_call(&base, "playlist", &root, "list", &[]).unwrap();
+        assert!(playlist.starts_with("playlist\t73616665\t0\n"));
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn adding_playlist_is_atomic_when_queue_limit_would_be_exceeded() {
+        use rust_music_library::{
+            playlist_store::PlaylistStore,
+            queue::{PlaybackQueue, MAX_QUEUE_ENTRIES},
+        };
+
+        let root = temp_root("state-queue-overflow-root");
+        let base = temp_root("state-queue-overflow-base");
+        let playlist_path = state_file_path(&root, &base, "rmp").unwrap();
+        let mut playlists = PlaylistStore::new();
+        playlists.create("two").unwrap();
+        playlists.push_entry("two", "one.flac".into()).unwrap();
+        playlists.push_entry("two", "two.flac".into()).unwrap();
+        ensure_state_base(&base).unwrap();
+        playlists.save_atomic(&playlist_path).unwrap();
+
+        let queue_path = state_file_path(&root, &base, "rmq").unwrap();
+        let mut queue = PlaybackQueue::new();
+        for _ in 0..MAX_QUEUE_ENTRIES - 1 {
+            queue.enqueue("existing.wav".into()).unwrap();
+        }
+        queue.save_atomic(&queue_path).unwrap();
+        assert!(state_call(&base, "queue", &root, "add-playlist", &["two"]).is_err());
+        let restored = PlaybackQueue::load_from(&queue_path).unwrap();
+        assert_eq!(restored, queue);
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
