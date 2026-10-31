@@ -150,6 +150,19 @@ recovery. Full-app memory/startup, transition performance, physical device
 error/recovery, DAC/panel, and live Rust Boy focus remain open. RM-020 remains
 in progress; PR #1 remains draft.
 
+**RM-020 exploratory full-app sample (2026-10-31):** Activity Monitor sampled
+the same Rust Music PID at 29.1 MB `anonymousMemory` before a generated 2k
+signature-only library, 85.3 MB immediately after scanning, and 32.0 MB on the
+next settled reading. During library/search interaction it later varied
+50.5–104.0 MB, then read 50.3 MB after five seconds. The host was under memory
+pressure (14.17–14.40/16 GB used, 8.39–8.56 GB swap); Open and Save Panel
+Service separately used about 58 MB. These values are not a qualified
+incremental-memory measure. Search returned one expected match; the 2.124 s
+CUA/accessibility round trip is not direct search latency. Playback remained
+stopped and no CLI child appeared after scan. Cmd-Q removed the app and CLI
+rows; a fresh launch was Ready / No Track with no autoplay. Generated files
+were removed. Full-app memory and direct UI latency remain open.
+
 **MAC-02 host output check (2026-10-31):** host `system_profiler` exited 0 and
 listed MacBook Air Speakers as the 48 kHz default output. A generated
 low-amplitude 440 Hz WAV played by the app-bundled CLI outside the restricted

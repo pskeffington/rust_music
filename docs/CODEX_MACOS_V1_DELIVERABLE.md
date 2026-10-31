@@ -1072,3 +1072,24 @@ error. This is a successful output-start smoke after reconnection. No acoustic
 capture was made, so continuity, DAC fidelity, and handling an AudioQueue
 invalid-device error/reopen remain unverified. RM-020 stays in progress and
 PR #1 remains draft.
+
+### 2026-10-31 exploratory app memory and search sample
+
+With a generated directory of 2,000 twelve-byte RIFF/WAVE signatures, the
+same Rust Music process (PID 43314) measured 29.1 MB in Activity Monitor's
+`anonymousMemory` column before loading. It showed 85.3 MB immediately after
+the explicit scan and 32.0 MB on the next settled sample. During a later
+library/search UI interaction it varied from 50.5 MB to 104.0 MB, then 50.3
+MB after five seconds. The host showed MEMORY PRESSURE, 14.17–14.40 GB of 16 GB
+memory used, and 8.39–8.56 GB swap. Open and Save Panel Service separately
+showed about 58 MB. These rounded, fluctuating readings are not a qualified
+incremental-memory or footprint result.
+
+The library showed 2,000 tracks and stayed stopped; searching for the last
+generated title returned exactly one result. The CUA `setValue` plus
+accessibility readback took 2.124 seconds, including UI/accessibility
+overhead, so it is not direct search latency. Activity Monitor showed no
+`rust-music-cli` after scanning. Cmd-Q removed both the Rust Music and CLI
+rows; a fresh launch returned to Ready / No Track without scanning or
+autoplay. The generated fixture directory was removed. Repeatable full-app
+memory and direct search latency remain open.
