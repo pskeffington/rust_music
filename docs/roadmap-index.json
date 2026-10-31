@@ -822,6 +822,66 @@
       "create_paths": [],
       "acceptance": "Measured on-device copy, disconnect, power-loss recovery, scan startup, RAM, 1024-byte panel, playback and RADIO/TV audio-focus contention.",
       "blocker": "Architecture only; source implementation, automated integration tests and hardware evidence not yet observed."
+    },
+    {
+      "gate": "G15",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "status": "planned",
+      "focus_paths": [
+        "apps/rust-music-macos/",
+        "crates/rust-music-library/",
+        "docs/MAC07_WINAMP_UI_ALIGNMENT.md"
+      ],
+      "create_paths": [],
+      "id": "RM-028",
+      "title": "MAC07-00/01 reproduce and repair GUI FLAC playback regression",
+      "priority": "P0",
+      "depends_on": [
+        "RM-020"
+      ],
+      "acceptance": "Same real FLAC file plays audibly via macOS GUI and native CLI, failing regression turns green, truthful output diagnostics captured.",
+      "blocker": "Operator confirms CLI audio but GUI cannot play real FLAC; source root cause not yet established."
+    },
+    {
+      "gate": "G15",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "status": "planned",
+      "focus_paths": [
+        "apps/rust-music-macos/",
+        "crates/rust-music-library/",
+        "docs/MAC07_WINAMP_UI_ALIGNMENT.md"
+      ],
+      "create_paths": [],
+      "id": "RM-029",
+      "title": "MAC07-02/03 typed playback snapshot and Winamp-functional desktop layout",
+      "priority": "P1",
+      "depends_on": [
+        "RM-028"
+      ],
+      "acceptance": "Validated real frame progress, accessible persistent player, resizable library and queue regions and sortable track browser tests.",
+      "blocker": "GUI playback regression unresolved; implementation and acceptance pending."
+    },
+    {
+      "gate": "G15",
+      "owner_agent": "host_integrator",
+      "review_agent": "gate_verifier",
+      "status": "planned",
+      "focus_paths": [
+        "apps/rust-music-macos/",
+        "crates/rust-music-library/",
+        "docs/MAC07_WINAMP_UI_ALIGNMENT.md"
+      ],
+      "create_paths": [],
+      "id": "RM-030",
+      "title": "MAC07-04/07 queue UX, playlist A/B acceptance and evidence",
+      "priority": "P1",
+      "depends_on": [
+        "RM-029"
+      ],
+      "acceptance": "Double-click play, multi-select enqueue, Next/Previous audio transition, persistent playlists, M3U8 and A/B acceptance with Mac app and offline gates.",
+      "blocker": "Requires MAC07 GUI playback and layout passes; no operator or hardware acceptance recorded."
     }
   ]
 }
