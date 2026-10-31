@@ -357,3 +357,10 @@ removed, the app was quit and relaunched to Ready / No Track, and the temporary
 fixture was removed. This verifies a small UI workflow only; RM-020 remains in
 progress, with broader search/restart/performance and release acceptance still
 open.
+
+A second generated-library run created a one-track named playlist and queue,
+then force-quit the app after both writes completed. The fresh launch returned
+to Ready / No Track without scanning or playback; after an explicit reload,
+both the playlist row and queue item were restored, with Play enabled and Pause
+disabled. The test entries and temporary files were removed. This is restart
+acceptance after completed writes, not an interruption-during-write guarantee.

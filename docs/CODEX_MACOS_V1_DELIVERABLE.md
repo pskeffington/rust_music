@@ -1218,6 +1218,16 @@ app, and a subsequent fresh launch returned to Ready / No Track. The generated
 library directory was removed. This is a synthetic UI workflow check, not
 acoustic or DAC acceptance; the RM-020 performance and feature gaps remain open.
 
+For restart persistence, a separate generated library was loaded and a named
+playlist containing one track plus a one-track queue were saved. Transport
+remained stopped (Play enabled, Pause disabled). After force-quitting the app,
+app inventory reported `isRunning=false`; the fresh launch showed Ready / No
+Track with no scan. Explicitly reloading that same fixture restored the named
+playlist entry and queue row, still without playback. The queue and playlist
+were then removed and the fixture deleted. This verifies persistence after
+completed writes and explicit reload, not crash consistency during an in-flight
+state write.
+
 ### 2026-10-31 managed catalog/state child lifetime regression
 
 At source commit `d129c87ba3f8a3030b3234bedcee524041105759`, macOS app catalog and state
