@@ -2,6 +2,17 @@
 
 **Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, physical panel/DAC acceptance, distribution signing and detached release approval remain open. Shure headphone unplug/reconnect now has active AudioQueue route-transition evidence, but no measured acoustic continuity or invalid-device failure/reopen was observed. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+### Local verification refresh at `0dd8f31`
+
+On 2026-10-31, `sh scripts/offline-gate.sh` exited **0** at local commit
+`0dd8f3104c0a62393632c75e9821a9f1b656cd15` (17 local crates, 32 path-only
+edges, zero registry/Git crates, zero third-party system links; native
+AudioQueue tests 17/17). `sh scripts/build-macos-app.sh` exited **0** with
+18/18 unsafe-path guard cases, playback UI-state regression, successful app
+bundle construction, and valid strict ad-hoc signature. This is a fresh local
+verification; it does not clear hardware, host-focus, distribution, review,
+or mainline acceptance.
+
 ## Current local candidate and remote PR recheck — 2026-10-31
 
 Local HEAD is `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` on

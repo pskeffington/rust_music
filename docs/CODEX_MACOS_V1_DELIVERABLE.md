@@ -16,6 +16,21 @@ release approval.
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | Product source candidate `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` passes `sh scripts/offline-gate.sh` (exit 0; 17 local crates, 32 path-only edges, zero registry/Git crates and third-party system links) and `sh scripts/build-macos-app.sh` (exit 0; 18/18 path-guard cases, Swift UI-state check and strict ad-hoc signature validation). Focused subprocess cleanup remains 7/7 at unchanged CLI source. Five synthetic Rust catalog-core runs measured 20k build median 599 ms (344–672) and search p95 median 745.625 µs (743.125–748.292); this is not SwiftUI/full-app qualification. The current 2k UI search sample returned correct counts, but timings include CUA and accessibility overhead and have no accepted threshold. App-wide incremental memory, direct search/transition latency, device recovery, DAC/panel and distribution acceptance remain open. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | Fresh GitHub read: PR #1 is open, draft and unmerged (`mergeable=true`), remote PR head `2947e6737622c3c668003130006823df0bdde3e0`, base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. Local HEAD `a1e15e056104902cdce53abdcbd92c79ab4a0d6f` contains the PR head (ancestor check exit 0); local `origin/main` is also an ancestor (exit 0). The local branch is 92 commits ahead of its stale tracking ref, 0 behind. Mergeability is ancestry only. No push or merge; preserve backups and stash until release acceptance and post-merge validation. |
 
+### 2026-10-31 current-candidate offline and app-bundle refresh
+
+At documentation candidate commit `0dd8f3104c0a62393632c75e9821a9f1b656cd15`
+(product source unchanged from `a1e15e056104902cdce53abdcbd92c79ab4a0d6f`),
+`sh scripts/offline-gate.sh` exited **0**. The audit reported 17 local crates,
+32 path-only internal edges, zero registry/Git crates, zero third-party system
+links, and one OS framework link. Workspace tests, warnings-denied Clippy,
+release build, and macOS feature checks passed; the native macOS AudioQueue
+suite passed **17/17**, including injected invalid-device enqueue recovery.
+`sh scripts/build-macos-app.sh` also exited **0**, including 18/18 unsafe
+symlink-path guards, playback UI-state regression, bundle construction, and
+strict ad-hoc signature validation. These automated results do not establish
+physical acoustic continuity or DAC fidelity; the separate headphone route
+observation above only proves macOS default-route switching and return.
+
 ### 2026-10-31 candidate verification at `c1ce494`
 
 At source commit `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, the focused
