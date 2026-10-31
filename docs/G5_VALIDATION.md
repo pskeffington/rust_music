@@ -42,6 +42,7 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
   AIFF evidence remains tied to the earlier recorded checkpoint. No new
   LaunchServices UI or physical device test was performed in this pass.
 | Audible Rust Music shared lease bridge / TV ownership | PENDING | The separate Pip-Boy regression proves host broker ownership around a real inert Rust Music child, including MUSIC/RADIO suspend/resume handoff. Audible MUSIC output, Rust Music sink/lease bridge, and live TV ownership/contention remain unverified. |
+| AudioQueue OSStatus failure and teardown recovery | PASS (simulated API failures) | `cargo test --locked --offline -p rust-music-native --features macos` passed 12/12 after adding an injectable API seam. Cases include create/partial-allocation failure, enqueue/start/stop/dispose errors, retained-orphan retry before a later open, graceful buffer callback drain before synchronous disposal, and timeout escalation to immediate stop/dispose. Independent review found no blocking synchronization or registry defect. The fake callback executes synchronously; this does not simulate physical device loss, a callback already running on another thread, disconnect/reconnect, audible output, or DAC behavior. |
 | Physical audio / bit-perfect output | PENDING | Actual macOS/Linux DAC/loopback measurement; not implied by NullSink or structural tests |
 
 ## Operational requirements
