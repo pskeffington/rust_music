@@ -391,11 +391,12 @@ remains unmeasured at the app level.
 ### Current Rust catalog-core scan/search profile (2026-10-31)
 
 At `4afaf1baab544212c43eb5433298c1f82801c7b6`, the release example build and
-two direct runs of `target/release/examples/profile_micro_library` exited 0.
+five direct runs of `target/release/examples/profile_micro_library` exited 0.
 The helper generated temporary 12-byte WAV signatures and no user media was
-read. Catalog build times were 0/0 ms at 0 and 1 tracks, 3/2 ms at 100,
-33/174 ms at 2,000, and 344/672 ms at 20,000. Search p95 was 0.125/0.125 µs,
-0.292/0.709 µs, 5.584/5.917 µs, 78.042/78.125 µs, and 743.125/746.458 µs
-respectively. The 20k build-time spread needs more samples. This is core-only
-measurement; SwiftUI search/render, app startup, full-app memory, and real
-tagged-library performance remain open.
+read. Catalog build medians/ranges were 0 ms (0–0) at 0 and 1 tracks, 1 ms
+(1–3) at 100, 29 ms (25–174) at 2,000, and 599 ms (344–672) at 20,000. Search
+p95 medians/ranges were 0.084 µs (0.084–0.125), 0.709 µs (0.292–7.583),
+5.875 µs (5.083–5.917), 78.125 µs (74.250–87.833), and 745.625 µs
+(743.125–748.292) respectively. The 20k build-time and one-track p95 spreads
+are substantial. This is core-only measurement; SwiftUI search/render, app
+startup, full-app memory, and real tagged-library performance remain open.
