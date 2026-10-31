@@ -1590,3 +1590,22 @@ representative library, app-wide retained memory, cold startup, interactive
 latency, physical device recovery, DAC/panel output, live Rust Boy focus or
 distribution signing. No private codec corpus was rerun; PR #1 remains draft
 and no remote synchronization or merge occurred.
+
+### 2026-10-31 current-bundle generated playback and shutdown smoke
+
+The rebuilt local app explicitly loaded one generated 20-second mono 16-bit /
+44.1 kHz WAV with a 163/32767 peak (approximately -46 dBFS). After loading, it
+showed one catalog track and `PLAYBACK IS STOPPED`; no output began until the
+Play button was pressed. The current bundle then reported AudioQueue Playing,
+Paused after Pause, Playing after Resume, and `PLAYBACK STOPPED` after an
+explicit Stop. The short initial 3-second fixture used to exercise Pause and
+Resume reached natural EOF before Stop could settle; it is not counted as Stop
+evidence. The extended fixture was then explicitly loaded for the Stop check.
+
+After Cmd-Q, the app inventory reported RustMusic `isRunning=false`. Activity
+Monitor refreshed with a `rust-music-cli` process filter and showed no process
+rows; the Rust Music app row also disappeared on refresh. The fixture was
+removed (cleanup exit **0**). This observes the current bundle's GUI state
+transitions and post-quit app/child absence, but does not measure acoustic
+loopback, confirm sound at the headphones, verify DAC fidelity, or exercise
+invalid-device recovery. No user library or private media was used.

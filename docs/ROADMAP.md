@@ -459,3 +459,12 @@ removable-media recovery, representative library behavior, physical device
 recovery, DAC/panel, live Rust Boy focus, and distribution acceptance remain
 open. The fixture was removed and private decoder corpora were not rerun; keep
 RM-020 in progress and PR #1 draft.
+
+The current rebuilt app also explicitly loaded a generated 20-second mono
+16-bit/44.1 kHz WAV at approximately -46 dBFS and remained stopped until Play.
+The UI reported AudioQueue Playing → Paused → Playing on Resume → Playback
+Stopped on explicit Stop. After Cmd-Q, the app inventory reported
+`isRunning=false`, Activity Monitor had no `rust-music-cli` row, and the Rust
+Music app process disappeared on refresh. This is current-bundle control and
+process-exit evidence; it is not acoustic loopback, headphone confirmation,
+DAC fidelity, or real invalid-device recovery. The fixture was removed.
