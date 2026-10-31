@@ -112,6 +112,20 @@ This adds current graceful-close evidence to RM-019; device disconnect/recovery,
 physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
 remain open. No private corpus was rerun.
 
+**Native transport and current sandbox launch recheck (2026-10-31, source HEAD
+`713c7e9`):** rebuilt bundle, Info.plist path, and strict ad-hoc signature
+verified. With two generated silent 16-bit/44.1 kHz WAVs, the UI reached active
+AudioQueue playback; settled Next/Previous states, Pause, Resume, and Stop all
+matched the requested transitions. Cmd-Q followed by refreshed Activity
+Monitor showed no app or `rust-music-cli` process. In this sandboxed shell,
+`open -n` still returned 1 (`kLSNoExecutableErr`); `lsregister -f` returned
+-10822, and direct executable launch aborted in AppKit registration. The same
+bundle launched through CUA. The launch discrepancy is therefore unresolved
+for shell/LaunchServices and cannot be counted as release launch acceptance.
+Silent transport is not audible-output or device-recovery evidence; DAC/panel,
+device disconnect/recovery, Rust Boy shared focus, and app-scale memory remain
+open.
+
 **Synthetic app-memory observation (2026-10-31):** one same-process Activity
 Monitor sample rose from 84.1 MB to 87.3 MB `anonymousMemory` while the app held
 a generated 2,000-entry catalog of 12-byte RIFF/WAVE signatures. The app showed

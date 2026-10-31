@@ -696,3 +696,33 @@ round-trips took **854.0, 861.4, 1,099.2, 1,165.0 and 1,442.8 ms** (median
 overhead; they are not direct search-function latency or a p95 qualification.
 The empty result was visible at the final query. No track was played; the app
 was quit and the generated directory removed.
+
+### 2026-10-31 native transport and sandboxed LaunchServices recheck
+
+At source HEAD `713c7e90d28d12f4cc1c002c02c4355847f6bcb1`,
+`sh scripts/build-macos-app.sh` exited **0** and strict ad-hoc bundle
+signature verification passed. The rebuilt bundle has a valid plist whose
+`CFBundleExecutable` is `RustMusic`; the arm64 Mach-O exists at that path and
+`codesign --verify --deep --strict` exited **0**. In this sandboxed shell,
+`/usr/bin/open -n /Users/null/GitHub/rust_music/target/macos/RustMusic.app`
+still exited **1** with LaunchServices `kLSNoExecutableErr` (-10827), and
+`lsregister -f` failed to scan the bundle with -10822. Directly invoking the
+executable exited **134**; the matching crash report records SIGABRT inside
+AppKit application registration. The desktop CUA launcher opened that same
+rebuilt bundle successfully to Ready / No Track. This isolates the observed
+failure to the shell/sandbox LaunchServices path but does not prove its root
+cause or close distribution launch acceptance. An earlier unsandboxed local
+`open -n` success is recorded above and remains valid for that environment.
+
+Using only two generated sparse, all-zero 16-bit/44.1 kHz, 10-minute WAVs, the
+UI explicitly loaded two tracks and showed active macOS AudioQueue playback.
+Settled accessibility states confirmed Next to track 002 and Previous to
+track 001, including a repeated Next/Previous pair, while playback remained
+active. Pause showed the paused state and released-focus message; Resume
+returned to active AudioQueue playback; Stop settled to Playback Stopped.
+After Cmd-Q, the CUA app inventory reported `isRunning=false`; Activity
+Monitor's refreshed `Rust` filter showed no Rust Music app or CLI child (the
+initial Activity Monitor list was stale). Temporary fixtures and copied app
+bundle were removed. These silent fixtures verify transport and process
+cleanup, not audible output, device disconnect/recovery, or physical DAC
+behavior. The volume slider was not qualified in this run.
