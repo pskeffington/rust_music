@@ -91,3 +91,7 @@ integration, user input, and physical panel/audio tests remain open. Keep PR #1
 draft; preserve sibling work and do not push or merge. RM-005/007/015 require
 operator hardware acceptance; RM-006/018 still need host evidence. Private FLAC
 corpus audio remains outside Git.
+
+## Desktop-managed Pip-Boy library deployment — 2026-10-31 directive
+
+Read [docs/design/PIPBOY_SOCKET_SCHEMA.md](docs/design/PIPBOY_SOCKET_SCHEMA.md) and [docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md](docs/design/PORTABLE_LIBRARY_DEPLOYMENT.md) for RM-021–RM-027. User product direction: desktop Rust Music on macOS, later Linux/Windows, organizes lossless files and playlists and explicitly exports validated offline packages to Pip-Boy MUSIC. The embedded device must use preloaded verified media/catalogs without desktop/network dependency. The approved UI reference supplies socket layout and information hierarchy, **not** permission to violate the Mac v1.0 no-artwork/skins rule. Preserve host-owned audio focus, no auto-scan/play on mount, existing RBPK v1 compatibility, and the fixed 1024-byte micro frame. `RM-020` and required Mac release acceptance remain first; the new roadmap tasks are plans, not passing evidence.
