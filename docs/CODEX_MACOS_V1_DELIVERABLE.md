@@ -1428,3 +1428,21 @@ active playback. It is not proof of real AudioQueue device-error recovery or
 physical audio output. Those gates, device disconnect/reconnect recovery,
 physical DAC/panel, live Rust Boy focus, distribution signing, and app-wide
 performance acceptance remain open. Private decoder corpora were not rerun.
+
+### 2026-10-31 current-bundle Force Quit during active playback
+
+The exact bundle built from source commit `50571a4f1ff5d66dbb96ab480cbfaacc1860f5c6`
+explicitly loaded one generated 25-second mono 16-bit/44.1 kHz, 440 Hz WAV at
+-40 dBFS and reported `PLAYING THROUGH RUST MUSIC AND MACOS AUDIOQUEUE`. Before
+Force Quit, Activity Monitor showed Rust Music PID 62567 and its
+`rust-music-cli` playback child PID 62594. Force Quit was issued to the actual
+Rust Music process from Activity Monitor. On the refreshed process listing,
+neither Rust Music nor `rust-music-cli` remained; app inventory reported
+`isRunning=false`. The exact bundle was relaunched and displayed `READY NO
+TRACK`, Play disabled, and no scan or playback. It was then normally quit and
+the synthetic fixture was removed. This is current-bundle process-exit and
+restart evidence, not an audio loopback/volume measurement or proof that the
+test signal was acoustically captured. It does not demonstrate invalid-device
+AudioQueue recovery; Shure unplug/reconnect remains route-transition evidence
+only, and the physical DAC/panel and live Rust Boy audio-focus gates remain
+open.
