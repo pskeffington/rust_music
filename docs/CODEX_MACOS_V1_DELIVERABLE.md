@@ -31,6 +31,16 @@ strict ad-hoc signature validation. These automated results do not establish
 physical acoustic continuity or DAC fidelity; the separate headphone route
 observation above only proves macOS default-route switching and return.
 
+At current pre-recording docs candidate `153ccced8444345e3340917ca65e1c8c2234300e`,
+the focused subprocess regression was rerun against unchanged current CLI
+source: `cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0**, with **7/7**
+tests passing. Coverage includes wrong identity, inert activation/shutdown,
+removed-track rejection, managed playback-error cleanup, repeated parent-pipe
+closure, active-playback parent closure, and acknowledged shutdown during
+active playback. These use test support output and do not replace the observed
+GUI/AudioQueue close test or a physical device-error test.
+
 ### 2026-10-31 candidate verification at `c1ce494`
 
 At source commit `c1ce494fa08a1867c9441b2e15d1eb4d7d253a30`, the focused
