@@ -784,10 +784,10 @@ behavior. The volume slider was not qualified in this run.
 
 ### 2026-10-31 macOS build-path containment follow-up
 
-At source parent `c2dff01015a06189317da01fd844786aa11af8eb`, the app builder
-pins `CARGO_TARGET_DIR` to the repository's guarded `target` directory even
-when its caller supplies an external override. The preflight refuses symlinked
-Cargo metadata outputs (`.rustc_info.json`, `CACHEDIR.TAG`, and
+Building on source parent `c2dff01015a06189317da01fd844786aa11af8eb`, the final
+candidate pins `CARGO_TARGET_DIR` to the repository's guarded `target`
+directory even when its caller supplies an external override. Its preflight
+refuses symlinked Cargo metadata outputs (`.rustc_info.json`, `CACHEDIR.TAG`, and
 `.future-incompat-report.json`) and checks for nested symlinks below release,
 app-output, and Swift module-cache trees. The adversarial path test passed
 18/18 cases with an external sentinel unchanged. The independent read-only
