@@ -66,3 +66,7 @@ PR STATUS (keep draft unless explicitly authorized):
 ## Release rule
 
 Keep draft PR #1 open and unmerged. No production support, bit-perfect hardware claim or automatic rollout follows from a formatter fix, reference fixture success, or source commit. Follow [production playbook](CODEX_PRODUCTION_PLAYBOOK.md) and the evidence ladder in [ROADMAP.md](ROADMAP.md).
+
+## 2026-10-31 branch and issue audit addendum
+
+See [branch and issue triage](BRANCH_AND_ISSUE_TRIAGE_2026-10-31.md) and [RM-001 tracker #2](https://github.com/pskeffington/rust_music/issues/2). At audit, feature was 70 commits ahead / 1 behind `main`, with a README-only main divergence and a GitHub `dirty` mergeability state. Reconcile ancestry without changing gate status. Historical Actions `startup_failure` is not successful validation. Keep PR #1 draft until the complete offline Rust gate, private native FLAC PCM parity, host focus and device acceptance are observed. Do not delete the implementation branch during this cleanup.
