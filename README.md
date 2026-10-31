@@ -73,6 +73,7 @@ All **12 workspace crates** are locally authored and have zero third-party Cargo
 - [Codex root instructions](AGENTS.md)
 - [Current engineering handoff and agent assignments (2026-10-30)](docs/ENGINEERING_HANDOFF_2026-10-30.md)
 - [RM-001 operator gate, failure routing, and private evidence capture](docs/RM001_OPERATOR_GATE.md)
+- [PR #1 merge-readiness ledger, current blockers, and one-command offline premerge check](docs/PR1_MERGE_READINESS.md)
 - [Zero third-party dependency policy and offline gate](docs/DEPENDENCY_POLICY.md)
 - [G2 FLAC validation ledger](docs/G2_VALIDATION.md)
 - [G5 host/source validation ledger](docs/G5_VALIDATION.md)
