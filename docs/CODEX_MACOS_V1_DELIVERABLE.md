@@ -227,6 +227,14 @@ termination of an app-like parent. These tests do not launch the SwiftUI app or
 prove its window-close callback ran; that app-level observation remains
 pending.
 
+At HEAD `258ecec8d15f392e5528ca098eda700cba9913bc`,
+`sh scripts/offline-gate.sh` exited 0. The audit reported 17 local crates,
+32 path-only internal edges, zero registry/Git crates, and zero third-party
+system links. Workspace tests, release build, and the 15 macOS AudioQueue
+fault/teardown tests passed. The gate does not compile the SwiftUI app or
+certify a physical audio device; the separate temporary Swift compilation
+above covers source compilation only.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
