@@ -22,6 +22,26 @@ Recorded 2026-10-29; updated 2026-10-31. Local workspace build, Clippy, tests an
 | Production package mount and acceptance | PENDING | Pip-Boy's reviewed executable roster is empty; live MUSIC registration/mount, host-supervised release binary, shared audio contention, shell/mobile acceptance and platform process behavior remain open. The supervisor is fault containment, not an OS sandbox. |
 | Standalone macOS app bundle and UI exercise | PASS (local offline build, verified signature, LaunchServices launch, nonzero output and child lifecycle) | At current built source, `sh scripts/build-macos-app.sh` exited 0 and strict signature/plist checks passed. Unsandboxed `/usr/bin/open -n` exited 0; LaunchServices checked in `dev.rustmusic.standalone` in 0.065434 s. Outside the restricted shell, `system_profiler` listed MacBook Air Speakers as the 48 kHz default output plus HDMI/headphone outputs. The bundled CLI played a generated nonzero 440 Hz 16-bit/44.1 kHz WAV and exited 0; the user confirms audible output. In the app UI, generated 10-second 440/660 Hz WAVs exercised Play, active Next/Previous, Pause/Resume, volume 100→95→100 and Stop. App PID 93068 owned `rust-music-cli serve` PID 93107; after Cmd-Q both were absent from the process list and LaunchServices marked Rust Music stopped. This is native output-path evidence, not acoustic loopback or bit-perfect DAC measurement. Existing FLAC/WAV/AIFF parity was retained. `spctl --assess` rejects the local ad-hoc signature; Developer ID/notarization remain unverified. Device disconnect/recovery, physical DAC, Rust Boy live focus, and panel remain separate gates. |
 
+### 2026-10-31 refreshed Rust Music child / host-focus broker test
+
+Pip-Boy checkout `codex/rust-music-shared-focus-integration` at
+`bfbb9c76d147911feb6d359ba0f2342a8a0cd97e` was clean before and after this
+read-only test. Against the Rust Music app-bundled release CLI rebuilt from
+product candidate `5e1e94edd199ed2fbd5cf49937c423bcdf582214` (SHA-256
+`14fe5c2cdd3a611b715a2a2fad626c4342bdc2a303da3005ec62e1c7b19dcaff`), the
+command below exited **0**, passing **1/1** test (304 filtered):
+
+```sh
+CARGO_TARGET_DIR=/private/tmp/rust-music-pipboy-target CARGO_NET_OFFLINE=true RUST_MUSIC_ADAPTER_BIN=/Users/null/GitHub/rust_music/target/macos/RustMusic.app/Contents/MacOS/rust-music-cli cargo test --locked --offline -p pipboy-core actual_rust_music_child_runs_under_host_supervisor_when_configured -- --nocapture
+```
+
+The real child ran under the host supervisor: its MUSIC claim excluded RADIO,
+Settings suspend allowed RADIO to acquire, resume reacquired MUSIC, and
+shutdown released the claim. Cargo output stayed under `/private/tmp`; no
+Pip-Boy source or tracked build output changed. This verifies broker lifecycle
+handoff only; it does not test audible playback, a Rust Music sink/lease
+bridge, live TV contention, physical panel, or DAC output.
+
 ## 2026-10-31 local integration pass
 
 - Verified checkout at `62e44a77ed632bf7925b30e0993a5f87728a2696` on
