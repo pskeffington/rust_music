@@ -492,6 +492,13 @@ the accessibility tree displayed `RUST MUSIC PIP-BOY 2000 · AUDIO`, and the
 screenshot showed the chassis around the Ready / No Track screen. This visual
 smoke did not load a library or start playback.
 
+At source commit `d65efc16f5e694ba40acdac6b4662ae94542b88d`,
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+internal edges, zero registry/Git crates, zero third-party system links, and
+one OS framework link. Formatting, warnings-denied Clippy, workspace tests,
+release build, and macOS feature checks passed. This gate does not resolve the
+separate LaunchServices shell-launch result below.
+
 The shell invocation `/usr/bin/open -n` for both the built bundle and the
 temporary copy exited **1** with LaunchServices `kLSNoExecutableErr` (-10827),
 despite `CFBundleExecutable=RustMusic`, the arm64 executable being present and
