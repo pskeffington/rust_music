@@ -42,6 +42,21 @@ Pip-Boy source or tracked build output changed. This verifies broker lifecycle
 handoff only; it does not test audible playback, a Rust Music sink/lease
 bridge, live TV contention, physical panel, or DAC output.
 
+The scripted clean-source integration path was also rerun with a new temporary
+target: `RUST_MUSIC_REPO=<Rust Music checkout>
+RUST_BOY_PROCESS_TARGET=<temporary target> CARGO_NET_OFFLINE=true python3
+tools/test_supervised_music_process.py`. It built the Rust Music CLI from the
+current checkout with `cargo build --locked --offline -p rust-music-cli
+--features macos-output --bin rust-music-cli` (exit **0**, no cache reuse in
+the fresh target; binary SHA-256
+`67611eea7afaf6c91bdf85086a19dc613203e73534a79c2d116a67fdbf83edc0`) and
+reran the Pip-Boy supervisor integration test (exit **0**, 1/1 passed). All
+Cargo artifacts were confined to temporary storage, and the Pip-Boy worktree
+remained clean. This confirms source-build interoperability in addition to
+the packaged-bundle check above, but still exercises inert activation and
+broker ownership rather than audio sink creation or audible MUSIC/TV
+contention.
+
 ## 2026-10-31 local integration pass
 
 - Verified checkout at `62e44a77ed632bf7925b30e0993a5f87728a2696` on

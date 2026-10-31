@@ -423,3 +423,13 @@ releasing the claim. Build output was directed to temporary storage and
 Pip-Boy source stayed clean. This does not open the audio sink, verify audible
 MUSIC output or TV contention, register/allowlist the package, or demonstrate
 live shell/mobile acceptance. RM-006 and RM-018 remain in progress.
+
+A fresh-target source-build rerun also passed on 2026-10-31: Pip-Boy's
+`tools/test_supervised_music_process.py` built the current Rust Music CLI
+offline into a new temporary target (exit **0**, binary SHA-256
+`67611eea7afaf6c91bdf85086a19dc613203e73534a79c2d116a67fdbf83edc0`) and
+passed the supervised-child broker test **1/1** (304 filtered). The Rust Music
+checkout and sibling Pip-Boy checkout remained clean. It tests inert protocol
+activation and MUSIC/RADIO broker suspend/resume/shutdown without opening the
+sink; live audible output, TV contention and package roster/mount acceptance
+remain open.
