@@ -664,7 +664,7 @@
       ],
       "create_paths": [],
       "acceptance": "Provide explicit-root browsing, stable root-scoped track IDs, bounded metadata indexing and text search, deterministic sorting/pagination, playlists, persistent queue, repeat and shuffle. Keep user audio read-only, skip image payloads without allocation, and add no artwork/image extraction/cache/visualizers or third-party runtime dependencies. Benchmark startup, memory and search across synthetic 0/1/100/2k/20k-track catalogs.",
-      "blocker": "ML-00 inventory complete: existing scanner is single-root, bounded, explicit, deterministic and image-free, but has no stable IDs, search API, playlists or persistent queue. ML-01/ML-03 catalog identity and search slice is in progress; remaining features and profiles are not yet implemented."
+      "blocker": "ML-01/ML-03 partial: stable canonical-root/relative-path IDs with duplicate rejection, bounded text/container filtering, deterministic sorting and pagination are implemented; `cargo test --locked --offline -p rust-music-library` passed 9/9 and the full offline gate passed at working-tree source. IDs are local identity, not authentication. Multiple roots/reconciliation, durable playlists, persistent queue/repeat/shuffle, UI and 0/1/100/2k/20k startup/memory/search profiles remain."
     }
   ]
 }

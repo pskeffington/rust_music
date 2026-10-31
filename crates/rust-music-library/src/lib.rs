@@ -7,6 +7,8 @@
 
 use rust_music_core::{MusicError, Result};
 use std::{
+    cmp::Ordering,
+    collections::HashSet,
     fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
@@ -19,6 +21,8 @@ const MAX_TAG_VALUE_BYTES: usize = 512;
 const MAX_TAG_ITEMS: u32 = 4096;
 const MAX_TAG_CHARS: usize = 120;
 const MAX_TAG_CHUNKS: usize = 512;
+const MAX_QUERY_BYTES: usize = 512;
+pub const MAX_PAGE_SIZE: usize = 200;
 
 /// Limits are application policy, not a promise to index an unlimited disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +55,7 @@ impl ScanLimits {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AudioContainer {
     Flac,
     Wave,
@@ -60,8 +64,68 @@ pub enum AudioContainer {
     Mp4,
 }
 
+/// Deterministic identifier scoped to one canonical library root and relative
+/// path. It remains stable across scans of that root. Moving/remounting a root
+/// changes its IDs; a future persisted-root identity can replace this scheme.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TrackId([u8; 16]);
+
+impl TrackId {
+    /// Stable opaque identifier bytes suitable for a local versioned index.
+    /// These bytes contain no source path or media metadata.
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+/// Text-only query and page parameters for an already-scanned catalog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrackQuery {
+    /// Case-insensitive Unicode lowercase substring across title, artist and
+    /// album. Empty text does not filter. This is not locale-aware collation.
+    pub text: String,
+    pub container: Option<AudioContainer>,
+    pub sort_by: TrackSort,
+    pub descending: bool,
+    pub offset: usize,
+    pub limit: usize,
+}
+
+impl Default for TrackQuery {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            container: None,
+            sort_by: TrackSort::Path,
+            descending: false,
+            offset: 0,
+            limit: 50,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackSort {
+    Path,
+    Title,
+    Artist,
+    Album,
+    Container,
+}
+
+/// A bounded page of references into the scanned library. `total_matches`
+/// describes the full filtered result, before applying offset and limit.
+#[derive(Debug)]
+pub struct TrackPage<'a> {
+    pub total_matches: usize,
+    pub offset: usize,
+    pub limit: usize,
+    pub tracks: Vec<&'a Track>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Track {
+    pub id: TrackId,
     /// Path relative to the selected library directory. Never use this as a URL.
     pub relative_path: PathBuf,
     /// Local filename only, not an untrusted embedded tag or network result.
@@ -126,6 +190,53 @@ impl Library {
         self.tracks.get(index)
     }
 
+    /// Find a track by its stable root-scoped identifier.
+    pub fn track_by_id(&self, id: TrackId) -> Option<&Track> {
+        self.tracks.iter().find(|track| track.id == id)
+    }
+
+    /// Filter, sort and paginate only the in-memory catalog. This method does
+    /// no filesystem access and is safe to call from a UI/search worker. Scan
+    /// work remains an explicit caller action.
+    pub fn query(&self, query: &TrackQuery) -> Result<TrackPage<'_>> {
+        if query.text.len() > MAX_QUERY_BYTES {
+            return Err(MusicError::Limit("music library query is too long"));
+        }
+        if query.text.chars().any(char::is_control) {
+            return Err(MusicError::Invalid("music library query contains controls"));
+        }
+        if query.limit == 0 || query.limit > MAX_PAGE_SIZE {
+            return Err(MusicError::Limit(
+                "music library page size is out of bounds",
+            ));
+        }
+
+        let needle = query.text.to_lowercase();
+        let mut matching = self
+            .tracks
+            .iter()
+            .filter(|track| {
+                query
+                    .container
+                    .is_none_or(|container| track.container == container)
+                    && (needle.is_empty() || text_matches(track, needle.as_str()))
+            })
+            .collect::<Vec<_>>();
+        matching
+            .sort_by(|left, right| compare_tracks(left, right, query.sort_by, query.descending));
+
+        let total_matches = matching.len();
+        let start = query.offset.min(total_matches);
+        let end = start.saturating_add(query.limit).min(total_matches);
+        let tracks = matching.drain(start..end).collect();
+        Ok(TrackPage {
+            total_matches,
+            offset: query.offset,
+            limit: query.limit,
+            tracks,
+        })
+    }
+
     /// Resolve only an item emitted by this Library. Recheck every component
     /// against symbolic-link substitution before using the path for playback.
     /// This does not claim atomic no-follow protection against a hostile local
@@ -155,6 +266,97 @@ impl Library {
         }
         Ok(absolute)
     }
+}
+
+fn text_matches(track: &Track, needle: &str) -> bool {
+    std::iter::once(Some(track.display_title()))
+        .chain(
+            track
+                .tags
+                .as_ref()
+                .into_iter()
+                .flat_map(|tags| [tags.artist.as_deref(), tags.album.as_deref()]),
+        )
+        .flatten()
+        .any(|field| field.to_lowercase().contains(needle))
+}
+
+fn compare_optional_text(left: Option<&str>, right: Option<&str>) -> Ordering {
+    match (left, right) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(left), Some(right)) => left.cmp(right),
+    }
+}
+
+fn compare_tracks(left: &Track, right: &Track, sort_by: TrackSort, descending: bool) -> Ordering {
+    let primary = match sort_by {
+        TrackSort::Path => left.relative_path.cmp(&right.relative_path),
+        TrackSort::Title => {
+            compare_optional_text(Some(left.display_title()), Some(right.display_title()))
+        }
+        TrackSort::Artist => compare_optional_text(
+            left.tags.as_ref().and_then(|tags| tags.artist.as_deref()),
+            right.tags.as_ref().and_then(|tags| tags.artist.as_deref()),
+        ),
+        TrackSort::Album => compare_optional_text(
+            left.tags.as_ref().and_then(|tags| tags.album.as_deref()),
+            right.tags.as_ref().and_then(|tags| tags.album.as_deref()),
+        ),
+        TrackSort::Container => left.container.cmp(&right.container),
+    };
+    let primary = if descending {
+        primary.reverse()
+    } else {
+        primary
+    };
+    primary
+        .then_with(|| left.relative_path.cmp(&right.relative_path))
+        .then_with(|| left.id.cmp(&right.id))
+}
+
+fn stable_track_id(root_bytes: &[u8], relative_path: &Path) -> TrackId {
+    let relative_bytes = path_bytes(relative_path);
+    let root_len = (root_bytes.len() as u64).to_le_bytes();
+    let relative_len = (relative_bytes.len() as u64).to_le_bytes();
+    let mut first = 0xcbf29ce484222325u64;
+    let mut second = 0x84222325cbf29ce4u64;
+    for byte in b"rust-music-track-id-v1"
+        .iter()
+        .chain(root_len.iter())
+        .chain(root_bytes.iter())
+        .chain(relative_len.iter())
+        .chain(relative_bytes.iter())
+    {
+        first = (first ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
+        second = (second ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
+        second ^= second.rotate_left(23);
+    }
+    let mut id = [0u8; 16];
+    id[..8].copy_from_slice(&first.to_be_bytes());
+    id[8..].copy_from_slice(&second.to_be_bytes());
+    TrackId(id)
+}
+
+#[cfg(unix)]
+fn path_bytes(path: &Path) -> Vec<u8> {
+    use std::os::unix::ffi::OsStrExt;
+    path.as_os_str().as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn path_bytes(path: &Path) -> Vec<u8> {
+    use std::os::windows::ffi::OsStrExt;
+    path.as_os_str()
+        .encode_wide()
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn path_bytes(path: &Path) -> Vec<u8> {
+    path.to_string_lossy().as_bytes().to_vec()
 }
 
 fn supported_extension(path: &Path) -> bool {
@@ -389,8 +591,10 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
         ));
     }
     let root = root.as_ref().canonicalize()?;
+    let root_bytes = path_bytes(&root);
     let mut pending = vec![(root.clone(), 0usize)];
     let mut tracks = Vec::new();
+    let mut track_ids = HashSet::new();
     let mut examined_entries = 0usize;
     let mut skipped_entries = 0usize;
     while let Some((dir, depth)) = pending.pop() {
@@ -422,6 +626,10 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
                         .strip_prefix(&root)
                         .map_err(|_| MusicError::Invalid("library entry escaped selected root"))?
                         .to_path_buf();
+                    let id = stable_track_id(&root_bytes, &relative_path);
+                    if !track_ids.insert(id) {
+                        return Err(MusicError::Invalid("stable music track ID collision"));
+                    }
                     let title = path
                         .file_stem()
                         .and_then(|stem| stem.to_str())
@@ -431,6 +639,7 @@ pub fn scan(root: impl AsRef<Path>, limits: ScanLimits) -> Result<Library> {
                         .collect::<String>();
                     let size_bytes = file.metadata()?.len();
                     tracks.push(Track {
+                        id,
                         relative_path,
                         title,
                         tags: read_tags(&mut file, container),
@@ -519,6 +728,126 @@ mod tests {
         bytes.extend_from_slice(&(body.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&body);
         bytes
+    }
+
+    fn wave_file() -> &'static [u8] {
+        b"RIFF1234WAVE"
+    }
+
+    #[test]
+    fn track_ids_are_stable_unique_and_scoped_to_the_canonical_root() {
+        let first_root = Temp::new();
+        let second_root = Temp::new();
+        fs::create_dir(first_root.0.join("one")).unwrap();
+        fs::create_dir(first_root.0.join("two")).unwrap();
+        fs::write(first_root.0.join("one/duplicate.flac"), b"fLaCdata").unwrap();
+        fs::write(first_root.0.join("two/duplicate.flac"), b"fLaCdata").unwrap();
+        fs::write(second_root.0.join("one.flac"), b"fLaCdata").unwrap();
+
+        let first = scan(&first_root.0, ScanLimits::default()).unwrap();
+        let again = scan(&first_root.0, ScanLimits::default()).unwrap();
+        let second = scan(&second_root.0, ScanLimits::default()).unwrap();
+
+        assert_eq!(first.len(), 2);
+        assert_ne!(first.track(0).unwrap().id, first.track(1).unwrap().id);
+        for track in first.tracks() {
+            assert_eq!(
+                again.track_by_id(track.id).unwrap().relative_path,
+                track.relative_path
+            );
+        }
+        assert!(second.track_by_id(first.track(0).unwrap().id).is_none());
+    }
+
+    #[test]
+    fn text_query_is_unicode_case_insensitive_and_paginates_deterministically() {
+        let t = Temp::new();
+        fs::write(t.0.join("Café.wav"), wave_file()).unwrap();
+        fs::write(t.0.join("Alpha.wav"), wave_file()).unwrap();
+        fs::write(t.0.join("Bravo.wav"), wave_file()).unwrap();
+        let lib = scan(&t.0, ScanLimits::default()).unwrap();
+
+        let unicode = lib
+            .query(&TrackQuery {
+                text: "CAFÉ".into(),
+                ..TrackQuery::default()
+            })
+            .unwrap();
+        assert_eq!(unicode.total_matches, 1);
+        assert_eq!(unicode.tracks[0].title, "Café");
+
+        let first_page = lib
+            .query(&TrackQuery {
+                sort_by: TrackSort::Title,
+                limit: 2,
+                ..TrackQuery::default()
+            })
+            .unwrap();
+        let second_page = lib
+            .query(&TrackQuery {
+                sort_by: TrackSort::Title,
+                offset: 2,
+                limit: 2,
+                ..TrackQuery::default()
+            })
+            .unwrap();
+        assert_eq!(first_page.total_matches, 3);
+        assert_eq!(first_page.tracks.len(), 2);
+        assert_eq!(second_page.tracks.len(), 1);
+        let all_titles = first_page
+            .tracks
+            .iter()
+            .chain(second_page.tracks.iter())
+            .map(|track| track.display_title())
+            .collect::<Vec<_>>();
+        assert_eq!(all_titles, vec!["Alpha", "Bravo", "Café"]);
+
+        let beyond_end = lib
+            .query(&TrackQuery {
+                offset: usize::MAX,
+                ..TrackQuery::default()
+            })
+            .unwrap();
+        assert!(beyond_end.tracks.is_empty());
+        assert_eq!(beyond_end.total_matches, 3);
+    }
+
+    #[test]
+    fn query_bounds_and_container_filters_are_enforced() {
+        let t = Temp::new();
+        fs::write(t.0.join("a.wav"), wave_file()).unwrap();
+        fs::write(t.0.join("b.flac"), b"fLaCdata").unwrap();
+        let lib = scan(&t.0, ScanLimits::default()).unwrap();
+
+        let waves = lib
+            .query(&TrackQuery {
+                container: Some(AudioContainer::Wave),
+                ..TrackQuery::default()
+            })
+            .unwrap();
+        assert_eq!(waves.total_matches, 1);
+        assert_eq!(waves.tracks[0].container, AudioContainer::Wave);
+
+        for invalid in [
+            TrackQuery {
+                limit: 0,
+                ..TrackQuery::default()
+            },
+            TrackQuery {
+                limit: MAX_PAGE_SIZE + 1,
+                ..TrackQuery::default()
+            },
+            TrackQuery {
+                text: "x".repeat(MAX_QUERY_BYTES + 1),
+                ..TrackQuery::default()
+            },
+            TrackQuery {
+                text: "bad\nquery".into(),
+                ..TrackQuery::default()
+            },
+        ] {
+            assert!(lib.query(&invalid).is_err());
+        }
     }
 
     #[test]

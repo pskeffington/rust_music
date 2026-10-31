@@ -77,9 +77,9 @@ documented unless the host uses OS no-follow descriptor APIs.
 | Pass | Scope | State |
 | --- | --- | --- |
 | ML-00 | Baseline inventory of scanner, host slot, UI, persistence, tests and footprint | complete; current scanner is explicit and bounded, but has no stable IDs, search, playlists, or durable queue |
-| ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | in progress |
+| ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
-| ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | planned |
+| ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root search, sort and pagination implemented; multiple roots/reconciliation remain |
 | ML-04 | Durable playlists and safe M3U/M3U8 import/export | planned |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | planned |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
@@ -111,3 +111,12 @@ covered by [G6 micro panel](G6_MICRO_PANEL.md); process view bounds are in
 This evidence applies to the local scanner and catalog model. It does not
 certify every third-party player or OS component, nor claim that source audio
 files have been scrubbed of artwork.
+
+The current catalog slice adds deterministic opaque IDs derived from the
+canonical selected root and relative path, duplicate-ID rejection, bounded
+Unicode lowercase text filtering, container filtering, deterministic sort,
+and bounded pagination. The ID hash is for local identity only, not
+authentication. `cargo test --locked --offline -p rust-music-library` passes
+9 tests covering repeat-scan stability, root scoping, duplicate filenames,
+Unicode queries, pagination, and query bounds. Multiple roots, persisted
+playlists/queue, presentation, and scale profiling remain unimplemented.
