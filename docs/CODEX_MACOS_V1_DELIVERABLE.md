@@ -1550,3 +1550,43 @@ MAC-02 device recovery, DAC/panel, live host-focus, and distribution gates
 remain open. The GitHub combined-status query returned no status contexts and
 the PR-head Actions workflow query returned no workflow runs; absence of
 checks is not a pass.
+
+### 2026-10-31 root-scoped queue and playlist UI recheck
+
+The current rebuilt app was used with two generated temporary roots, each
+containing two 12-byte RIFF/WAVE signature files (no PCM payload). In root A,
+one track was queued and a named playlist containing that track was saved.
+After explicitly loading root B, both its queue and playlist list were empty.
+Returning to root A restored its one queued track and one named playlist with
+one entry. Play remained available while Pause and Stop were disabled, and no
+output started at any point. The generated roots were removed after the
+exercise. This directly observes root-to-root state isolation and return
+restoration in one app session; it does not test process-restart persistence
+for multiple roots, reconciliation of simultaneous roots, removable-media
+recovery, or playback of these signature-only fixtures. RM-020's broader
+multiple-root reconciliation remains open.
+
+### 2026-10-31 current-HEAD automated gate refresh
+
+At documentation HEAD `39a3c3007d8de5fb9eb3afebfafa740fef9cd696`,
+`sh scripts/offline-gate.sh` exited **0**. The audit reported 17 local crates,
+32 path-only internal edges, zero registry/Git crates, zero third-party
+system links and one OS framework link. Workspace tests, release build,
+warnings-denied Clippy, macOS feature checks and simulated AudioQueue tests
+passed; AudioQueue recovery simulations were **17/17**. The focused
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0** (9/9), including
+managed child shutdown, parent closure during playback, repeated launch/exit,
+and output-error recovery only after explicit Play.
+
+`sh scripts/build-macos-app.sh` exited **0**. The 18/18 unsafe symlink-path
+guards, shutdown/process-drain harnesses, release catalog/search checks,
+playback UI-state tests, catalog bounds checks, bundle construction and strict
+deep ad-hoc signature validation passed. The 20k optimized catalog harness
+measured search at 5,684.583 µs p50 / 6,107.083 µs p95 (101 queries), indexed
+model construction at 117.226 ms / 120.591 ms p50/p95, and 1,300,000 bytes of
+cached-index payload. These synthetic core results do not qualify a
+representative library, app-wide retained memory, cold startup, interactive
+latency, physical device recovery, DAC/panel output, live Rust Boy focus or
+distribution signing. No private codec corpus was rerun; PR #1 remains draft
+and no remote synchronization or merge occurred.

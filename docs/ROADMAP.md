@@ -433,3 +433,29 @@ checkout and sibling Pip-Boy checkout remained clean. It tests inert protocol
 activation and MUSIC/RADIO broker suspend/resume/shutdown without opening the
 sink; live audible output, TV contention and package roster/mount acceptance
 remain open.
+
+## RM-020 current-HEAD and root-scope recheck — 2026-10-31
+
+At documentation HEAD `39a3c3007d8de5fb9eb3afebfafa740fef9cd696`,
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only edges,
+zero registry/Git crates, zero third-party system links, and 17/17 simulated
+AudioQueue tests. The focused package-process suite passed **9/9**. The
+macOS-app build exited **0**, including 18/18 symlink-path guards,
+shutdown/process-drain harnesses, catalog/search and UI-state checks, and
+strict deep ad-hoc bundle signature validation. The current 20k optimized
+catalog harness measured search at 5,684.583 µs p50 / 6,107.083 µs p95,
+indexed construction at 117.226 / 120.591 ms p50/p95, and 1,300,000 bytes of
+cached-index payload. These synthetic core timings do not establish
+representative-library, app-wide memory, cold-start, or interactive-latency
+acceptance.
+
+In a current-bundle UI exercise, two generated roots each contained two
+12-byte RIFF/WAVE signatures without PCM. Root A had one queued item and a
+named playlist with one entry. Loading root B showed an empty queue and
+playlist list; returning to root A restored both records. Playback stayed
+stopped. This is direct in-session evidence of per-root queue and playlist
+isolation, while multiple-root reconciliation, multiple-root restart,
+removable-media recovery, representative library behavior, physical device
+recovery, DAC/panel, live Rust Boy focus, and distribution acceptance remain
+open. The fixture was removed and private decoder corpora were not rerun; keep
+RM-020 in progress and PR #1 draft.
