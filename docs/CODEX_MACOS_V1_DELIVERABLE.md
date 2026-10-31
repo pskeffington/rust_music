@@ -67,3 +67,16 @@ Radio/TV focus, cold startup/incremental RSS, and Developer ID/notarization.
 Independent Swift and security reviews found no actionable finding after the
 paused-navigation fix. These operator and performance gaps block release
 integration under current policy.
+
+### Launch and memory sample for the rebuilt bundle
+
+The rebuilt bundle was launched with `open -n` (exit 0). `lsappinfo list`
+showed bundle `/Users/null/GitHub/rust_music/target/macos/RustMusic.app`,
+executable `Contents/MacOS/RustMusic`, PID 89533, and LaunchServices check-in;
+reported launch-to-check-in was 0.218 s. A single `ps` snapshot about 20 s
+after launch reported RSS 94,432 KiB. This is not a cold-launch distribution,
+catalog incremental RSS, nor memory target pass; it includes SwiftUI/AppKit and
+the process baseline. Sending SIGTERM to validation PIDs 89533 and 88443 was
+followed by `ps -p` exit status 1 for both, confirming neither app process
+remained. The unrelated pre-existing app PID was not signaled. No playback
+child was started during this LaunchServices sample.

@@ -1659,3 +1659,9 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   Rust Boy shared Radio/TV focus, cold startup/incremental RSS, Developer ID
   distribution signing, and final security review remain open. PR #1 stays
   draft and unmerged.
+- Follow-up LaunchServices smoke on the rebuilt `0b1263c` app: `open -n`
+  exited 0; `lsappinfo` recorded a 0.218 s launch-to-check-in for PID 89533.
+  One RSS snapshot at about 20 s was 94,432 KiB, which includes app/framework
+  baseline and is not incremental catalog memory. SIGTERM followed by `ps -p`
+  exit status 1 confirmed validation PIDs 89533 and 88443 exited. No playback
+  child was started; this is launch/exit evidence, not audible output.
