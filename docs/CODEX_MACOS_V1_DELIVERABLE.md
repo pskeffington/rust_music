@@ -1043,3 +1043,32 @@ pre/post scan pair, the host was under memory pressure, and no incremental
 memory conclusion follows. A `/usr/bin/footprint` attempt returned exit 0 but
 reported `Operation not permitted` for task access, so full-app physical
 footprint remains unmeasured.
+
+### 2026-10-31 bounded state output and post-reconnect playback
+
+At code commit `37379598a5c0cf4dbb379e5e5f04b99a5fd748d6`, the Swift state
+command reader enforces the CLI's 6 MiB output limit while catalog and state
+stdout/stderr are merged. Overflow and read errors discard partial output,
+terminate the child, wait for exit, and return a distinct bounded UI error.
+`sh scripts/build-macos-app.sh` exited **0** on Darwin 25.5.0 arm64 / Swift
+6.3.3. Its regressions accept an exact 6 MiB stream, reject output above the
+bound, invoke cleanup on a read error, and observe an over-producing `/usr/bin/yes`
+child exit. The app bundle passed strict local signature verification. A
+separate read-only review found no concrete defect; it noted the existing
+terminate/wait path has no force-kill escalation if the trusted bundled CLI
+were to ignore SIGTERM.
+
+`sh scripts/offline-gate.sh` passed on the same code (17 local crates, 32
+path-only edges, zero registry/Git crates, zero third-party system links, one
+OS framework link; native AudioQueue tests 17/17). Roadmap and literature
+validators and `git diff --check` also passed. The private FLAC corpus was not
+rerun.
+
+After the Shure headphones were reconnected, System Settings showed External
+Headphones selected and unmuted. The app explicitly played a generated
+two-second mono 16-bit/44.1 kHz 440 Hz WAV at -40 dBFS; Rust Music showed
+PLAYING through AudioQueue and then PLAYBACK FINISHED without a surfaced
+error. This is a successful output-start smoke after reconnection. No acoustic
+capture was made, so continuity, DAC fidelity, and handling an AudioQueue
+invalid-device error/reopen remain unverified. RM-020 stays in progress and
+PR #1 remains draft.

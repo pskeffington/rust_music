@@ -136,6 +136,20 @@ This adds current graceful-close evidence to RM-019; device disconnect/recovery,
 physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
 remain open. No private corpus was rerun.
 
+**RM-020 app subprocess output hardening and headphone reconnect smoke
+(2026-10-31, code `37379598a5c0cf4dbb379e5e5f04b99a5fd748d6`):** Swift state
+commands now enforce the CLI's 6 MiB stdout/stderr bound. Exact-limit output,
+over-limit termination, and read-error cleanup pass in the Foundation test
+harness. `sh scripts/build-macos-app.sh` and `sh scripts/offline-gate.sh`
+exited 0; the latter passed 17 workspace crates and 17/17 simulated AudioQueue
+tests. Independent security review found no concrete defect. After reconnect,
+External Headphones was selected and unmuted; a generated -40 dBFS test WAV
+started and finished through AudioQueue without a surfaced error. This does
+not prove acoustic output, DAC fidelity, or AudioQueue invalid-device
+recovery. Full-app memory/startup, transition performance, physical device
+error/recovery, DAC/panel, and live Rust Boy focus remain open. RM-020 remains
+in progress; PR #1 remains draft.
+
 **MAC-02 host output check (2026-10-31):** host `system_profiler` exited 0 and
 listed MacBook Air Speakers as the 48 kHz default output. A generated
 low-amplitude 440 Hz WAV played by the app-bundled CLI outside the restricted
