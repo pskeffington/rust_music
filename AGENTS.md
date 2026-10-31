@@ -10,6 +10,11 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - No user FLAC/other copyrighted music, account credentials, private absolute paths, reference-code copies, or build artifacts in Git.
 - Rust_Boy controls the single RAII audio-focus lease shared with Radio/TV; no autoplay, surprise file scans, independent audio focus, or audio-callback I/O. Keep 128×64 panel output at 1024 bytes.
 
+## Text-only micro library (new directive)
+
+- For user-facing library, metadata, playlist and queue development, read [docs/MICRO_LIBRARY_ZERO_ARTWORK.md](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). **Absolutely no cover art, embedded picture extraction, image decoders/caches/assets, visualizers, or artwork placeholders.** Maintain text-only UX and the current fixed 1,024-byte monochrome panel.
+- Preserve any unmerged local WavPack, IPC, packaging and app work before editing shared files. The media-library directive is a plan, not proof of implementation.
+
 ## Routing and engineering passes
 
 - For a roadmap pass read `docs/roadmap-index.json` and choose the highest-priority unblocked `RM-###` task requested. `docs/CODEX_AGENT_MAP.md` maps tasks to project-scoped `.codex/agents/*.toml` specialists. Assign **one writer per overlapping file scope**. Delegate read-only discovery/review in parallel where helpful; shared files require serial integration.
