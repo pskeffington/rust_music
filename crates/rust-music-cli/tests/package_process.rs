@@ -256,9 +256,14 @@ fn spawned_cli_unit_handshakes_activates_inertly_and_shuts_down() {
     reply_reader.join().expect("join child reply reader");
 }
 
-#[test]
 #[cfg(all(debug_assertions, feature = "test-support"))]
-fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
+fn start_active_playback_child() -> (
+    TempLibrary,
+    ChildGuard,
+    ChildStdin,
+    Receiver<Result<Option<Vec<u8>>, rust_music_ipc::ProtocolError>>,
+    JoinHandle<()>,
+) {
     let library = TempLibrary::new();
     write_sparse_silent_wav(&library.0.join("long-silence.wav"));
 
@@ -269,8 +274,7 @@ fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
         .stderr(Stdio::null())
         .spawn()
         .expect("spawn mock-output package process");
-    let child_pid = child.id();
-    assert_ne!(child_pid, 0, "spawned package has a real OS process ID");
+    assert_ne!(child.id(), 0, "spawned package has a real OS process ID");
     let mut child = ChildGuard(child);
     let mut stdin = child.0.stdin.take().expect("child stdin");
     let stdout = child.0.stdout.take().expect("child stdout");
@@ -335,6 +339,13 @@ fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
         "paced mock output must receive decoded frames before shutdown"
     );
 
+    (library, child, stdin, replies, reply_reader)
+}
+
+#[test]
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
+    let (_library, mut child, stdin, replies, reply_reader) = start_active_playback_child();
     // Closing the parent's IPC stream exercises the EOF cleanup path. The
     // direct Child handle then verifies this exact subprocess exits on time.
     drop(stdin);
@@ -342,6 +353,34 @@ fn spawned_cli_exits_after_parent_pipe_closes_during_active_playback() {
     assert!(
         status.success(),
         "active package child exited with {status}"
+    );
+    assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
+    reply_reader.join().expect("join child reply reader");
+}
+
+#[test]
+#[cfg(all(debug_assertions, feature = "test-support"))]
+fn spawned_cli_acknowledges_shutdown_and_exits_during_active_playback() {
+    let (_library, mut child, mut stdin, replies, reply_reader) = start_active_playback_child();
+    // Match PackageProcessClient.shutdown(): release playback/focus before
+    // asking the package process to exit.
+    send_request(&mut stdin, 6, Request::Stop);
+    let stopped = receive_reply(&replies);
+    let Reply::View(stopped) = stopped.body else {
+        panic!("Stop should return the stopped view");
+    };
+    assert_eq!(stopped.playback, Playback::Stopped);
+    assert!(!stopped.audio_claimed);
+
+    send_request(&mut stdin, 7, Request::Shutdown);
+    let shutdown = receive_reply(&replies);
+    assert_eq!(shutdown.body, Reply::Ack);
+
+    drop(stdin);
+    let status = wait_for_exit(&mut child.0);
+    assert!(
+        status.success(),
+        "active package child exited with {status} after Shutdown"
     );
     assert!(matches!(replies.recv_timeout(REPLY_DEADLINE), Ok(Ok(None))));
     reply_reader.join().expect("join child reply reader");

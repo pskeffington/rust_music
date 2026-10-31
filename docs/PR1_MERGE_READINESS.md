@@ -272,11 +272,14 @@ filter, neither process remained, and `cua.listApps()` reported the app
 `isRunning=false`. This is observed app/child exit during active silent
 playback; it is not audible-content or DAC acceptance.
 
-The test-only paced-null subprocess regression independently observed a
-`Playing` view with `audio_claimed=true` and nonzero delivered frames, then
-closed the IPC parent. The real child exited with status 0 and stdout reached
-EOF. The package-process suite passed 6/6, the release-mode targeted filter
-exited 0 with no debug-only test selected, and the full offline gate exited 0.
+The test-only paced-null subprocess regressions independently observed a
+`Playing` view with `audio_claimed=true` and nonzero delivered frames. One
+closed the IPC parent; another matched the Swift client's normal Stop-then-
+Shutdown sequence, requiring a Stopped view with `audio_claimed=false`, a
+Shutdown Ack, child exit status 0, and stdout EOF. The package-process suite
+passed 7/7 on 2026-10-31. The release-mode targeted filter exited 0 with zero
+debug-only tests selected, and the full offline gate was rerun after
+integration and exited 0 across all workspace crates.
 
 RM-019 is now **done for local bundle idle and active synthetic-playback
 shutdown acceptance**. Native-device disconnect/recovery, live Rust Boy focus,
