@@ -1107,3 +1107,18 @@ after its app-like parent was force-killed. The test sink does not open a DAC.
 This is fresh CLI process-exit evidence, not a fresh active-audio GUI close or
 device-error test. Earlier GUI active-playback close evidence remains in the
 entries above.
+
+The focused integration command
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` also exited **0** with
+**7/7** tests. The bundled release executable smoke
+`python3 scripts/test_release_package_process.py --binary
+target/macos/RustMusic.app/Contents/MacOS/rust-music-cli` exited **0**,
+completed RBPK v1 Hello/Activate/Shutdown, and reported SHA-256
+`3305565f8b4c42598b242a3b498f30caceee2345d042162f3e794322a6f95e4e`.
+
+For the app-memory measurement limitation, `xcrun xctrace list templates`
+exited **72** because `xctrace` is not installed; `vmmap -summary 43650`
+exited **255** because the shell lacks process-inspection privileges. No
+privileged inspection was attempted. Activity Monitor remains the available
+coarse process-memory observation in this environment.

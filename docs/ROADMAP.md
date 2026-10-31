@@ -173,6 +173,14 @@ with the test sink, not a new GUI active-audio close or physical device
 recovery. Earlier GUI active-playback exit evidence remains in the ledger;
 RM-020 and hardware gates remain open.
 
+The focused `cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited 0 (7/7). The bundled
+release CLI completed the RBPK v1 release-process smoke with exit 0 and SHA-256
+`3305565f8b4c42598b242a3b498f30caceee2345d042162f3e794322a6f95e4e`. App
+memory measurement remains coarse: xctrace is absent (exit 72) and vmmap
+cannot inspect the process without additional privileges (exit 255); no
+privileged inspection was attempted.
+
 **MAC-02 host output check (2026-10-31):** host `system_profiler` exited 0 and
 listed MacBook Air Speakers as the 48 kHz default output. A generated
 low-amplitude 440 Hz WAV played by the app-bundled CLI outside the restricted
