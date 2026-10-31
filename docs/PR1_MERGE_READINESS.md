@@ -2,6 +2,20 @@
 
 **Current decision: scripted local checks pass; PR #1 is not release-merge eligible.** The private FLAC, WAVE, AIFF and offline Rust gates pass locally. Rust_Boy live MUSIC/RADIO/TV acceptance, device disconnect/recovery, physical panel/DAC acceptance, distribution signing and detached release approval remain open. A GitHub `mergeable=true` value is about branch conflict resolution, not quality assurance.
 
+## 2026-10-31 catalog and package hardening pass
+
+Local development HEAD is `f660053127f5fe899c11479833fdea0aa720a5a6`
+(`feat: add stable text catalog search`) on `build/native-codecs-g0`. The
+checkout is clean, local `origin/main` (`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`)
+is an ancestor, and HEAD is 49 commits ahead of the local
+`origin/build/native-codecs-g0` tracking ref (`4e3d24a8fe6bea68b4cd40736ddd4b7db6368011`).
+That tracking ref is known to be stale; this is not a fresh GitHub comparison
+and is not authorization to push. The catalog adds bounded text search,
+deterministic sort/pagination and root-scoped IDs. `sh scripts/offline-gate.sh`
+and the app bundle rebuild passed locally; private corpus parity was not
+rerun. Host playback contention, hardware device recovery, physical panel/DAC,
+distribution signing and release approval still block merge.
+
 ## Local post-commit verification — 2026-10-31
 
 Local commit `0bc3f1673a635e688b928406c63baa46bbbb22da` is clean, includes the
