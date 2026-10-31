@@ -114,6 +114,13 @@ No private codec corpus was rerun. These checks do not simulate a physical
 device disconnect, asynchronous route loss, audible output, DAC fidelity, or
 Rust Boy live focus contention; those acceptance gates remain open.
 
+At `4d110594a7b4c3c2641d86f166a2160d1f7cfd1f`, the macOS app builder now
+compiles and runs `PlaybackUIStateTests.swift` before compiling and signing the
+bundle. A fresh `sh scripts/build-macos-app.sh` exited **0** and printed the
+regression's PASS line before successful signature verification. This keeps
+the failure-state regression in the normal packaging path; it does not replace
+the interactive playback-failure or device-recovery tests.
+
 ## 2026-10-31 restricted-shell device query
 
 - Sandboxed `system_profiler SPAudioDataType -detailLevel full` exited 0 but
