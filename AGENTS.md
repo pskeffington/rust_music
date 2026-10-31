@@ -19,6 +19,11 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - When a toolchain/hardware/private corpus is unavailable, mark the task **blocked or unverified**, with explicit required operator command. Source implemented ≠ compiled ≠ PCM parity ≠ measured DAC.
 - Do not advance a dependent gate while its prerequisite evidence is still blocked. Do not automatically create schedules, install dependencies, change sibling repositories, push/merge branches, or configure hardware outside the user-authorized task.
 
+## Merge-preparation and verification
+
+- Before any merge into `main`, read [PR #1 merge-readiness](docs/PR1_MERGE_READINESS.md). On the current clean PR branch run `PRIVATE_FLAC_DIRECTORY=/private/corpus sh scripts/premerge-check.sh` with an operator-provisioned toolchain; do not upload private logs/media. The checker is fail-closed, performs no network/downloads, and does **not** merge.
+- GitHub `mergeable=true` confirms ancestry/conflict resolution only. Do not mark RM-001 complete, close issue #2, clear downstream blocks, or certify hardware from a static audit. Keep draft PR #1 unmerged until required acceptance evidence is recorded; never move `main` by force.
+
 ## RM-001 evidence capture
 
 - For a local operator gate, follow [docs/RM001_OPERATOR_GATE.md](docs/RM001_OPERATOR_GATE.md) and run `sh scripts/capture_offline_gate.sh` from the clean active PR branch. The wrapper records the real gate exit status and private transcript outside the repository; it does not claim success or change roadmap states. Do not upload private transcripts without review.
