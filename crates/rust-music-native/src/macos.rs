@@ -298,6 +298,8 @@ pub struct MacAudioQueueSink {
     registered: bool,
     pending_teardown: bool,
     drain_timeout: Duration,
+    #[cfg(test)]
+    write_timeout: Duration,
 }
 impl Default for MacAudioQueueSink {
     fn default() -> Self {
@@ -311,6 +313,8 @@ impl Default for MacAudioQueueSink {
             registered: false,
             pending_teardown: false,
             drain_timeout: MAX_DRAIN_WAIT,
+            #[cfg(test)]
+            write_timeout: MAX_WAIT,
         }
     }
 }
@@ -458,8 +462,12 @@ impl PcmSink for MacAudioQueueSink {
             .ok_or(MusicError::Invalid("missing AudioQueue callback"))?;
         let n = usize::from(block.format.bits_per_sample / 8);
         let channels = usize::from(block.format.channels);
+        #[cfg(test)]
+        let write_timeout = self.write_timeout;
+        #[cfg(not(test))]
+        let write_timeout = MAX_WAIT;
         for samples in block.samples.chunks(FRAMES_PER_SLOT * channels) {
-            let deadline = Instant::now() + MAX_WAIT;
+            let deadline = Instant::now() + write_timeout;
             let index = loop {
                 if let Some(i) = (0..SLOTS).find(|&i| !context.in_flight[i].load(Ordering::Acquire))
                 {
@@ -974,6 +982,67 @@ mod tests {
         assert!(state.pending_buffers.is_empty());
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+    }
+
+    #[test]
+    fn simulated_callback_starvation_timeout_escalates_teardown_and_allows_reopen() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let active_before = registry_lock().active;
+        let (mut sink, api) = fake_sink();
+        sink.write_timeout = Duration::from_millis(20);
+
+        sink.open(valid_format()).unwrap();
+        for _ in 0..SLOTS {
+            sink.write(&one_sample()).unwrap();
+        }
+        assert!(sink.started);
+        assert!(sink
+            .context
+            .as_ref()
+            .unwrap()
+            .in_flight
+            .iter()
+            .all(|slot| slot.load(Ordering::Acquire)));
+        assert_eq!(api.0.lock().unwrap().pending_buffers.len(), SLOTS);
+
+        // The fake retains all queued buffers and suppresses completion on
+        // stop. This models callback starvation only, not physical unplug.
+        api.0.lock().unwrap().suppress_callbacks = true;
+        assert!(matches!(
+            sink.write(&one_sample()),
+            Err(MusicError::Output(message)) if message.contains("AudioQueue buffer timed out")
+        ));
+        assert_eq!(api.0.lock().unwrap().pending_buffers.len(), SLOTS);
+
+        // With no callbacks to drain, finish escalates to immediate stop and
+        // synchronous dispose, then releases the queue registry/context.
+        assert!(matches!(sink.finish(), Err(MusicError::Output(_))));
+        assert!(sink.queue.is_null());
+        assert!(sink.context.is_none());
+        assert!(!sink.registered);
+        let state = api.0.lock().unwrap();
+        assert_eq!(state.stop_modes, vec![0, 1]);
+        assert_eq!(state.dispose_modes, vec![1]);
+        assert!(state.pending_buffers.is_empty());
+        drop(state);
+        assert_eq!(registry_lock().active, active_before);
+        assert_eq!(registry_lock().pending_teardowns, 0);
+
+        // Restore fake callbacks and reuse the same API for a fresh queue.
+        // This is simulated recovery, not physical unplug/hot-plug evidence.
+        api.0.lock().unwrap().suppress_callbacks = false;
+        let (mut recovered_sink, _) = fake_sink();
+        recovered_sink.api = api.clone();
+        recovered_sink.open(valid_format()).unwrap();
+        recovered_sink.write(&one_sample()).unwrap();
+        assert!(recovered_sink.started);
+        recovered_sink.finish().unwrap();
+        assert!(recovered_sink.queue.is_null());
+        assert!(recovered_sink.context.is_none());
+        assert_eq!(registry_lock().active, active_before);
+        let state = api.0.lock().unwrap();
+        assert_eq!(state.new_calls, 2);
+        assert_eq!(state.dispose_calls, 2);
     }
 
     #[test]
