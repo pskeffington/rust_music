@@ -1729,3 +1729,18 @@ denied Clippy, workspace tests, release build, macOS feature checks, and all
 17 simulated AudioQueue tests passed. No private codec parity corpus was
 rerun; this exact-HEAD offline result does not replace physical device,
 shared-focus, DAC/panel, signing, or distribution acceptance.
+
+### 2026-10-31 rebuilt bundle compile and launch smoke
+
+At source HEAD `de94d07e16dba150aa32b0c80b5d4a717035f7d2`,
+`sh scripts/build-macos-app.sh` exited **0**. It passed 18 symlink-path
+refusal cases, shutdown coordination, process-drain and child lifecycle
+checks, playback-state and catalog-bound checks, and strict local bundle
+signature validation. The optimized 20k catalog harness measured final-item
+search at 7,417.958 µs p50 / 7,991.916 µs p95 (101 queries), indexed model
+construction at 173.093 / 195.245 ms p50/p95, and cached index payload at
+1,300,000 bytes. The newly rebuilt app launched through the desktop to
+`READY NO TRACK`, with Play disabled and no scan/autoplay; Cmd-Q was followed
+by `RustMusic isRunning=false`. No playback child was created in this launch
+smoke. This is a compile/package/startup check, not Developer ID distribution
+signing or physical output acceptance.

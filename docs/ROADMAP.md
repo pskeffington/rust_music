@@ -531,3 +531,15 @@ link, and 17/17 simulated AudioQueue tests. Formatting, Clippy, workspace
 tests, release build, and macOS feature checks passed. Private codec parity
 corpora were not rerun. Physical output/device recovery, live host focus,
 DAC/panel, signing, and distribution gates remain separate.
+
+**RM-019 current bundle compile/launch refresh (2026-10-31):** at source
+`de94d07e16dba150aa32b0c80b5d4a717035f7d2`,
+`sh scripts/build-macos-app.sh` exited **0**. Eighteen symlink-path refusal
+cases, shutdown/process-drain and child lifecycle checks, playback-state and
+catalog-bound checks, and strict local signature validation passed. The
+20k optimized catalog harness measured final-item search at 7,417.958 µs
+p50 / 7,991.916 µs p95 (101 queries), indexed construction at 173.093 /
+195.245 ms p50/p95, and 1,300,000 cached-index bytes. The rebuilt app opened
+at `READY NO TRACK` with Play disabled and no scan/autoplay; Cmd-Q left
+`isRunning=false`. This smoke created no playback child. Distribution
+signing, physical output/recovery, and shared host focus remain open.
