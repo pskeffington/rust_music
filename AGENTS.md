@@ -2,6 +2,14 @@
 
 Rust Music is an independent, ultra-lightweight **lossless-only** audio module for Rust_Boy and standalone offline systems. Follow the repository, not assumptions about other Rust_Boy modules.
 
+## FIRST: agent_skills orchestration
+
+Before any mutable development work, load the verified sibling [`agent_skills`](https://github.com/pskeffington/agent_skills) hierarchy, following [docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md). First perform a read-only Git safety inspection; then pin the actual agent_skills development SHA and read applicable SKILL.md role contracts. Do not assume agent_skills/main contains the hierarchy. Only after routing the agents should Codex resolve the checkout, implement, test and pursue an evidence-backed mainline merge. If unavailable, report the limitation and preserve this repository's existing agents. Never treat a skill as evidence of a passed test.
+
+## Current Codex product directive — library import, autoplay and EQ
+
+Read [docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md) after the pinned `agent_skills` role contracts, and before modifying the library, player or UI. Product policy update: optional autoplay **only after a user explicitly loads a library**, with persistent opt-in and default off; never on app startup or background rescan, and never without host audio-focus grant. Implement an internally authored bypassable 10-band EQ with proof of unchanged PCM in bypass; EQ-active audio is processed, not bit-perfect. **No image/artwork/visualizer implementation.** Existing blanket no-autoplay provisions mean no *unrequested* autoplay; reconcile those texts on the current local branch. This remote documentation may lag local unpushed code; preserve that code and integrate non-destructively.
+
 ## Non-negotiable constraints
 
 - Every product decoder, output adapter and crate is authored here. Cargo dependencies must remain workspace-local `path` edges. No crates.io/Git packages, build.rs downloads, FFmpeg, libFLAC, external ALAC libraries, GStreamer, CPAL, Rodio, system decoder fallback, runtime network calls or telemetry. The OS's built-in audio/device ABI and locally installed Rust toolchain are explicit prerequisites.
@@ -15,6 +23,11 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - Load the verified pinned `agent_skills` roles before mutable work, then follow [the production continuation](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and [library-load/autoplay/EQ gates](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md).
 - Preserve local code, branches, backups, and stashes while reconciling remote docs. These directives are plans, not implementation or release evidence.
 - Keep the zero-artwork policy absolute: no artwork extraction, images, image caches, placeholders, visualizers, or image dependencies.
+
+## Text-only micro library (new directive)
+
+- For user-facing library, metadata, playlist and queue development, read [docs/MICRO_LIBRARY_ZERO_ARTWORK.md](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). **Absolutely no cover art, embedded picture extraction, image decoders/caches/assets, visualizers, or artwork placeholders.** Maintain text-only UX and the current fixed 1,024-byte monochrome panel.
+- Preserve any unmerged local WavPack, IPC, packaging and app work before editing shared files. The media-library directive is a plan, not proof of implementation.
 
 ## Routing and engineering passes
 

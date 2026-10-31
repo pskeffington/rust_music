@@ -66,6 +66,18 @@ cargo run --locked --offline -p rust-music-cli --features alsa-output -- play ~/
 
 All **17 workspace crates** are locally authored and have zero third-party Cargo dependencies. The local Rust 1.99.1/macOS offline gate passes; generated FLAC, WAVE, AIFF, CAF and bounded WavPack vectors and six private real-world FLAC tracks pass recorded native PCM parity. Use `rust_music_library::scan` for explicit discovery and `rust_music_host::MusicSlot` to integrate with Rust_Boy. The host must provide an exclusive `AudioLease` shared with Radio/TV. Playback `Poll` must run on a worker, never on the GUI or native audio callback. Pip-Boy modules remain distinct package identities mounted into the common container; the Music adapter must not mutate or uninstall Radio. Physical playback and actual shared host arbitration remain unverified; see the [Pip-Boy adapter contract](docs/PIP_BOY_ADAPTER.md).
 
+## Codex production continuation
+
+Start with the pinned [agent_skills-first production directive](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and preserve all unfinished local checkout work before integrating remotely. Then follow the [zero-artwork micro-library specification](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). This is a tasking order, not a completed release.
+
+## Winamp-like library import and EQ engineering
+
+The active product tasking is [Codex library-load/autoplay/EQ gates](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md). Autoplay is **optional, default off**, and may start only after a user explicitly loads a library and audio focus is granted. The native EQ is bypassable; enabled EQ intentionally processes PCM. The zero-artwork policy remains absolute. This is a specification, not a verified implementation.
+
+## Media library design: no artwork
+
+The text-first library, search, playlist and queue roadmap is specified in [the zero-artwork micro-library directive](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). No cover art or image decoding, extraction, caching, or display is permitted; the fixed monochrome 128x64 screen remains a text/control surface only. These planned features are not a claim of implementation.
+
 ## Module and research guide
 
 - [Architecture and micro-interface](docs/ARCHITECTURE.md)
