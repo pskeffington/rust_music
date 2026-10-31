@@ -1267,3 +1267,22 @@ closed and Rust Music was quit from its application menu; the desktop inventory
 then reported `isRunning=false`. Shell process listing was unavailable because
 `sysmond` process-list access failed. No playback child was created in this
 pass. RM-020 remains in progress.
+
+### 2026-10-31 populated queue repeat/shuffle UI exercise
+
+The rebuilt app loaded two generated two-second, stereo 16-bit / 44.1 kHz
+silent WAVs. Adding each selected track created a two-entry queue while the
+transport remained stopped (Play enabled, Pause disabled). With Repeat One,
+explicit Play started AudioQueue output; after more than the two-second track
+duration, the UI still reported `PLAYING TRACK 002 silent-1`. After stopping,
+Repeat All Next selected the other row and a second stopped Next wrapped to the
+first row, without starting output. Explicit Play then remained in the
+AudioQueue Playing state across the two-track duration and visibly advanced
+from `silent-0` back to `silent-1`, demonstrating an active repeat-all cycle.
+Turning Shuffle on visibly reordered the rows from `silent-1, silent-0` to
+`silent-0, silent-1` while the selected `silent-1` item remained selected.
+This used silence, so it proves UI/transport state and queue advancement, not
+audibility or DAC output. Both queue entries were removed, Repeat and Shuffle
+were reset Off, Rust Music was quit (`isRunning=false` in desktop inventory),
+and the synthetic fixture was removed. `sysmond` process listing was
+unavailable, so no separate playback-child PID check was made in this pass.
