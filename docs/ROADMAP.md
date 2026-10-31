@@ -88,6 +88,17 @@ Each task closes only when its `acceptance` line has observed evidence. Record s
 **G14:** Independent WASAPI and AAudio device adapters with real target qualification.
 **RM-020 / ML-00–ML-07:** The catalog has stable canonical-root IDs, bounded text/container filtering, deterministic sorting/pagination, cancel-aware explicit scans, bounded M3U8 editing, Unix-persistent queue state with repeat/seeded shuffle, and bounded versioned named playlists. The standalone macOS UI provides explicit folder load/search, queue/playlists and Play/Pause/Resume/Stop/Next/Previous/software volume. Rebuilt-app checks covered silent-library browsing, playlist/queue restore after restart, no autoplay, and an earlier nonzero synthetic WAV smoke through AudioQueue with operator-reported audible output. At 7c1b1d0, the full offline gate and app bundle/plist/strict local signature checks passed; focused CLI tests passed 19/19 plus 7/7. Three 20k synthetic process-RSS profiles measured 5,248 / 5,568 / 7,824 KiB medians for no-tag/10%-tagged/all-tagged mixes. These are RSS estimates, not full-app memory qualification. Remaining work: app-wide memory and cold-start profiling, transition latency, multiple-root reconciliation, non-Unix queue persistence, device disconnect/recovery, physical DAC/panel, and Rust Boy shared focus. Optional explicit-load autoplay and native EQ remain follow-on gates. Preserve the zero-artwork policy.
 
+**RM-020 macOS acceptance update (2026-10-31):** SwiftUI chassis source at
+`d65efc16f5e694ba40acdac6b4662ae94542b88d` builds and signs; the host
+LaunchServices `/usr/bin/open -n` path returned 0 and the UI remained Ready / No
+Track. The bundled RBPK Hello/Activate/Shutdown smoke exited 0. A generated
+2,000-entry explicit scan and single-match search completed without playback.
+App-wide RSS remains unqualified: the same-process resident set fell from a
+96,384 KiB idle median to 69,440 KiB after the catalog scan, so page reclamation
+confounded the incremental measurement. Device disconnect/recovery, DAC/panel,
+and live Rust Boy shared focus remain open; keep RM-020 in progress and PR #1
+draft.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map
