@@ -80,7 +80,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
 | ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root search, sort and pagination implemented; multiple roots/reconciliation remain |
-| ML-04 | Durable playlists and safe M3U/M3U8 import/export | planned |
+| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model/import/export and reorder operations; persistence remains |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | planned |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
 | ML-07 | Synthetic scale, restart/corruption and performance profiles | planned |
@@ -117,6 +117,9 @@ canonical selected root and relative path, duplicate-ID rejection, bounded
 Unicode lowercase text filtering, container filtering, deterministic sort,
 and bounded pagination. The ID hash is for local identity only, not
 authentication. `cargo test --locked --offline -p rust-music-library` passes
-9 tests covering repeat-scan stability, root scoping, duplicate filenames,
-Unicode queries, pagination, and query bounds. Multiple roots, persisted
-playlists/queue, presentation, and scale profiling remain unimplemented.
+15 tests covering repeat-scan stability, root scoping, duplicate filenames,
+Unicode queries, pagination, query bounds, safe M3U8 round trips, and playlist
+limits. The new playlist model accepts only bounded UTF-8 relative paths with
+supported lossless-container suffixes; it does no filesystem access. Playlist
+durability, queue state, multiple roots, presentation, and scale profiling
+remain unimplemented.

@@ -664,7 +664,7 @@
       ],
       "create_paths": [],
       "acceptance": "Provide explicit-root browsing, stable root-scoped track IDs, bounded metadata indexing and text search, deterministic sorting/pagination, playlists, persistent queue, repeat and shuffle. Keep user audio read-only, skip image payloads without allocation, and add no artwork/image extraction/cache/visualizers or third-party runtime dependencies. Benchmark startup, memory and search across synthetic 0/1/100/2k/20k-track catalogs.",
-      "blocker": "ML-01/ML-03 partial: stable canonical-root/relative-path IDs with duplicate rejection, bounded text/container filtering, deterministic sorting and pagination are implemented; `cargo test --locked --offline -p rust-music-library` passed 9/9 and the full offline gate passed at working-tree source. IDs are local identity, not authentication. Multiple roots/reconciliation, durable playlists, persistent queue/repeat/shuffle, UI and 0/1/100/2k/20k startup/memory/search profiles remain."
+      "blocker": "ML-01/ML-03 and ML-04 partial: stable canonical-root/relative-path IDs with duplicate rejection, bounded text/container filtering, deterministic sorting/pagination, and a bounded text-only M3U8 model/import/export/edit API are implemented; `cargo test --locked --offline -p rust-music-library` passed 15/15. IDs are local identity, not authentication. Multiple roots/reconciliation, durable playlist persistence, persistent queue/repeat/shuffle, UI and 0/1/100/2k/20k startup/memory/search profiles remain."
     }
   ]
 }

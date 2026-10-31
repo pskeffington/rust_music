@@ -14,6 +14,9 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+/// Bounded, text-only M3U8 playlist import/export and edit model.
+pub mod playlist;
+
 const MAX_TAG_BLOCKS: usize = 128;
 const MAX_TAG_BLOCK_BYTES: u32 = 16 * 1024 * 1024;
 const MAX_TAG_TOTAL_BYTES: u64 = 64 * 1024 * 1024;

@@ -29,7 +29,7 @@ its separate clean branch and is unpushed; it is not in Rust Music history.
 Local commit `0bc3f1673a635e688b928406c63baa46bbbb22da` is clean, includes the
 RM-019 child-lifecycle changes, and has local `origin/main` as an ancestor. The
 operator-provisioned Rust/Cargo 1.99.1 toolchain completed
-`PRIVATE_FLAC_DIRECTORY=<private six-file directory> RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-gate-evidence sh scripts/premerge-check.sh`:
+`PRIVATE_FLAC_DIRECTORY=<private six-file directory> RUST_MUSIC_EVIDENCE_DIR=<private-output-directory> sh scripts/premerge-check.sh`:
 roadmap/literature checks and eight roadmap unit tests passed, the complete
 offline Rust gate exited 0, WAVE passed 6/6, AIFF/AIFF-C passed 7/7, and the
 six exact manifest FLACs (L1/L2/L3/G4/G5/G6) passed native PCM/metadata/hash
