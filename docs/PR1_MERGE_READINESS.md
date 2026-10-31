@@ -4,19 +4,22 @@
 
 ## 2026-10-31 catalog and package hardening pass
 
-At this recording, local `build/native-codecs-g0` is clean at
-`845b32c05c045affcaf1f891aae774e141866291`. Local `origin/main`
-(`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`) is an ancestor, and HEAD is 55
-commits ahead of local
+At this recording, the latest implementation snapshot on
+`build/native-codecs-g0` is `84f2096` (this subsequent commit only refreshes
+this document). Local `origin/main`
+(`c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`) is an ancestor, and that
+snapshot is 58 commits ahead of local
 `origin/build/native-codecs-g0` tracking ref (`4e3d24a8fe6bea68b4cd40736ddd4b7db6368011`).
 That tracking ref is known to be stale; this is not a fresh GitHub comparison
 and is not authorization to push. Recent commits add bounded text search,
 deterministic sort/pagination, root-scoped IDs, a bounded non-persistent M3U8
-model, a versioned Unix-persistent queue/repeat/shuffle model, and simulated
-AudioQueue failure/teardown handling. The full `sh scripts/offline-gate.sh`
-exited 0 at this source, and `sh scripts/build-macos-app.sh`, plist lint and
-strict signature verification all exited 0; private corpus parity was not
-rerun. Audible Rust Music host contention, live TV, physical device
+model, a versioned Unix-persistent queue/repeat/shuffle model, a synthetic
+0/1/100/2k/20k catalog profile, and simulated AudioQueue failure/teardown
+handling. The full `sh scripts/offline-gate.sh` exited 0 at the queue/native
+implementation snapshot `845b32c`; the profile example was separately built,
+run and checked with warnings-denied Clippy. The app bundle build, plist lint
+and strict signature verification exited 0 at `845b32c`; private corpus parity
+was not rerun. Audible Rust Music host contention, live TV, physical device
 disconnect/recovery, panel/DAC, distribution signing and release approval
 still block merge.
 
