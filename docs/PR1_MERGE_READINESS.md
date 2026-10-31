@@ -283,3 +283,11 @@ shutdown acceptance**. Native-device disconnect/recovery, live Rust Boy focus,
 physical panel/DAC and distribution approval remain open. The overall release
 decision is unchanged: local branch is unpushed, PR #1 stays draft, and mainline
 integration remains blocked.
+
+After that active-playback check, a fresh process launch returned the empty
+Ready / No Track accessibility tree in **891 ms**. Activity Monitor reported
+**28.2 MB** in its `anonymousMemory` column for the idle app (PID 12236), with no
+CLI child. The app was then quit and both `listApps()` and the refreshed
+Activity Monitor filter showed no Rust Music or CLI process. This is one
+startup and memory sample, not a cold-start distribution, RSS measurement, or
+threshold result.
