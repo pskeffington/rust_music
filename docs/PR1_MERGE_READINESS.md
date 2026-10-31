@@ -228,8 +228,10 @@ picker remained open during this pass and was left untouched. RM-019 is
 reopened as `in_progress` for that current-candidate evidence. Device
 disconnect/recovery, Rust Boy shared focus, physical panel/DAC, and
 distribution approval remain open. Local HEAD remains 24 commits ahead of its
-local development-branch tracking ref (not refreshed this pass); no push or
-merge was performed. PR #1 remains draft and ineligible for merge.
+local development-branch tracking ref as of code checkpoint `b03c592` (not
+refreshed during this pass); no push or merge was performed. At documentation
+checkpoint `b16201d`, the local branch was 26 commits ahead. PR #1 remains
+draft and ineligible for merge.
 
 ## 2026-10-31 follow-up current-app close and startup observation
 
