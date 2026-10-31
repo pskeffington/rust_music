@@ -542,3 +542,9 @@ or playback. Host `ps` inspection showed Rust Music process IDs **20761** and
 Thus exact-path LaunchServices launch and the idle no-child state pass; this
 does not test playback output, device loss/recovery, or normal-close child
 teardown.
+
+`system_profiler SPAudioDataType -detailLevel mini` exited **0** and enumerated
+the built-in speakers and headphones plus a two-channel HDMI output, all
+reported at 48 kHz; the built-in speakers were the default output. This is a
+current device-inventory observation only. It does not establish Music's
+AudioQueue playback on each route or device-disconnect recovery.
