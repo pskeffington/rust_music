@@ -4,8 +4,8 @@
 
 ## Current local candidate and remote PR recheck — 2026-10-31
 
-Local HEAD is `e934fb6efe87b1060bdeb01d12f65c20b8d14838` on
-`build/native-codecs-g0`, clean and 84 commits ahead of the local tracking ref
+Local HEAD is `17dff9031c0701d1fb6daa857fec83cfffe9ecdb` on
+`build/native-codecs-g0`, clean and 86 commits ahead of the local tracking ref
 `2947e6737622c3c668003130006823df0bdde3e0` (`git rev-list --left-right --count
 origin/build/native-codecs-g0...HEAD` returned `0 84`). Local `origin/main`
 `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf` is an ancestor (exit 0). A live
@@ -24,6 +24,17 @@ Five synthetic catalog-core runs are recorded in the MAC v1.0 ledger; they do
 not close app-wide performance acceptance. Existing private parity evidence
 was not rerun. Keep PR #1 draft and unpushed while host focus, hardware and
 remaining performance/release gates are open.
+
+The bundle built from product code at `5da9393` (no app/Rust source changes
+through current HEAD) was exercised with two generated 60-second WAV fixtures:
+search returned one row without autoplay; explicit Play, Pause/Resume,
+active Next/Previous, volume adjustment and Stop worked. During AudioQueue
+playback, Activity Monitor showed app PID 28923 and CLI PID 33396. After
+Cmd-Q, the old active process and child were gone; the fresh Ready / No Track
+process was PID 33445 without a CLI child. Closing it left `cua.listApps()` at
+`isRunning=false`, and Activity Monitor showed no Rust Music/CLI row. Fixtures
+were removed and queue/playlist state was not changed. Device disconnect and
+recovery remain untested.
 
 ## 2026-10-31 standalone text-library workflow
 

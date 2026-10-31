@@ -131,6 +131,20 @@ shell exited 0. The sandboxed attempt returned AudioQueueStart `-66680`
 execution boundary and native output path, not an acoustic/DAC measurement or
 disconnect/recovery test. The physical-device gate remains open.
 
+**MAC-01/02 rebuilt-app confirmation (2026-10-31, bundle built at `5da9393`,
+no app/Rust source changes through `17dff90`):** the standalone UI loaded two
+generated 60-second WAVs, search returned one track without starting playback,
+and explicit Play,
+Pause/Resume, active Next/Previous, volume adjustment (99%→98% during active
+playback), and Stop reached the expected UI states. Activity Monitor showed
+app PID 28923 and CLI child PID 33396 during playback. After Cmd-Q, the old
+active instance and child were gone; a fresh Ready / No Track instance was PID
+33445 with no CLI child. Closing that idle instance left `cua.listApps()` at
+`isRunning=false` and Activity Monitor's refreshed Rust filter empty for Music
+and CLI. Generated fixtures were removed; queue/playlist state was not
+changed. Physical disconnect/recovery, acoustic capture and DAC fidelity remain
+open.
+
 **Native transport and current sandbox launch recheck (2026-10-31, source HEAD
 `713c7e9`):** rebuilt bundle, Info.plist path, and strict ad-hoc signature
 verified. With two generated silent 16-bit/44.1 kHz WAVs, the UI reached active

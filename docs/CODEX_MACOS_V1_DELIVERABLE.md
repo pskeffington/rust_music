@@ -11,8 +11,8 @@ release approval.
 
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
-| MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded generated 16-bit/44.1 kHz WAVs, queued, played, paused/resumed, advanced Previous/Next while Playing, changed volume, and stopped; repeat behavior and queue/playlist restart persistence are separately verified. Latest host run played a generated low-amplitude 440 Hz WAV through the app-bundled CLI with exit 0 on the listed MacBook Air Speakers route. Prior app UI output was operator-reported audible. This is not acoustic loopback or DAC bit-perfect evidence. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / CLOSE AND HOST OUTPUT VERIFIED; DEVICE RECOVERY OPEN** | Active synthetic-playback GUI close and child termination were observed at `be6615e`; normal/forced close, injected playback error, repeated serve exits, and current 7/7 feature-gated subprocess tests cover lifecycle. The host AudioQueue tone exited 0. A restricted-shell attempt returned `-66680` (`kAudioQueueErr_InvalidDevice`) and the host retry passed. Real output-device disconnect/recovery, DAC measurement, and Developer ID/notarization remain open. |
+| MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Current rebuilt-app UI loaded two generated 60-second, 16-bit/44.1 kHz WAV tracks, showed search narrowing to one result without playback, then explicit Play, Pause/Resume, active Next/Previous, volume 99%→98% while active, and Stop. No queue or playlist records were changed. Earlier queue/playlist restart persistence and repeat behavior remain separately verified. The app-bundled CLI host tone exited 0; prior app UI output was operator-reported audible. No acoustic loopback or DAC bit-perfect evidence. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / ACTIVE GUI CLOSE VERIFIED; DEVICE RECOVERY OPEN** | Current app PID 28923 and `rust-music-cli` child PID 33396 were visible in Activity Monitor during generated AudioQueue playback. After Cmd-Q, a fresh Ready/No Track instance appeared as PID 33445 with no CLI child; after closing it, `cua.listApps()` reported Rust Music stopped and Activity Monitor's refreshed Rust filter showed no Rust Music or CLI process. Normal/forced close and 7/7 feature-gated subprocess cleanup tests also pass. The host AudioQueue tone exited 0; restricted-shell `-66680` was followed by successful host retry. Physical disconnect/recovery, DAC measurement, and Developer ID/notarization remain open. |
 | MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At code candidate `ab829b3`, the full offline gate exited 0 (17 local crates, 32 path-only edges, zero registry/Git crates or third-party system links); macOS app build with an external `CARGO_TARGET_DIR` override, Swift UI-state check, and strict ad-hoc signature validation exited 0. The symlink guard passed 18/18 and its focused independent security follow-up found no further path-containment issue. Focused subprocess tests pass 7/7 at unchanged app/CLI code. Five synthetic Rust catalog-core runs measured 20k build median 599 ms (344–672) and search p95 median 745.625 µs (743.125–748.292); this is not SwiftUI/full-app qualification. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. App-wide memory, app-level search/transition performance, device recovery, DAC/panel, and distribution acceptance remain open. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | Live GitHub metadata reports PR #1 open, draft, unmerged (`mergeable=true`), head `2947e6737622c3c668003130006823df0bdde3e0`, base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. Local HEAD `e934fb6efe87b1060bdeb01d12f65c20b8d14838` has that PR head as ancestor; tracking-ref comparison is `0 84`, and `origin/main` is an ancestor (exit 0). Mergeability is ancestry only. No push or merge; preserve backups and stash until post-merge validation. |
 
@@ -865,3 +865,23 @@ signature verification (all exit **0**). Roadmap-index, literature, and
 `git diff --check` validation passed. This history adds only release evidence
 documents after code candidate `ab829b3`; no product source changed. The
 focused feature-gated subprocess suite remains 7/7 at unchanged CLI code.
+
+### 2026-10-31 rebuilt-app library/transport and active-close smoke
+
+Using the rebuilt bundle from the code tree verified at `5da9393` (no app or
+Rust source changed through the current local head), CUA loaded two generated
+60-second, stereo, 16-bit/44.1 kHz WAV tones. The library showed both tracks;
+search for the second title returned one row and the Player remained Ready / No
+Track. Explicit Play showed active macOS AudioQueue output, Pause and Resume
+showed their expected states, Next and Previous changed tracks while playback
+remained active, a volume decrement changed 99% to 98% during playback, and
+Stop reached Playback Stopped. Queue and playlist data were not changed; their
+list operations were read-only. The fixtures were removed after the test.
+
+Activity Monitor showed Rust Music PID 28923 and its `rust-music-cli` child PID
+33396 during active playback. After Cmd-Q, a fresh Ready / No Track process
+appeared as PID 33445 with no CLI child. After closing that idle instance,
+`cua.listApps()` reported Rust Music `isRunning=false` and Activity Monitor's
+refreshed Rust filter contained neither Rust Music nor `rust-music-cli`. This
+verifies current GUI child cleanup during generated playback; it is not device
+disconnect/recovery, acoustic capture, or DAC fidelity evidence.
