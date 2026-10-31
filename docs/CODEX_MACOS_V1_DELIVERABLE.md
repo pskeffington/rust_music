@@ -643,3 +643,18 @@ acceptance against a performance threshold. After choosing Quit Rust Music,
 Activity Monitor's refreshed `Rust Music` filter showed no app or CLI rows; the
 generated fixture directory was removed. This does not close the app-wide
 memory gate.
+
+### 2026-10-31 footprint sampler attempt during explicit catalog load
+
+To improve on the Activity Monitor sample, `/usr/bin/footprint -p 23269
+--sample 1 --sample-duration 12 --noCategories` exited **0** while the same
+app process was observed before and after an explicit 2,000-entry generated
+catalog scan. The 12-second output ranged from **42 MB** to **96 MB**; it
+reported a `phys_footprint_peak` of 96 MB and later settled at 43 MB. The
+folder picker and scan occurred during the series, so the samples do not
+separate picker, scan, transient UI allocation, and retained catalog memory.
+This is not a usable incremental-memory delta or threshold result. A separate
+five-second idle series before opening the picker held at 37 MB, further
+showing that this short method was not repeatable enough to qualify the app.
+After selecting Quit Rust Music, Activity Monitor's refreshed process filter
+showed no app or CLI row; generated fixtures were removed.

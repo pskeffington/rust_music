@@ -119,6 +119,13 @@ playback stopped; no track was played. This single pair is not RSS, exact
 catalog heap, a repeated profile, or a passed memory threshold. The app-wide
 memory gate remains open.
 
+**Footprint sampler follow-up (2026-10-31):** `/usr/bin/footprint -p 23269
+--sample 1 --sample-duration 12 --noCategories` exited 0, but its same-process
+series ranged 42–96 MB while the folder picker and scan were active, then
+settled at 43 MB. A separate idle sample held at 37 MB. The scan interval did
+not isolate retained catalog memory, so no incremental delta is claimed and
+the memory gate remains open.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map
