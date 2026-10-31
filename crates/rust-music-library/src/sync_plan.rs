@@ -57,7 +57,7 @@ fn valid_path(value: &str) -> bool {
         !component.is_empty()
             && component != "."
             && component != ".."
-            && !component.ends_with([' ', '.'])
+            && !component.ends_with(' ') && !component.ends_with('.')
             && !matches!(component.to_ascii_lowercase().as_str(),
                 "con" | "prn" | "aux" | "nul"
                 | "com1" | "com2" | "com3" | "com4" | "com5" | "com6" | "com7" | "com8" | "com9"
