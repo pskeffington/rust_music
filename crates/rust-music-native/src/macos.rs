@@ -599,6 +599,7 @@ mod tests {
     use std::sync::Mutex;
 
     const FAKE_QUEUE: AudioQueueRef = 1usize as AudioQueueRef;
+    const FAKE_INVALID_DEVICE: i32 = -66_680;
     static SERIAL_TESTS: Mutex<()> = Mutex::new(());
 
     struct FakeBuffer {
@@ -632,6 +633,7 @@ mod tests {
     struct FakeState {
         new_status: i32,
         new_calls: usize,
+        device_available: Option<bool>,
         fail_allocate_at: Option<usize>,
         allocate_calls: usize,
         enqueue_status: i32,
@@ -664,12 +666,17 @@ mod tests {
         ) -> i32 {
             let mut state = self.0.lock().unwrap();
             state.new_calls += 1;
-            if state.new_status == 0 {
+            let status = if state.device_available == Some(false) {
+                FAKE_INVALID_DEVICE
+            } else {
+                state.new_status
+            };
+            if status == 0 {
                 state.callback = Some(callback);
                 state.callback_user_data = user_data as usize;
                 unsafe { *out_queue = FAKE_QUEUE };
             }
-            state.new_status
+            status
         }
 
         fn allocate_buffer(
@@ -694,7 +701,11 @@ mod tests {
         fn enqueue_buffer(&self, _queue: AudioQueueRef, buffer: AudioQueueBufferRef) -> i32 {
             let mut state = self.0.lock().unwrap();
             state.events.push("enqueue");
-            let status = state.enqueue_status;
+            let status = if state.device_available == Some(false) {
+                FAKE_INVALID_DEVICE
+            } else {
+                state.enqueue_status
+            };
             if status == 0 {
                 state.pending_buffers.push(buffer as usize);
             }
@@ -867,6 +878,58 @@ mod tests {
         sink.finish().unwrap();
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+    }
+
+    #[test]
+    fn simulated_synchronous_invalid_device_enqueue_failure_recovers_after_device_returns() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let active_before = registry_lock().active;
+        let (mut sink, api) = fake_sink();
+
+        // Start a queue while the fake device is available, then have a later
+        // active enqueue synchronously report Apple's InvalidDevice OSStatus.
+        sink.open(valid_format()).unwrap();
+        sink.write(&one_sample()).unwrap();
+        assert!(sink.started);
+        assert_eq!(registry_lock().active, active_before + 1);
+        let failed_slot = sink
+            .context
+            .as_ref()
+            .unwrap()
+            .in_flight
+            .iter()
+            .position(|slot| !slot.load(Ordering::Acquire))
+            .unwrap();
+        api.0.lock().unwrap().device_available = Some(false);
+
+        assert!(matches!(
+            sink.write(&one_sample()),
+            Err(MusicError::Output(message)) if message.contains("-66680")
+        ));
+        assert!(!sink.context.as_ref().unwrap().in_flight[failed_slot].load(Ordering::Acquire));
+
+        // This is a synchronous API-error simulation, not hot-unplug detection.
+        // Finishing drains the prior successful buffer and releases capacity.
+        sink.finish().unwrap();
+        assert!(sink.queue.is_null());
+        assert!(sink.context.is_none());
+        assert!(!sink.registered);
+        assert_eq!(registry_lock().active, active_before);
+        assert_eq!(api.0.lock().unwrap().dispose_calls, 1);
+
+        // Restoring the fake device permits a fresh queue to open and write.
+        api.0.lock().unwrap().device_available = Some(true);
+        let (mut recovered_sink, _) = fake_sink();
+        recovered_sink.api = api.clone();
+        recovered_sink.open(valid_format()).unwrap();
+        recovered_sink.write(&one_sample()).unwrap();
+        assert!(recovered_sink.started);
+        recovered_sink.finish().unwrap();
+        assert!(recovered_sink.queue.is_null());
+        assert!(recovered_sink.context.is_none());
+        assert_eq!(registry_lock().active, active_before);
+        assert_eq!(api.0.lock().unwrap().new_calls, 2);
+        assert_eq!(api.0.lock().unwrap().dispose_calls, 2);
     }
 
     #[test]
