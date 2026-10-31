@@ -6,7 +6,11 @@
 //! destruction, without assuming which other Rust_Boy module owns the device.
 
 use rust_music::{open_file, MusicError, PcmSink, PlaybackSnapshot, PlaybackState, Player, Result};
-use rust_music_library::Library;
+use rust_music_library::{
+    queue::{PlaybackQueue, RepeatMode},
+    Library,
+};
+use std::path::Path;
 
 /// Stable Pip-Boy package identity. It is deliberately distinct from Radio's
 /// `org.rustboy.radio`; the host registers each module as its own package.
@@ -32,6 +36,18 @@ pub enum Command {
     /// Reposition a seek-capable decoder; successful seeks stop output and do
     /// not autoplay. Frames are sample frames per channel, not PCM samples.
     SeekFrame(u64),
+    /// Add the current checked catalog track to the in-memory playback queue.
+    /// This never starts output or acquires audio focus.
+    EnqueueSelection,
+    /// Select a queue entry after resolving it against the checked catalog.
+    /// Selection stops existing playback but never starts the new candidate.
+    SelectQueue(usize),
+    /// Select the next or previous queue candidate without starting playback.
+    QueueNext,
+    QueuePrevious,
+    SetRepeat(RepeatMode),
+    /// Set a deterministic shuffle seed, or `None` to clear shuffle metadata.
+    ShuffleQueue(Option<u64>),
     /// Process exactly one decoded block. The caller schedules a worker tick.
     Poll,
 }
@@ -42,6 +58,10 @@ pub struct SlotSnapshot {
     pub tracks: usize,
     pub playback: PlaybackSnapshot,
     pub has_audio_focus: bool,
+    pub queue_entries: usize,
+    pub queue_selection: Option<usize>,
+    pub repeat_mode: RepeatMode,
+    pub shuffle_seed: Option<u64>,
 }
 
 /// One Rust_Boy pop-in music module. There is exactly one player and sink.
@@ -49,6 +69,7 @@ pub struct MusicSlot<S: PcmSink> {
     player: Player<S>,
     library: Library,
     selected: Option<usize>,
+    queue: PlaybackQueue,
     focus_lease: Option<Box<dyn AudioLease>>,
 }
 
@@ -59,6 +80,7 @@ impl<S: PcmSink> MusicSlot<S> {
             player: Player::new(sink),
             library,
             selected,
+            queue: PlaybackQueue::new(),
             focus_lease: None,
         }
     }
@@ -68,12 +90,28 @@ impl<S: PcmSink> MusicSlot<S> {
     pub fn sink(&self) -> &S {
         self.player.sink()
     }
+    /// Read-only queue state. Persist through `PlaybackQueue::save_atomic` or
+    /// serialize with `to_record`; queue selection itself never starts audio.
+    pub fn queue(&self) -> &PlaybackQueue {
+        &self.queue
+    }
+    /// Replace persisted queue state without selecting or starting its current
+    /// item. Entries are resolved against this slot's current catalog only
+    /// when a separate queue-selection command is issued.
+    pub fn replace_queue(&mut self, queue: PlaybackQueue) -> SlotSnapshot {
+        self.queue = queue;
+        self.status()
+    }
     pub fn status(&self) -> SlotSnapshot {
         SlotSnapshot {
             selection: self.selected,
             tracks: self.library.len(),
             playback: self.player.status(),
             has_audio_focus: self.focus_lease.is_some(),
+            queue_entries: self.queue.len(),
+            queue_selection: self.queue.current_index(),
+            repeat_mode: self.queue.repeat_mode(),
+            shuffle_seed: self.queue.shuffle_seed(),
         }
     }
 
@@ -81,6 +119,7 @@ impl<S: PcmSink> MusicSlot<S> {
     /// always stops playback, preserves the previous relative path if present,
     /// and never starts a different song automatically.
     pub fn replace_library(&mut self, catalog: Library) -> Result<SlotSnapshot> {
+        let same_root = self.library.root() == catalog.root();
         let old_path = self
             .selected
             .and_then(|i| self.library.track(i))
@@ -90,6 +129,12 @@ impl<S: PcmSink> MusicSlot<S> {
             .and_then(|p| catalog.tracks().iter().position(|t| t.relative_path == p))
             .or_else(|| (!catalog.is_empty()).then_some(0));
         self.library = catalog;
+        if !same_root {
+            // Queue paths are relative to one selected root. Without a root
+            // identity in the persisted queue record, retaining them across
+            // roots could silently target unrelated files with equal names.
+            self.queue = PlaybackQueue::new();
+        }
         Ok(self.status())
     }
 
@@ -113,6 +158,13 @@ impl<S: PcmSink> MusicSlot<S> {
             Command::Play => self.play(audio_focus)?,
             Command::Stop => self.stop()?,
             Command::SeekFrame(frame) => self.seek_frame(frame)?,
+            Command::EnqueueSelection => self.enqueue_selection()?,
+            Command::SelectQueue(index) => self.select_queue(index)?,
+            Command::QueueNext => self.move_queue_candidate(true)?,
+            Command::QueuePrevious => self.move_queue_candidate(false)?,
+            Command::SetRepeat(mode) => self.queue.set_repeat_mode(mode),
+            Command::ShuffleQueue(Some(seed)) => self.queue.shuffle(seed),
+            Command::ShuffleQueue(None) => self.queue.clear_shuffle(),
             Command::Poll => self.poll()?,
         }
         Ok(self.status())
@@ -127,6 +179,55 @@ impl<S: PcmSink> MusicSlot<S> {
             self.selected = Some(index);
         }
         Ok(())
+    }
+    fn enqueue_selection(&mut self) -> Result<()> {
+        let index = self
+            .selected
+            .ok_or(MusicError::Invalid("no music track is selected"))?;
+        self.library.checked_path(index)?;
+        let relative_path = self
+            .library
+            .track(index)
+            .ok_or(MusicError::Invalid("selected music track does not exist"))?
+            .relative_path
+            .clone();
+        // The check above deliberately revalidates presence/symlink state but
+        // queue insertion stores only the catalog-relative text path.
+        self.queue.enqueue(relative_path)
+    }
+    fn select_queue(&mut self, queue_index: usize) -> Result<()> {
+        let path = self
+            .queue
+            .entries()
+            .get(queue_index)
+            .ok_or(MusicError::Invalid("queue selection is out of bounds"))?
+            .clone();
+        let track_index = self.resolve_queue_path(&path)?;
+        self.queue.select(queue_index)?;
+        self.select(track_index)
+    }
+    fn move_queue_candidate(&mut self, forwards: bool) -> Result<()> {
+        let path = if forwards {
+            self.queue.next_candidate()
+        } else {
+            self.queue.previous_candidate()
+        }
+        .ok_or(MusicError::Invalid("queue has no next candidate"))?
+        .to_path_buf();
+        let track_index = self.resolve_queue_path(&path)?;
+        self.select(track_index)
+    }
+    fn resolve_queue_path(&self, path: &Path) -> Result<usize> {
+        let index = self
+            .library
+            .tracks()
+            .iter()
+            .position(|track| track.relative_path == path)
+            .ok_or(MusicError::Invalid(
+                "queue candidate is missing from the current library",
+            ))?;
+        self.library.checked_path(index)?;
+        Ok(index)
     }
     fn move_selection(&mut self, forwards: bool) -> Result<()> {
         let count = self.library.len();
@@ -209,7 +310,7 @@ mod tests {
         fs,
         path::PathBuf,
         sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
+            atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
             Arc,
         },
         time::{SystemTime, UNIX_EPOCH},
@@ -248,6 +349,7 @@ mod tests {
     #[derive(Clone, Default)]
     struct TestFocus {
         claimed: Arc<AtomicBool>,
+        attempts: Arc<AtomicUsize>,
     }
     struct TestLease(Arc<AtomicBool>);
     impl AudioLease for TestLease {}
@@ -258,6 +360,7 @@ mod tests {
     }
     impl AudioFocus for TestFocus {
         fn try_acquire_music(&self) -> Option<Box<dyn AudioLease>> {
+            self.attempts.fetch_add(1, Ordering::Relaxed);
             self.claimed
                 .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
                 .ok()
@@ -609,6 +712,87 @@ mod tests {
     }
 
     #[test]
+    fn queue_selection_and_navigation_never_open_sink_or_acquire_focus() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        temp.wav("b.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+
+        let initial = slot.status();
+        assert_eq!(initial.queue_entries, 0);
+        assert_eq!(initial.queue_selection, None);
+        slot.handle(Command::EnqueueSelection, &focus).unwrap();
+        slot.handle(Command::Next, &focus).unwrap();
+        slot.handle(Command::EnqueueSelection, &focus).unwrap();
+        assert_eq!(
+            slot.queue().entries(),
+            &[PathBuf::from("a.wav"), PathBuf::from("b.wav")]
+        );
+        let restored =
+            PlaybackQueue::from_record(slot.queue().to_record().unwrap().as_bytes()).unwrap();
+        let restored_status = slot.replace_queue(restored);
+        assert_eq!(restored_status.queue_entries, 2);
+        assert_eq!(restored_status.playback.state, PlaybackState::Stopped);
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 0);
+        assert!(slot.sink().opened.is_none());
+
+        let selected = slot.handle(Command::SelectQueue(0), &focus).unwrap();
+        assert_eq!(selected.selection, Some(0));
+        assert_eq!(selected.queue_selection, Some(0));
+        let next = slot.handle(Command::QueueNext, &focus).unwrap();
+        assert_eq!(next.selection, Some(1));
+        assert_eq!(next.queue_selection, Some(1));
+        let previous = slot.handle(Command::QueuePrevious, &focus).unwrap();
+        assert_eq!(previous.selection, Some(0));
+        assert_eq!(previous.queue_selection, Some(0));
+
+        let repeated = slot
+            .handle(Command::SetRepeat(RepeatMode::All), &focus)
+            .unwrap();
+        assert_eq!(repeated.repeat_mode, RepeatMode::All);
+        let shuffled = slot
+            .handle(Command::ShuffleQueue(Some(42)), &focus)
+            .unwrap();
+        assert_eq!(shuffled.shuffle_seed, Some(42));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 0);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert!(slot.sink().opened.is_none());
+        assert_eq!(slot.sink().frames_written, 0);
+
+        slot.handle(Command::Play, &focus).unwrap();
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 1);
+        assert!(focus.claimed.load(Ordering::Acquire));
+        // Selecting a new queue item stops and releases the active session;
+        // it does not request another lease or restart output.
+        let moved = slot.handle(Command::QueuePrevious, &focus).unwrap();
+        assert_eq!(moved.selection, Some(1));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 1);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert!(slot.sink().opened.is_none());
+        assert_eq!(slot.sink().frames_written, 0);
+    }
+
+    #[test]
+    fn stale_queue_candidates_fail_closed_without_focus_or_output() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let focus = TestFocus::default();
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        slot.handle(Command::EnqueueSelection, &focus).unwrap();
+        fs::remove_file(temp.0.join("a.wav")).unwrap();
+
+        assert!(matches!(
+            slot.handle(Command::SelectQueue(0), &focus),
+            Err(MusicError::Io(_))
+        ));
+        assert_eq!(focus.attempts.load(Ordering::Relaxed), 0);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+        assert!(slot.sink().opened.is_none());
+        assert_eq!(slot.sink().frames_written, 0);
+    }
+
+    #[test]
     fn package_identity_is_distinct_and_suspend_preserves_mounted_module() {
         assert_eq!(MUSIC_PACKAGE_ID, "org.rustboy.music");
         assert_ne!(MUSIC_PACKAGE_ID, "org.rustboy.radio");
@@ -648,12 +832,14 @@ mod tests {
         let focus = TestFocus::default();
         let mut slot = MusicSlot::new(NullSink::default(), initial.scan());
         slot.handle(Command::Next, &focus).unwrap(); // Select b.wav.
+        slot.handle(Command::EnqueueSelection, &focus).unwrap();
         slot.handle(Command::Play, &focus).unwrap();
         assert!(focus.claimed.load(Ordering::Acquire));
 
         let replaced = slot.replace_library(reordered.scan()).unwrap();
         assert_eq!(replaced.tracks, 1);
         assert_eq!(replaced.selection, Some(0)); // Same relative path.
+        assert_eq!(replaced.queue_entries, 0); // Queue was scoped to the old root.
         assert_eq!(replaced.playback.state, PlaybackState::Stopped);
         assert!(!replaced.has_audio_focus);
         assert!(!focus.claimed.load(Ordering::Acquire));
