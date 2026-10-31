@@ -185,6 +185,20 @@ still answers a snapshot as Stopped with no audio claim, then requests
 Shutdown and observes a clean child exit. This covers stale media before
 output starts; it does not simulate a device disappearing during active audio.
 
+### Compact phosphor UI theme — `fb5e70dd62a348053088a8bc03e9ea5e85e42a3e`
+
+The app now renders a clean, text-only phosphor-green player surface intended
+to sit inside the outer Pip-Boy wrapper. It does not draw a second chassis and
+contains no artwork, mascot, waveform, EQ bar, or image subsystem. Player
+status and queue sit above library/search and playlists; transport and volume
+remain in a bottom bar. `sh scripts/build-macos-app.sh`, `plutil -lint`, and
+strict deep `codesign --verify` passed. Unsandboxed `open -n` exited 0 and
+LaunchServices checked in the app 0.0901999 seconds after launch. Visual review
+at 974×620 showed all panels and transport in the window. In the actual UI, a
+generated two-track WAV folder loaded; the queue remained stopped, and playlist
+create/delete both worked. The user independently confirmed audio output and
+library loading. This is a UI/build check, not DAC or device-recovery evidence.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.

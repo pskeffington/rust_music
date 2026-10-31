@@ -1705,3 +1705,23 @@ decorrelation and CRC validation remain required, and WavPack stays unregistered
   AudioQueue failure/teardown 15/15). Physical device loss during active
   output, Rust Boy shared focus, DAC measurement, repeatable app profiling,
   distribution signing, and mainline release approval remain open.
+
+## 2026-10-31 — Compact phosphor macOS player theme
+
+- Reworked `apps/rust-music-macos/RustMusicApp.swift` as a clean text-first
+  phosphor panel meant to sit inside the Pip-Boy wrapper. The UI now lays out
+  player status and persistent queue above library/search and playlists, with
+  Play/Pause/Stop/Previous/Next and volume pinned in a bottom bar. It uses no
+  second chassis, art, mascot, waveform, EQ bar, or image API.
+- Commit `fb5e70dd62a348053088a8bc03e9ea5e85e42a3e` built successfully with
+  `sh scripts/build-macos-app.sh`; `plutil -lint` and strict deep codesign
+  verification passed. Unsandboxed `open -n` exited 0; LaunchServices checked
+  in after 0.0901999 seconds. The accessibility tree exposed all four panels
+  and transport controls; a 974×620 screenshot showed the full layout.
+- UI smoke used only the generated two-tone folder under `/private/tmp` (no
+  private music scan). Two catalog entries loaded; queue remained stopped;
+  playlist creation and deletion both worked. The user separately confirmed
+  output and library load work. No playback was started during this theme pass.
+- `cargo fmt --all -- --check`, `git diff --check`, and a source scan for image
+  and visualization APIs passed. This pass changed SwiftUI presentation only;
+  Rust offline test results remain those already recorded at `2984278`.
