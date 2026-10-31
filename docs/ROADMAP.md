@@ -101,6 +101,17 @@ confounded the incremental measurement. Device disconnect/recovery, DAC/panel,
 and live Rust Boy shared focus remain open; keep RM-020 in progress and PR #1
 draft.
 
+**Current candidate recheck (2026-10-31, source HEAD `be6615e`):** the full
+offline gate exited 0 (17 local crates, 32 path-only edges, zero registry/Git
+crates, zero third-party system links); the app bundle built and passed strict
+ad-hoc signature verification; the focused package-process suite passed 7/7.
+The current app loaded two generated silent WAVs, showed active AudioQueue
+playback, and was quit from its app menu. Activity Monitor reported its CLI
+child as Terminated with zero memory and then showed no Rust Music/CLI process.
+This adds current graceful-close evidence to RM-019; device disconnect/recovery,
+physical output, DAC/panel, live Rust Boy focus, and app-wide incremental memory
+remain open. No private corpus was rerun.
+
 Expanded lossless **G4** remains the umbrella milestone for G10–G13, not a claim that ALAC or WavPack is currently supported.
 
 ## How Codex uses this map

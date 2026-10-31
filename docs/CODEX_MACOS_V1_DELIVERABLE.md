@@ -12,8 +12,8 @@ release approval.
 | Gate | Production requirement | Current status | Evidence / remaining acceptance |
 | --- | --- | --- | --- |
 | MAC-01 | Complete usable library-to-playback workflow | **PARTIAL / OUTPUT PATH VERIFIED** | Exact rebuilt-app UI loaded two generated 10-second, nonzero 16-bit/44.1 kHz WAV tones, queued both, played, paused/resumed, advanced Previous/Next between titles while Playing, changed volume 100→95→100, and stopped. Synthetic silent short-track UI checks verified Repeat One continues and Repeat All loops; Repeat Off finishes at the final item instead of replaying it. The bundled CLI played a synthetic 440 Hz WAV through AudioQueue with exit 0; the operator reports audible output. This is native output-path evidence, not an acoustic loopback or DAC bit-perfect measurement. |
-| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / NORMAL AND FORCED ACTIVE-PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. Normal Cmd-Q had already shown no app or child process. On 2026-10-31, app PID 16381 was SIGKILLed while UI reported Playing through AudioQueue; its `rust-music-cli serve` child PID 16556 disappeared within the 8-second process deadline, and CUA reported `isRunning=false`. The absolute bundle also launches through host LaunchServices with `open -n` exit 0 and the expected bundle ID/executable. Separate process tests verify playback-error cleanup and three repeated serve launch/exit cycles. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
-| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At code source `7c1b1d0ba795a8af6cd0ff36bb55abf3fd087bcc`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links. Focused macOS CLI tests passed 19/19 unit and 7/7 subprocess tests. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc `codesign --verify --deep --strict` exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Independent code/security review found no blocking issue; the public pre-v1 `Track.tags` API changed and is documented below. Serial profile measured 20k catalog construction at 310–312 ms and search p95 at 751–756 µs. New repeated process-RSS deltas were below 8 MiB for synthetic no-tag, 10%-tagged and all-tagged catalogs, but are OS-observed estimates, not exact heap accounting or app-wide RSS. Cold-start distribution, actual-app incremental memory, transition latency, device recovery and distribution acceptance remain open. |
+| MAC-02 | Native macOS playback, shutdown and device recovery | **PARTIAL / NORMAL AND FORCED ACTIVE-PLAYBACK CLOSE VERIFIED; DEVICE RECOVERY OPEN** | The rebuilt app explicitly played generated silent WAV fixtures through AudioQueue. On 2026-10-31 at source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`, the app loaded only two generated 16-bit/44.1 kHz silent WAVs and showed Playing through AudioQueue. Activity Monitor showed CLI child PID 22787; after selecting Quit Rust Music, the child inspector reported Terminated and 0 bytes memory, and the refreshed `Rust` filter showed no app or CLI process. Earlier normal Cmd-Q and forced active-playback SIGKILL checks also observed app/child exit. The absolute bundle launches through host LaunchServices with `open -n` exit 0. Separate process tests verify playback-error cleanup and repeated serve launch/exit cycles. AudioQueue injected failure/teardown tests pass 15/15. Device disconnect/recovery, DAC measurement and Developer ID/notarization remain open. |
+| MAC-03 | Complete offline suite, performance and independent security/code review | **PARTIAL** | At source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`, `sh scripts/offline-gate.sh` exited 0 across 17 local crates and 32 path-only internal edges, with zero registry/Git crates and zero third-party system links; injected AudioQueue failure/teardown tests passed 15/15. Focused macOS CLI subprocess tests passed 7/7. `sh scripts/build-macos-app.sh`, Info.plist lint, and strict ad-hoc code-sign validation exited 0. Existing FLAC 6/6, WAV 6/6, AIFF 7/7 and ALAC/WavPack evidence is retained; private corpus was not rerun. Independent code/security review found no blocking issue; the public pre-v1 `Track.tags` API changed and is documented below. Synthetic catalog profiling remains OS-observed rather than exact heap accounting; actual-app incremental memory, device recovery, physical DAC/panel, transition latency and distribution acceptance remain open. |
 | MAC-04 | Reviewed mainline integration with preserved history | **BLOCKED BY RELEASE GATES** | Live GitHub fetch on 2026-10-31 reports PR #1 open, draft and unmerged (`mergeable=true`), remote head `2947e6737622c3c668003130006823df0bdde3e0`, base `c02ef6c9b86cff3a86ceaaf5e35900593f592fbf`. At local HEAD `e5bb801c43f975576736f23dc2615ee5ef43659f`, the PR head is an ancestor; `git rev-list --left-right --count 2947e6737622c3c668003130006823df0bdde3e0...HEAD` reports `0 51`. Mergeability is not release acceptance. No push or merge; preserve backup branches and stash through post-merge verification.
 
 ### 2026-10-31 candidate verification at `c1ce494`
@@ -602,3 +602,28 @@ tests passing: wrong package identity, inert handshake/shutdown, removed-track
 rejection, managed playback-error cleanup, repeated parent-pipe close,
 active-playback parent-pipe close, and active-playback Shutdown exit. These
 use test support and do not establish physical device recovery.
+
+### 2026-10-31 current offline gate, package build and graceful active-playback quit
+
+At source HEAD `be6615e802b24c42da3d2b5d89906da52938c110`,
+`sh scripts/offline-gate.sh` exited **0** across 17 local crates and 32
+path-only internal edges, with zero registry/Git crates and zero third-party
+system links. The focused command
+`cargo test --locked --offline -p rust-music-cli --features
+macos-output,test-support --test package_process` exited **0**, with **7/7**
+tests passing, including playback-error and active-playback parent cleanup.
+`sh scripts/build-macos-app.sh` exited **0**; Info.plist validation and strict
+ad-hoc signature validation passed. Roadmap/literature validators and
+`git diff --check` also exited **0**. No private corpus was rerun.
+
+The rebuilt app explicitly loaded only the two generated silent test WAVs
+`01.wav` and `02.wav`, displayed `PLAYING THROUGH RUST MUSIC AND MACOS
+AUDIOQUEUE`, then was quit from the Rust Music menu. Activity Monitor first
+showed child PID 22787; its process inspector then reported
+`rust-music-cli (22787) (Terminated)` and zero real/private memory. The
+refreshed process list filtered by `Rust` showed no Rust Music app or CLI
+process (the remaining matches were Apple `trustd` processes). This is
+observable graceful app-quit cleanup during synthetic silent playback. No
+private media was selected. Device disconnect/recovery, live Rust Boy focus,
+physical DAC/panel, app-wide incremental-memory qualification, and
+Developer ID/notarization remain open.
