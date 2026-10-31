@@ -8,7 +8,13 @@ Rust Music is an independent, ultra-lightweight **lossless-only** audio module f
 - Source input must be genuinely **lossless** at the codec level. Playback floor: integer PCM **16 bits / 44,100 Hz**. Reject AAC/MP3/Opus/Vorbis/lossy WavPack and unsupported codecs; never upscale low-quality audio to claim better fidelity. Parser-only lower-quality test fixtures are allowed but not playback.
 - Exact integer PCM decode parity is not hardware bit-perfect certification. Do not claim tested, complete, merged, lossless mastering provenance or DAC fidelity without observed evidence.
 - No user FLAC/other copyrighted music, account credentials, private absolute paths, reference-code copies, or build artifacts in Git.
-- Rust_Boy controls the single RAII audio-focus lease shared with Radio/TV; no autoplay, surprise file scans, independent audio focus, or audio-callback I/O. Keep 128×64 panel output at 1024 bytes.
+- Rust_Boy controls the single RAII audio-focus lease shared with Radio/TV; no unrequested autoplay, surprise file scans, independent audio focus, or audio-callback I/O. Optional autoplay is allowed only after an explicit user library load, persistent opt-in, and successful host focus grant; it defaults off and never runs on startup, refresh, or reconnect. Keep 128×64 panel output at 1024 bytes.
+
+## Production tasking
+
+- Load the verified pinned `agent_skills` roles before mutable work, then follow [the production continuation](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and [library-load/autoplay/EQ gates](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md).
+- Preserve local code, branches, backups, and stashes while reconciling remote docs. These directives are plans, not implementation or release evidence.
+- Keep the zero-artwork policy absolute: no artwork extraction, images, image caches, placeholders, visualizers, or image dependencies.
 
 ## Routing and engineering passes
 

@@ -16,6 +16,8 @@ use std::{
 
 /// Bounded, text-only M3U8 playlist import/export and edit model.
 pub mod playlist;
+/// Bounded, versioned local persistence for named playlists.
+pub mod playlist_store;
 /// Bounded, persistent text-only queue state and navigation model.
 pub mod queue;
 

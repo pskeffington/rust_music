@@ -1,5 +1,16 @@
 # Micro library policy: zero artwork
 
+## Active task directives
+
+The [agent_skills-first production continuation](CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md)
+and [library-load/autoplay/EQ gates](CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md)
+define current sequencing and acceptance criteria. Their requirements are
+plans, not evidence of implementation. Reconcile older blanket autoplay
+prohibitions as prohibiting **unrequested** playback: optional autoplay is
+allowed only after explicit user library load, persistent opt-in, a successful
+bounded scan, and host audio-focus grant. It defaults off and never runs on
+startup, silent refresh, cancellation, or device reconnect.
+
 ## Contract
 
 The library catalog, package-process view, and 128×64 panel carry no album
@@ -80,7 +91,7 @@ documented unless the host uses OS no-follow descriptor APIs.
 | ML-01 | Data contract for root-scoped IDs, metadata, catalog snapshots and limits | partial: stable root-scoped IDs and query API implemented |
 | ML-02 | Bounded local metadata for supported containers; skip image payloads | planned |
 | ML-03 | Multiple explicit roots, reconcile/missing media, search, stable sort and pagination | partial: single-root search, sort and pagination implemented; multiple roots/reconciliation remain |
-| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model/import/export and reorder operations; named playlist persistence remains |
+| ML-04 | Durable playlists and safe M3U/M3U8 import/export | partial: bounded text-only M3U8 model plus bounded versioned named-playlist CRUD and atomic `.rmp` persistence; UI/host wiring remains |
 | ML-05 | Persistent queue, transport state, repeat/shuffle and failure recovery under host-owned focus | partial: bounded versioned queue state, Unix atomic persistence, repeat modes and seeded shuffle; host transport/focus wiring remains |
 | ML-06 | Text-only desktop and 1 KiB panel presentation | planned |
 | ML-07 | Synthetic scale, restart/corruption and performance profiles | partial: catalog build/search profiled at 0/1/100/2k/20k; cold app startup, incremental memory, restart/corruption remain |
@@ -134,6 +145,20 @@ the audio file fixture remains byte-identical. Non-Unix queue persistence
 currently returns `Unsupported`. Local filesystem path replacement races
 remain documented; resolve every queue entry through the selected library's
 checked-path API before playback.
+
+`rust-music-library::playlist_store` adds bounded named playlist create/rename/
+remove/edit operations and a versioned `.rmp` record. Names and relative audio
+paths only are persisted; store limits cover 128 playlists, 10,000 aggregate
+entries and 1 MiB serialized state. Atomic save uses a same-directory temporary
+file and rename, mode 0600 plus parent-directory sync on Unix, and platform
+native rename behavior elsewhere. The store refuses symlink/non-file targets,
+duplicate names, malformed versions, traversal and over-limit state. Four new
+tests cover CRUD/restart round trip, malformed and unsafe records, Unix atomic
+replacement/symlink refusal, and that playlist edits never open or change
+audio files. This is a data-model/persistence slice; no standalone or host
+workflow is implied by it. Like queue and catalog state, the symlink metadata
+check and subsequent file open can race a hostile local filesystem actor;
+hosts requiring that threat model need an OS no-follow/openat-style API.
 
 ### Initial synthetic catalog profile (2026-10-31)
 

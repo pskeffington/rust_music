@@ -29,7 +29,7 @@ The **machine-readable task, gate and agent registry** is [roadmap-index.json](r
 | **G12** | RF64 and WavPack lossless extensions | `codec_engineer` | partial evidence | Bounded RF64/ds64 and large-size synthetic streaming pass. WavPack's bounded decoder passes generated FFmpeg PCM vectors and independent Tiny Encoder 4.40 parity for selected packed-16/24-bit profiles, including a 1,063,147-frame deterministic synthetic 24-bit stress vector. Native real-world WavPack files, broader profile/encoder coverage, trailing tags, hybrid correction and public playback admission remain open |
 | **G13** | Bounded metadata and sample-accurate seek | `codec_engineer` | partial evidence | Bounded FLAC/AIFF tags, synthetic seek tests, and PCM-exact seeks at every populated SEEKTABLE point in six private FLAC streams pass; other encoders and host/hardware evidence remain |
 | **G14** | Windows WASAPI and Android AAudio ports | `audio_backend` | planned | Platform-local compile, focus and physical output acceptance needed |
-| **G15** | Desktop micro-library browsing and playback controls | `host_integrator` | planned | Explicit-root indexed browsing, metadata search, playlists, persistent queue, repeat/shuffle and startup/memory/search profiles; zero artwork and zero remote runtime dependencies |
+| **G15** | Desktop micro-library browsing and playback controls | `host_integrator` | partial evidence | Bounded catalog/search, M3U8 model, Unix queue state, and named-playlist persistence have library tests; explicit-load UI, host workflow, autoplay setting, and EQ remain unimplemented |
 
 ## Codex task queue
 
