@@ -74,6 +74,18 @@ final class PlayerModel: ObservableObject {
         return tracks.first(where: { $0.id == selectedIndex })
     }
 
+    func boundSearchText() {
+        var bounded = ""
+        for scalar in searchText.unicodeScalars {
+            let value = scalar.value
+            if value < 0x20 || (0x7f...0x9f).contains(value) { continue }
+            let scalarBytes = String(scalar).utf8.count
+            if bounded.utf8.count + scalarBytes > 512 { break }
+            bounded.unicodeScalars.append(scalar)
+        }
+        if bounded != searchText { searchText = bounded }
+    }
+
     func chooseLibrary() {
         let picker = NSOpenPanel()
         picker.title = "Choose a Music Library Folder"
@@ -370,6 +382,7 @@ struct PlayerView: View {
         }
         .padding(24)
         .foregroundStyle(RustMusicPalette.phosphor)
+        .onChange(of: model.searchText) { _ in model.boundSearchText() }
         .onChange(of: model.selectedIndex) { _ in model.selectionChanged() }
         .onDisappear { model.cancelScan(); model.stop() }
     }
