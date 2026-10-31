@@ -245,6 +245,19 @@ launch/exit cycles, and forced termination of an app-like parent. This verifies
 the CLI process lifecycle, not the SwiftUI window-close callback; app-level
 close observation remains unverified.
 
+At source HEAD `51216085b560d2bb5d2d87929d92c0398d074538`, a separate temporary
+preview bundle assembled from the compiled current SwiftUI executable and the
+offline release CLI passed `plutil -lint` and strict deep ad-hoc
+`codesign --verify`; it was not launched and did not replace the normal app.
+Both executables are arm64 Mach-O. `vtool` reports the app minimum macOS 13.0
+and CLI minimum 11.0; the bundle identifier is `dev.rustmusic.standalone` and
+`LSMinimumSystemVersion` is 13.0. The measured executable SHA-256 values were
+`12351149b134390ef46d6f7c6dd2b2b2b9ca042115e281b3cdade25024a9cfb2` (app) and
+`7be9853bd6eb9f6cc1706d3fcd3d6065fdfaec223be9f22d695e9e97ede242ce` (CLI).
+This is a staged package-structure/signature check only; production build
+script execution, LaunchServices launch, visible layout and app-close cleanup
+remain pending.
+
 ## Required handoff
 
 Report exact local/remote HEAD, agent_skills SHA, task IDs/owners, code commits, actual test outputs/exit codes, Mac app/manual evidence, device and signing status, what remains deferred for v1.1/Rust Boy, and PR/mainline recommendation. Never claim release completion from compilation alone.
