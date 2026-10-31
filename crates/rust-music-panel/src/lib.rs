@@ -129,6 +129,7 @@ fn state_text(state: PlaybackState) -> &'static str {
         PlaybackState::Empty => "EMPTY",
         PlaybackState::Ready => "READY",
         PlaybackState::Playing => "PLAYING",
+        PlaybackState::Paused => "PAUSED",
         PlaybackState::Stopped => "STOPPED",
         PlaybackState::Finished => "FINISHED",
         PlaybackState::Failed => "ERROR",
@@ -246,10 +247,10 @@ pub fn translate_button(button: Button, playback: PlaybackState) -> PanelAction 
         Button::Stop => PanelAction::Music(Command::Stop),
         Button::Settings => PanelAction::OpenSettings,
         Button::Confirm => {
-            let command = if playback == PlaybackState::Playing {
-                Command::Stop
-            } else {
-                Command::Play
+            let command = match playback {
+                PlaybackState::Playing => Command::Pause,
+                PlaybackState::Paused => Command::ResumePlayback,
+                _ => Command::Play,
             };
             PanelAction::Music(command)
         }
@@ -406,11 +407,15 @@ mod tests {
         );
         assert_eq!(
             translate_button(Button::Confirm, PlaybackState::Playing),
-            PanelAction::Music(Command::Stop)
+            PanelAction::Music(Command::Pause)
         );
         assert_eq!(
             translate_button(Button::Confirm, PlaybackState::Finished),
             PanelAction::Music(Command::Play)
+        );
+        assert_eq!(
+            translate_button(Button::Confirm, PlaybackState::Paused),
+            PanelAction::Music(Command::ResumePlayback)
         );
         assert_eq!(
             translate_button(Button::Settings, PlaybackState::Playing),

@@ -8,6 +8,7 @@ pub enum PlaybackState {
     Empty,
     Ready,
     Playing,
+    Paused,
     Stopped,
     Finished,
     Failed,
@@ -50,6 +51,8 @@ pub struct Player<S: PcmSink> {
     decoder: Option<Box<dyn Decoder>>,
     sink: S,
     snapshot: PlaybackSnapshot,
+    volume_percent: u8,
+    sink_may_be_open: bool,
 }
 
 impl<S: PcmSink> Player<S> {
@@ -64,6 +67,8 @@ impl<S: PcmSink> Player<S> {
                 total_frames: None,
                 format: None,
             },
+            volume_percent: 100,
+            sink_may_be_open: false,
         }
     }
     pub fn status(&self) -> PlaybackSnapshot {
@@ -71,6 +76,17 @@ impl<S: PcmSink> Player<S> {
     }
     pub fn sink(&self) -> &S {
         &self.sink
+    }
+    /// Software attenuation from 0 (silent) to 100 (exact PCM bypass).
+    pub fn volume_percent(&self) -> u8 {
+        self.volume_percent
+    }
+    pub fn set_volume_percent(&mut self, percent: u8) -> Result<()> {
+        if percent > 100 {
+            return Err(MusicError::Invalid("volume must be between 0 and 100"));
+        }
+        self.volume_percent = percent;
+        Ok(())
     }
 
     pub fn load(&mut self, decoder: Box<dyn Decoder>) -> Result<()> {
@@ -101,10 +117,11 @@ impl<S: PcmSink> Player<S> {
             .snapshot
             .format
             .ok_or(MusicError::Invalid("track format missing"))?;
+        self.sink_may_be_open = true;
         if let Err(err) = self.sink.open(format) {
             self.snapshot.state = PlaybackState::Failed;
             // A native open may have acquired some resources before failing.
-            let _ = self.sink.finish();
+            let _ = self.finish_sink();
             return Err(err);
         }
         self.snapshot.state = PlaybackState::Playing;
@@ -140,13 +157,13 @@ impl<S: PcmSink> Player<S> {
         let was_playing = self.snapshot.state == PlaybackState::Playing;
         if let Err(error) = decoder.seek_frame(frame) {
             if was_playing {
-                let _ = self.sink.finish();
+                let _ = self.finish_sink();
             }
             self.snapshot.state = PlaybackState::Failed;
             return Err(error);
         }
         if was_playing {
-            if let Err(error) = self.sink.finish() {
+            if let Err(error) = self.finish_sink() {
                 self.snapshot.state = PlaybackState::Failed;
                 return Err(error);
             }
@@ -166,15 +183,15 @@ impl<S: PcmSink> Player<S> {
             .ok_or(MusicError::Invalid("decoder missing"))?;
         let next = decoder.next_block();
         match next {
-            Ok(Some(block)) => {
+            Ok(Some(mut block)) => {
                 if let Err(error) = block.validate() {
                     self.snapshot.state = PlaybackState::Failed;
-                    let _ = self.sink.finish();
+                    let _ = self.finish_sink();
                     return Err(error);
                 }
                 if Some(block.format) != self.snapshot.format {
                     self.snapshot.state = PlaybackState::Failed;
-                    let _ = self.sink.finish();
+                    let _ = self.finish_sink();
                     return Err(MusicError::Invalid(
                         "decoder changed PCM format during playback",
                     ));
@@ -189,7 +206,7 @@ impl<S: PcmSink> Player<S> {
                     Ok(frames) => frames,
                     Err(err) => {
                         self.snapshot.state = PlaybackState::Failed;
-                        let _ = self.sink.finish();
+                        let _ = self.finish_sink();
                         return Err(err);
                     }
                 };
@@ -199,14 +216,29 @@ impl<S: PcmSink> Player<S> {
                     .is_some_and(|total| frames > total)
                 {
                     self.snapshot.state = PlaybackState::Failed;
-                    let _ = self.sink.finish();
+                    let _ = self.finish_sink();
                     return Err(MusicError::Invalid(
                         "decoded audio exceeds declared total frames",
                     ));
                 }
+                // 100% is a strict bypass: do not rewrite even one decoded
+                // integer sample. Lower values apply bounded software
+                // attenuation on this worker before the native sink.
+                if self.volume_percent < 100 {
+                    let percent = i64::from(self.volume_percent);
+                    for sample in &mut block.samples {
+                        let scaled = i64::from(*sample) * percent;
+                        let rounded = if scaled < 0 {
+                            (scaled - 50) / 100
+                        } else {
+                            (scaled + 50) / 100
+                        };
+                        *sample = rounded as i32;
+                    }
+                }
                 if let Err(err) = self.sink.write(&block) {
                     self.snapshot.state = PlaybackState::Failed;
-                    let _ = self.sink.finish();
+                    let _ = self.finish_sink();
                     return Err(err);
                 }
                 self.snapshot.frames_delivered = frames;
@@ -218,12 +250,12 @@ impl<S: PcmSink> Player<S> {
                     .is_some_and(|total| self.snapshot.frames_delivered != total)
                 {
                     self.snapshot.state = PlaybackState::Failed;
-                    let _ = self.sink.finish();
+                    let _ = self.finish_sink();
                     return Err(MusicError::Invalid(
                         "decoded audio is shorter than declared total frames",
                     ));
                 }
-                if let Err(err) = self.sink.finish() {
+                if let Err(err) = self.finish_sink() {
                     self.snapshot.state = PlaybackState::Failed;
                     return Err(err);
                 }
@@ -231,18 +263,48 @@ impl<S: PcmSink> Player<S> {
             }
             Err(err) => {
                 self.snapshot.state = PlaybackState::Failed;
-                let _ = self.sink.finish();
+                let _ = self.finish_sink();
                 return Err(err);
             }
         }
         Ok(self.snapshot)
     }
+    /// Pause the native output and retain the decoder cursor. If the backend
+    /// cannot pause safely, tear it down and fail closed.
+    pub fn pause(&mut self) -> Result<()> {
+        if self.snapshot.state != PlaybackState::Playing {
+            return Err(MusicError::Invalid("pause requires Playing state"));
+        }
+        if let Err(error) = self.sink.pause() {
+            let _ = self.finish_sink();
+            self.decoder = None;
+            self.snapshot.state = PlaybackState::Failed;
+            return Err(error);
+        }
+        self.snapshot.state = PlaybackState::Paused;
+        Ok(())
+    }
+    /// Resume a paused native output. Failure closes the output and requires
+    /// an explicit new Play after reloading the track.
+    pub fn resume(&mut self) -> Result<()> {
+        if self.snapshot.state != PlaybackState::Paused {
+            return Err(MusicError::Invalid("resume requires Paused state"));
+        }
+        if let Err(error) = self.sink.resume() {
+            let _ = self.finish_sink();
+            self.decoder = None;
+            self.snapshot.state = PlaybackState::Failed;
+            return Err(error);
+        }
+        self.snapshot.state = PlaybackState::Playing;
+        Ok(())
+    }
     /// Stop releases the output before any future module can acquire focus.
     pub fn stop(&mut self) -> Result<()> {
         // Clear ownership even when the physical device refuses a clean drain.
         // The host's focus lease must not be stranded by a native I/O error.
-        let result = if self.snapshot.state == PlaybackState::Playing {
-            self.sink.finish()
+        let result = if self.sink_may_be_open {
+            self.finish_sink()
         } else {
             Ok(())
         };
@@ -250,6 +312,17 @@ impl<S: PcmSink> Player<S> {
         self.snapshot.state = PlaybackState::Stopped;
         self.snapshot.format = None;
         self.snapshot.total_frames = None;
+        result
+    }
+
+    fn finish_sink(&mut self) -> Result<()> {
+        if !self.sink_may_be_open {
+            return Ok(());
+        }
+        let result = self.sink.finish();
+        if result.is_ok() {
+            self.sink_may_be_open = false;
+        }
         result
     }
 }
@@ -490,6 +563,116 @@ mod tests {
         assert!(player.stop().is_err());
         assert_eq!(player.status().state, PlaybackState::Stopped);
         assert!(!player.sink().opened);
+    }
+    #[derive(Default)]
+    struct CaptureSink {
+        last_samples: Vec<i32>,
+        paused: bool,
+        finished: bool,
+    }
+    impl PcmSink for CaptureSink {
+        fn open(&mut self, _: AudioFormat) -> Result<()> {
+            self.finished = false;
+            Ok(())
+        }
+        fn write(&mut self, block: &PcmBlock) -> Result<()> {
+            self.last_samples.clone_from(&block.samples);
+            Ok(())
+        }
+        fn pause(&mut self) -> Result<()> {
+            self.paused = true;
+            Ok(())
+        }
+        fn resume(&mut self) -> Result<()> {
+            self.paused = false;
+            Ok(())
+        }
+        fn finish(&mut self) -> Result<()> {
+            self.finished = true;
+            self.paused = false;
+            Ok(())
+        }
+    }
+
+    struct Samples {
+        format: AudioFormat,
+        yielded: bool,
+        samples: Vec<i32>,
+    }
+    impl Decoder for Samples {
+        fn format(&self) -> AudioFormat {
+            self.format
+        }
+        fn next_block(&mut self) -> Result<Option<PcmBlock>> {
+            if self.yielded {
+                return Ok(None);
+            }
+            self.yielded = true;
+            PcmBlock::new(self.format, self.samples.clone()).map(Some)
+        }
+    }
+
+    #[test]
+    fn volume_at_100_percent_is_exact_integer_bypass_and_other_values_are_bounded() {
+        let format = AudioFormat::new(44_100, 2, 24).unwrap();
+        let source = vec![-8_388_608, 8_388_607, -3, 3];
+        let mut player = Player::new(CaptureSink::default());
+        player
+            .load(Box::new(Samples {
+                format,
+                yielded: false,
+                samples: source.clone(),
+            }))
+            .unwrap();
+        assert_eq!(player.volume_percent(), 100);
+        player.play().unwrap();
+        player.step().unwrap();
+        assert_eq!(player.sink().last_samples, source);
+
+        player.stop().unwrap();
+        player
+            .load(Box::new(Samples {
+                format,
+                yielded: false,
+                samples: vec![-8_388_608, 8_388_607, -3, 3],
+            }))
+            .unwrap();
+        player.set_volume_percent(50).unwrap();
+        player.play().unwrap();
+        player.step().unwrap();
+        assert_eq!(
+            player.sink().last_samples,
+            vec![-4_194_304, 4_194_304, -2, 2]
+        );
+        assert!(player.set_volume_percent(101).is_err());
+        assert_eq!(player.volume_percent(), 50);
+    }
+
+    #[test]
+    fn pause_retains_decoder_position_and_stop_closes_paused_output() {
+        let format = AudioFormat::new(44_100, 1, 16).unwrap();
+        let mut player = Player::new(CaptureSink::default());
+        player
+            .load(Box::new(Seekable {
+                format,
+                cursor: 0,
+                total: 3,
+            }))
+            .unwrap();
+        player.play().unwrap();
+        player.step().unwrap();
+        player.pause().unwrap();
+        assert_eq!(player.status().state, PlaybackState::Paused);
+        assert!(player.sink().paused);
+        assert!(player.step().is_err());
+        player.resume().unwrap();
+        assert_eq!(player.status().state, PlaybackState::Playing);
+        assert!(!player.sink().paused);
+        assert_eq!(player.step().unwrap().frames_delivered, 2);
+        player.pause().unwrap();
+        player.stop().unwrap();
+        assert_eq!(player.status().state, PlaybackState::Stopped);
+        assert!(player.sink().finished);
     }
     #[test]
     fn no_autoplay_and_one_track_at_a_time() {

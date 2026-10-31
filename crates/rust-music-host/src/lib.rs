@@ -32,7 +32,11 @@ pub enum Command {
     Next,
     Previous,
     Play,
+    Pause,
+    ResumePlayback,
     Stop,
+    /// Software attenuation, 0 (silent) through 100 (exact decoded PCM).
+    SetVolumePercent(u8),
     /// Reposition a seek-capable decoder; successful seeks stop output and do
     /// not autoplay. Frames are sample frames per channel, not PCM samples.
     SeekFrame(u64),
@@ -156,7 +160,10 @@ impl<S: PcmSink> MusicSlot<S> {
             Command::Next => self.move_selection(true)?,
             Command::Previous => self.move_selection(false)?,
             Command::Play => self.play(audio_focus)?,
+            Command::Pause => self.pause()?,
+            Command::ResumePlayback => self.resume_playback(audio_focus)?,
             Command::Stop => self.stop()?,
+            Command::SetVolumePercent(percent) => self.player.set_volume_percent(percent)?,
             Command::SeekFrame(frame) => self.seek_frame(frame)?,
             Command::EnqueueSelection => self.enqueue_selection()?,
             Command::SelectQueue(index) => self.select_queue(index)?,
@@ -261,6 +268,9 @@ impl<S: PcmSink> MusicSlot<S> {
         if self.player.status().state == PlaybackState::Playing {
             return Ok(()); // A repeated Play must not open a second sink.
         }
+        if self.player.status().state == PlaybackState::Paused {
+            return self.resume_playback(audio_focus);
+        }
         let selection = self
             .selected
             .ok_or(MusicError::Invalid("no track selected"))?;
@@ -273,6 +283,25 @@ impl<S: PcmSink> MusicSlot<S> {
         })?;
         self.focus_lease = Some(lease);
         if let Err(error) = self.player.play() {
+            self.focus_lease = None;
+            return Err(error);
+        }
+        Ok(())
+    }
+    fn pause(&mut self) -> Result<()> {
+        // A failed backend pause is failed closed by Player::pause. Drop the
+        // host lease in either case so RADIO/TV are not blocked by a dead
+        // stream.
+        let result = self.player.pause();
+        self.focus_lease = None;
+        result
+    }
+    fn resume_playback(&mut self, audio_focus: &dyn AudioFocus) -> Result<()> {
+        let lease = audio_focus.try_acquire_music().ok_or_else(|| {
+            MusicError::Output("audio focus belongs to another Rust_Boy module".into())
+        })?;
+        self.focus_lease = Some(lease);
+        if let Err(error) = self.player.resume() {
             self.focus_lease = None;
             return Err(error);
         }
@@ -583,6 +612,48 @@ mod tests {
         slot.handle(Command::Play, &focus).unwrap();
         slot.handle(Command::Stop, &focus).unwrap();
         assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn pause_releases_focus_and_resume_requires_a_fresh_grant() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        let focus = TestFocus::default();
+        slot.handle(Command::Play, &focus).unwrap();
+        assert!(slot.status().has_audio_focus);
+
+        let paused = slot.handle(Command::Pause, &focus).unwrap();
+        assert_eq!(paused.playback.state, PlaybackState::Paused);
+        assert!(!paused.has_audio_focus);
+        assert!(!focus.claimed.load(Ordering::Acquire));
+
+        focus.claimed.store(true, Ordering::Release); // RADIO took the lease.
+        assert!(slot.handle(Command::ResumePlayback, &focus).is_err());
+        assert_eq!(slot.status().playback.state, PlaybackState::Paused);
+        assert!(!slot.status().has_audio_focus);
+        assert!(focus.claimed.load(Ordering::Acquire));
+
+        focus.claimed.store(false, Ordering::Release);
+        // The explicit Play action is also a resume when the decoder is
+        // paused; it must not reload from frame zero.
+        let resumed = slot.handle(Command::Play, &focus).unwrap();
+        assert_eq!(resumed.playback.state, PlaybackState::Playing);
+        assert!(resumed.has_audio_focus);
+        slot.handle(Command::Stop, &focus).unwrap();
+        assert!(!focus.claimed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn bounded_volume_control_preserves_default_and_rejects_out_of_range() {
+        let temp = Temp::new();
+        temp.wav("a.wav");
+        let mut slot = MusicSlot::new(NullSink::default(), temp.scan());
+        let focus = TestFocus::default();
+        assert!(slot.handle(Command::SetVolumePercent(100), &focus).is_ok());
+        assert!(slot.handle(Command::SetVolumePercent(0), &focus).is_ok());
+        assert!(slot.handle(Command::SetVolumePercent(101), &focus).is_err());
+        assert!(!slot.status().has_audio_focus);
     }
 
     #[test]

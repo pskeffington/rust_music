@@ -261,6 +261,7 @@ pub struct AlsaSink {
     device: PathBuf,
     handle: Option<File>,
     format: Option<AudioFormat>,
+    paused: bool,
 }
 impl AlsaSink {
     pub fn new(device: &str, _strict_hw: bool) -> Result<Self> {
@@ -268,6 +269,7 @@ impl AlsaSink {
             device: device_path(device)?,
             handle: None,
             format: None,
+            paused: false,
         })
     }
 }
@@ -307,11 +309,15 @@ impl PcmSink for AlsaSink {
         call(&file, readwrite::<SwParams>(0x13), &mut sw).map_err(|e| as_output("SW_PARAMS", e))?;
         command(&file, none(0x40)).map_err(|e| as_output("PREPARE", e))?;
         self.format = Some(format);
+        self.paused = false;
         self.handle = Some(file);
         Ok(())
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
         block.validate()?;
+        if self.paused {
+            return Err(MusicError::Invalid("ALSA output is paused"));
+        }
         if self.format != Some(block.format) {
             return Err(MusicError::Invalid(
                 "Linux sink not open or PCM format changed",
@@ -378,11 +384,41 @@ impl PcmSink for AlsaSink {
         }
         Ok(())
     }
+    fn pause(&mut self) -> Result<()> {
+        let file = self
+            .handle
+            .as_ref()
+            .ok_or(MusicError::Invalid("ALSA sink is closed"))?;
+        if self.paused {
+            return Ok(());
+        }
+        let mut enabled: c_int = 1;
+        call(file, write::<c_int>(0x45), &mut enabled).map_err(|e| as_output("PAUSE", e))?;
+        self.paused = true;
+        Ok(())
+    }
+    fn resume(&mut self) -> Result<()> {
+        let file = self
+            .handle
+            .as_ref()
+            .ok_or(MusicError::Invalid("ALSA sink is closed"))?;
+        if !self.paused {
+            return Err(MusicError::Invalid("ALSA sink is not paused"));
+        }
+        let mut enabled: c_int = 0;
+        call(file, write::<c_int>(0x45), &mut enabled).map_err(|e| as_output("RESUME", e))?;
+        self.paused = false;
+        Ok(())
+    }
     fn finish(&mut self) -> Result<()> {
+        let was_paused = self.paused;
         let handle = self.handle.take();
         self.format = None;
+        self.paused = false;
         if let Some(file) = handle {
-            command(&file, none(0x44)).map_err(|e| as_output("DRAIN", e))?;
+            if !was_paused {
+                command(&file, none(0x44)).map_err(|e| as_output("DRAIN", e))?;
+            }
         }
         Ok(())
     }
@@ -406,6 +442,7 @@ mod tests {
         assert_eq!(readwrite::<HwParams>(0x10) as u64, 0xc2604110);
         assert_eq!(readwrite::<SwParams>(0x13) as u64, 0xc0884113);
         assert_eq!(write::<Transfer>(0x50) as u64, 0x40184150);
+        assert_eq!(write::<c_int>(0x45) as u64, 0x40044145);
     }
     #[test]
     fn accepts_only_direct_bounded_pcm_devices() {

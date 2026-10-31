@@ -155,6 +155,15 @@ pub trait Decoder: Send {
 pub trait PcmSink {
     fn open(&mut self, format: AudioFormat) -> Result<()>;
     fn write(&mut self, block: &PcmBlock) -> Result<()>;
+    /// Pause output without discarding queued samples. Backends that cannot
+    /// preserve a stream across pause must fail closed instead of simulating it.
+    fn pause(&mut self) -> Result<()> {
+        Err(MusicError::Unsupported("output pause is unsupported"))
+    }
+    /// Resume a stream previously paused by `pause`.
+    fn resume(&mut self) -> Result<()> {
+        Err(MusicError::Unsupported("output resume is unsupported"))
+    }
     fn finish(&mut self) -> Result<()>;
 }
 
@@ -180,6 +189,16 @@ impl PcmSink for NullSink {
             .checked_add(block.frames() as u64)
             .ok_or(MusicError::Limit("frame count overflow"))?;
         Ok(())
+    }
+    fn pause(&mut self) -> Result<()> {
+        self.opened
+            .ok_or(MusicError::Invalid("null sink is closed"))
+            .map(|_| ())
+    }
+    fn resume(&mut self) -> Result<()> {
+        self.opened
+            .ok_or(MusicError::Invalid("null sink is closed"))
+            .map(|_| ())
     }
     fn finish(&mut self) -> Result<()> {
         self.opened = None;

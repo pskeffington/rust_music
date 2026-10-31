@@ -46,6 +46,7 @@ pub enum Playback {
     Empty = 0,
     Ready = 1,
     Playing = 2,
+    Paused = 6,
     Stopped = 3,
     Finished = 4,
     Failed = 5,
@@ -98,6 +99,9 @@ pub enum Request {
     Next,
     Play,
     Stop,
+    Pause,
+    ResumePlayback,
+    SetVolumePercent { percent: u8 },
     Snapshot { page: u16 },
     Shutdown,
 }
@@ -286,6 +290,15 @@ impl Envelope<Request> {
                 body.u16(*page);
             }
             Request::Shutdown => body.byte(12),
+            Request::Pause => body.byte(13),
+            Request::ResumePlayback => body.byte(14),
+            Request::SetVolumePercent { percent } => {
+                if *percent > 100 {
+                    return Err(ProtocolError::Invalid("volume must be 0..=100"));
+                }
+                body.byte(15);
+                body.byte(*percent);
+            }
         }
         encode_header(1, &self.package_id, self.request_id, body)
     }
@@ -324,6 +337,11 @@ impl Envelope<Request> {
                 page: reader.u16()?,
             },
             12 => Request::Shutdown,
+            13 => Request::Pause,
+            14 => Request::ResumePlayback,
+            15 => Request::SetVolumePercent {
+                percent: reader.byte()?,
+            },
             _ => return Err(ProtocolError::Invalid("unknown request tag")),
         };
         reader.done()?;
@@ -558,6 +576,7 @@ fn playback_from(value: u8) -> Result<Playback, ProtocolError> {
         3 => Ok(Playback::Stopped),
         4 => Ok(Playback::Finished),
         5 => Ok(Playback::Failed),
+        6 => Ok(Playback::Paused),
         _ => Err(ProtocolError::Invalid("unknown playback state")),
     }
 }
@@ -644,6 +663,31 @@ mod tests {
         let mut stream = Vec::new();
         write_frame(&mut stream, &payload).unwrap();
         assert_eq!(read_frame(&mut stream.as_slice()).unwrap(), Some(payload));
+    }
+
+    #[test]
+    fn pause_resume_and_bounded_volume_requests_roundtrip() {
+        for (request_id, body) in [
+            (1, Request::Pause),
+            (2, Request::ResumePlayback),
+            (3, Request::SetVolumePercent { percent: 0 }),
+            (4, Request::SetVolumePercent { percent: 100 }),
+        ] {
+            let request = Envelope {
+                package_id: ID.into(),
+                request_id,
+                body,
+            };
+            let bytes = request.encode().unwrap();
+            assert_eq!(Envelope::<Request>::decode(&bytes).unwrap(), request);
+        }
+        assert!(Envelope {
+            package_id: ID.into(),
+            request_id: 5,
+            body: Request::SetVolumePercent { percent: 101 },
+        }
+        .encode()
+        .is_err());
     }
 
     #[test]

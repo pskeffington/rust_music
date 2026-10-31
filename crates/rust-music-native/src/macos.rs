@@ -69,6 +69,7 @@ unsafe extern "C" {
         descriptions: *const c_void,
     ) -> i32;
     fn AudioQueueStart(queue: AudioQueueRef, start: *const c_void) -> i32;
+    fn AudioQueuePause(queue: AudioQueueRef) -> i32;
     fn AudioQueueStop(queue: AudioQueueRef, immediate: u8) -> i32;
     fn AudioQueueDispose(queue: AudioQueueRef, immediate: u8) -> i32;
 }
@@ -89,6 +90,7 @@ trait AudioQueueApi: Send + Sync {
     ) -> i32;
     fn enqueue_buffer(&self, queue: AudioQueueRef, buffer: AudioQueueBufferRef) -> i32;
     fn start(&self, queue: AudioQueueRef) -> i32;
+    fn pause(&self, queue: AudioQueueRef) -> i32;
     fn stop(&self, queue: AudioQueueRef, immediate: u8) -> i32;
     fn dispose(&self, queue: AudioQueueRef, immediate: u8) -> i32;
 }
@@ -131,6 +133,10 @@ impl AudioQueueApi for SystemAudioQueue {
 
     fn start(&self, queue: AudioQueueRef) -> i32 {
         unsafe { AudioQueueStart(queue, ptr::null()) }
+    }
+
+    fn pause(&self, queue: AudioQueueRef) -> i32 {
+        unsafe { AudioQueuePause(queue) }
     }
 
     fn stop(&self, queue: AudioQueueRef, immediate: u8) -> i32 {
@@ -288,6 +294,7 @@ pub struct MacAudioQueueSink {
     context: Option<Box<CallbackContext>>,
     format: Option<AudioFormat>,
     started: bool,
+    paused: bool,
     registered: bool,
     pending_teardown: bool,
     drain_timeout: Duration,
@@ -300,6 +307,7 @@ impl Default for MacAudioQueueSink {
             context: None,
             format: None,
             started: false,
+            paused: false,
             registered: false,
             pending_teardown: false,
             drain_timeout: MAX_DRAIN_WAIT,
@@ -389,10 +397,43 @@ impl PcmSink for MacAudioQueueSink {
         self.context = Some(context);
         self.format = Some(format);
         self.started = false;
+        self.paused = false;
+        Ok(())
+    }
+    fn pause(&mut self) -> Result<()> {
+        if self.queue.is_null() || !self.started {
+            return Err(MusicError::Invalid("AudioQueue is not playing"));
+        }
+        if self.paused {
+            return Ok(());
+        }
+        let err = self.api.pause(self.queue);
+        if err != 0 {
+            return Err(MusicError::Output(format!(
+                "AudioQueuePause OSStatus {err}"
+            )));
+        }
+        self.paused = true;
+        Ok(())
+    }
+    fn resume(&mut self) -> Result<()> {
+        if self.queue.is_null() || !self.started || !self.paused {
+            return Err(MusicError::Invalid("AudioQueue is not paused"));
+        }
+        let err = self.api.start(self.queue);
+        if err != 0 {
+            return Err(MusicError::Output(format!(
+                "AudioQueueStart OSStatus {err}"
+            )));
+        }
+        self.paused = false;
         Ok(())
     }
     fn write(&mut self, block: &PcmBlock) -> Result<()> {
         block.validate()?;
+        if self.paused {
+            return Err(MusicError::Invalid("AudioQueue is paused"));
+        }
         if self.queue.is_null() || self.format != Some(block.format) {
             return Err(MusicError::Invalid(
                 "AudioQueue not open or source format changed",
@@ -459,7 +500,7 @@ impl PcmSink for MacAudioQueueSink {
             return Ok(());
         }
         let queue = self.queue;
-        let had_audio = self.started;
+        let had_audio = self.started && !self.paused;
         // Apple documents stop(false) as asynchronous; dispose(false) is also
         // asynchronous. Keep callback state alive through buffer completion,
         // then use dispose(true), which synchronously ends callbacks before
@@ -485,6 +526,7 @@ impl PcmSink for MacAudioQueueSink {
             self.context.take();
             self.format = None;
             self.started = false;
+            self.paused = false;
             if self.pending_teardown {
                 clear_pending_teardown();
                 self.pending_teardown = false;
@@ -581,6 +623,7 @@ mod tests {
         allocate_calls: usize,
         enqueue_status: i32,
         start_status: i32,
+        pause_status: i32,
         stop_status: i32,
         dispose_status: i32,
         stop_calls: usize,
@@ -649,6 +692,12 @@ mod tests {
             let mut state = self.0.lock().unwrap();
             state.events.push("start");
             state.start_status
+        }
+
+        fn pause(&self, _queue: AudioQueueRef) -> i32 {
+            let mut state = self.0.lock().unwrap();
+            state.events.push("pause");
+            state.pause_status
         }
 
         fn stop(&self, queue: AudioQueueRef, immediate: u8) -> i32 {
@@ -867,6 +916,45 @@ mod tests {
         sink.finish().unwrap();
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+    }
+
+    #[test]
+    fn pause_resume_preserves_queue_and_finishes_without_waiting_on_paused_callbacks() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.open(valid_format()).unwrap();
+        sink.write(&one_sample()).unwrap();
+        sink.pause().unwrap();
+        assert!(sink.paused);
+        api.0.lock().unwrap().suppress_callbacks = true;
+        sink.resume().unwrap();
+        assert!(!sink.paused);
+        sink.pause().unwrap();
+        sink.finish().unwrap();
+        let state = api.0.lock().unwrap();
+        assert_eq!(
+            state
+                .events
+                .iter()
+                .filter(|event| **event == "pause")
+                .count(),
+            2
+        );
+        assert!(state.stop_modes.contains(&1));
+        assert!(sink.queue.is_null());
+    }
+
+    #[test]
+    fn pause_failure_is_reported_without_changing_sink_state() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.open(valid_format()).unwrap();
+        sink.write(&one_sample()).unwrap();
+        api.0.lock().unwrap().pause_status = -50;
+        assert!(matches!(sink.pause(), Err(MusicError::Output(_))));
+        assert!(!sink.paused);
+        api.0.lock().unwrap().suppress_callbacks = false;
+        sink.finish().unwrap();
     }
 
     #[test]

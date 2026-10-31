@@ -1190,6 +1190,21 @@ fn handle_unit_request<S: PcmSink>(
             .map(|_| ()),
         Request::Previous => slot.handle(Command::Previous, focus).map(|_| ()),
         Request::Next => slot.handle(Command::Next, focus).map(|_| ()),
+        Request::Pause => {
+            focus.grant.store(false, Ordering::Release);
+            slot.handle(Command::Pause, focus).map(|_| ())
+        }
+        Request::ResumePlayback => {
+            focus.grant.store(true, Ordering::Release);
+            let result = slot.handle(Command::ResumePlayback, focus).map(|_| ());
+            if result.is_err() {
+                focus.grant.store(false, Ordering::Release);
+            }
+            result
+        }
+        Request::SetVolumePercent { percent } => slot
+            .handle(Command::SetVolumePercent(percent), focus)
+            .map(|_| ()),
         Request::Play => {
             focus.grant.store(true, Ordering::Release);
             let result = slot.handle(Command::Play, focus).map(|_| ());
@@ -1350,6 +1365,7 @@ fn make_view<S: PcmSink>(slot: &MusicSlot<S>, page: u16) -> View {
         rust_music::PlaybackState::Empty => Playback::Empty,
         rust_music::PlaybackState::Ready => Playback::Ready,
         rust_music::PlaybackState::Playing => Playback::Playing,
+        rust_music::PlaybackState::Paused => Playback::Paused,
         rust_music::PlaybackState::Stopped => Playback::Stopped,
         rust_music::PlaybackState::Finished => Playback::Finished,
         rust_music::PlaybackState::Failed => Playback::Failed,
@@ -2007,6 +2023,74 @@ mod tests {
         assert_eq!(shutdown.request_id, 3);
         assert_eq!(shutdown.body, Reply::Ack);
         assert_eq!(read_frame(&mut replies).unwrap(), None);
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    fn package_transport_pause_resume_volume_and_stop_preserve_lease_contract() {
+        let root = temp_root("transport-control");
+        let format = AudioFormat::new(44_100, 2, 16).unwrap();
+        let mut wave = header(format, 4);
+        wave.extend_from_slice(&[1, 0, 2, 0]);
+        fs::write(root.join("track.wav"), wave).unwrap();
+
+        let focus = ProcessFocus {
+            grant: Arc::new(AtomicBool::new(false)),
+        };
+        let mut slot = MusicSlot::new(NullSink::default(), Library::empty());
+        let request = |request_id, body| Envelope {
+            package_id: rust_music_host::MUSIC_PACKAGE_ID.into(),
+            request_id,
+            body,
+        };
+        let scanned = handle_unit_request(
+            &mut slot,
+            &focus,
+            request(
+                1,
+                Request::ScanLibrary {
+                    root: root.to_string_lossy().into_owned(),
+                },
+            ),
+        );
+        assert!(matches!(scanned, Reply::View(_)));
+        let started = handle_unit_request(&mut slot, &focus, request(2, Request::Play));
+        let Reply::View(started) = started else {
+            panic!("play should return a view");
+        };
+        assert_eq!(started.playback, rust_music_ipc::Playback::Playing);
+        assert!(started.audio_claimed);
+
+        let paused = handle_unit_request(&mut slot, &focus, request(3, Request::Pause));
+        let Reply::View(paused) = paused else {
+            panic!("pause should return a view");
+        };
+        assert_eq!(paused.playback, rust_music_ipc::Playback::Paused);
+        assert!(!paused.audio_claimed);
+
+        let volume = handle_unit_request(
+            &mut slot,
+            &focus,
+            request(4, Request::SetVolumePercent { percent: 50 }),
+        );
+        assert!(matches!(volume, Reply::View(_)));
+        let resumed = handle_unit_request(&mut slot, &focus, request(5, Request::ResumePlayback));
+        let Reply::View(resumed) = resumed else {
+            panic!("resume should return a view");
+        };
+        assert_eq!(resumed.playback, rust_music_ipc::Playback::Playing);
+        assert!(resumed.audio_claimed);
+
+        let stopped = handle_unit_request(&mut slot, &focus, request(6, Request::Stop));
+        let Reply::View(stopped) = stopped else {
+            panic!("stop should return a view");
+        };
+        assert_eq!(stopped.playback, rust_music_ipc::Playback::Stopped);
+        assert!(!stopped.audio_claimed);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(any(
