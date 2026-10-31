@@ -70,6 +70,10 @@ All **17 workspace crates** are locally authored and have zero third-party Cargo
 
 Start with the pinned [agent_skills-first production directive](docs/CODEX_AGENT_SKILLS_FIRST_PRODUCTION.md) and preserve all unfinished local checkout work before integrating remotely. Then follow the [zero-artwork micro-library specification](docs/MICRO_LIBRARY_ZERO_ARTWORK.md). This is a tasking order, not a completed release.
 
+## Standalone macOS v1.0 deliverable
+
+The current Codex release objective and Mac-only acceptance checklist are defined in [docs/CODEX_MACOS_V1_DELIVERABLE.md](docs/CODEX_MACOS_V1_DELIVERABLE.md). First deliver a working text-only Mac library/playlist player with real transport and audible native output; EQ, autoplay, Rust Boy hardware and public notarized distribution remain separately gated. This document specifies a target, not a completed release.
+
 ## Winamp-like library import and EQ engineering
 
 The active product tasking is [Codex library-load/autoplay/EQ gates](docs/CODEX_WINAMP_LIBRARY_AUTOPLAY_EQ.md). Autoplay is **optional, default off**, and may start only after a user explicitly loads a library and audio focus is granted. The native EQ is bypassable; enabled EQ intentionally processes PCM. The zero-artwork policy remains absolute. This is a specification, not a verified implementation.
