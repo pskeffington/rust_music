@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-UPDATED = "2026-10-29"
+UPDATED = "2026-10-31"
 CATEGORIES = {
     "standards": "Codec, container, and native API standards",
     "reference-codecs": "Comparison decoders and conformance tools (never dependencies)",
@@ -37,6 +37,12 @@ DATA = [
     ("Cargo offline and locked builds", "engineering", "https://doc.rust-lang.org/cargo/reference/config.html#netoffline", "official-guide", "high", "Require offline locked workspace builds with no registry/git packages and no build.rs hooks.", "Run the built-in Rust audit and offline build gate from disconnected workstation.", "G0", "Rust toolchain itself is an explicit prerequisite; no dependencies are downloaded"),
     ("WavPack 4 and 5 binary file/block format", "standards", "https://www.wavpack.com/WavPack5FileFormat.pdf", "official-spec", "high", "Use the block header and metadata layout to implement bounded, original WavPack parsing; accept only independently verified lossless profiles.", "Header/sub-block bounds, codec rejection, and independent integer PCM parity with missing/corrupt correction-stream cases.", "G12", "Format documentation; all decoder code remains original Rust"),
     ("WavPack 5 porting guide", "standards", "https://www.wavpack.com/WavPack5PortingGuide.pdf", "official-guide", "high", "Distinguish legacy-compatible stream 0x407 from the WavPack 5 stream 0x410 when interpreting extended header fields.", "Boundary tests keep 0x407 fields 32-bit and parse 0x410 upper bytes; decoder support remains unadmitted.", "G12", "Official format guide; all decoder code remains original Rust"),
+    ("Winamp desktop player UI and playlists", "reference-players", "https://support.winamp.com/winamp-desktop-player-for-windows", "official-product-doc", "high", "Keep transport, playlist editing, library and search immediately reachable; adopt keyboard selection and direct playlist actions.", "Paired task tests: find track, add to playlist, reorder, initiate playback, return to queue without losing state.", "G5", "Behavioral reference only; no skins, assets or source copying"),
+    ("Nielsen Norman Group ten usability heuristics", "engineering", "https://www.nngroup.com/articles/ten-usability-heuristics/", "research-guidance", "high", "Prioritize visible status, consistent controls, recognition over recall and user control.", "Measure misclicks, task completion, discoverability and state comprehension.", "G5", "Guidance only; no runtime dependency"),
+    ("Apple macOS design guidelines", "engineering", "https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/", "official-platform-guidance", "high", "Use resizable navigation, native keyboard conventions, discoverable toolbar/menu actions.", "Validate window sizes, keyboard-only tasks and native Mac navigation.", "G5", "Platform guidance only"),
+    ("Apple progress indicator guidelines", "engineering", "https://developer.apple.com/design/human-interface-guidelines/progress-indicators", "official-platform-guidance", "high", "Do not invent track progress; show bounded frame-derived elapsed/total and honest unknown status.", "Pause/stop/EOF/frame count and unknown-duration state tests.", "G5", "Platform guidance only"),
+    ("Apple keyboard guidelines", "engineering", "https://developer.apple.com/design/human-interface-guidelines/keyboards/", "official-platform-guidance", "high", "Preserve macOS standard shortcuts, Full Keyboard Access and explicit focus states.", "Keyboard-only library/queue/transport regression checks.", "G5", "Platform guidance only"),
+    ("Apple accessibility design guidelines", "engineering", "https://developer.apple.com/design/human-interface-guidelines/accessibility", "official-platform-guidance", "high", "Ensure labeled status, VoiceOver navigation, scalable text and low cognitive burden.", "VoiceOver checks, contrast at small text, no time-limited notices.", "G5", "Platform guidance only"),
 ]
 
 STANDARD_DATA = [
@@ -89,12 +95,14 @@ def render(matrix):
         cells = [f'**{s["id"]}**', s["rule"], s["gate"], s["status"], ", ".join(s["evidence_ids"]), s["acceptance"]]
         rows.append("| " + " | ".join(cells) + " |\n")
     index = ["# Rust Music literature navigation\n\n", f"Updated: {UPDATED}. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature-index.json) and [roadmap routing](roadmap-index.json).\n\n"]
-    for key, name in matrix["categories"].items():
+    categories = list(matrix["categories"].items())
+    for category_index, (key, name) in enumerate(categories):
         index.append(f"## {name}\n\n")
         for s in matrix["sources"]:
             if s["category"] == key:
                 index.append(f'- **{s["id"]}** [{s["title"]}]({s["url"]}) - {s["decision"]} Gate {s["gate"]}.\n')
-        index.append("\n")
+        if category_index + 1 < len(categories):
+            index.append("\n")
     return "".join(rows), "".join(index)
 
 def main():

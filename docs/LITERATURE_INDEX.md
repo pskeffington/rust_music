@@ -1,6 +1,6 @@
 # Rust Music literature navigation
 
-Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature-index.json) and [roadmap routing](roadmap-index.json).
+Updated: 2026-10-31. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature-index.json) and [roadmap routing](roadmap-index.json).
 
 ## Codec, container, and native API standards
 
@@ -26,6 +26,7 @@ Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature
 - **LIT-006** [Music Player Daemon](https://github.com/MusicPlayerDaemon/MPD) - Separate codec, music database, control, and physical outputs. Gate G1.
 - **LIT-007** [Termusic](https://github.com/tramhao/termusic) - Study keyboard-first playlists and compact status, not dependency surface. Gate G5.
 - **LIT-008** [Firefly TUI music player](https://github.com/ly-ns0/firefly) - Contrast compact transport controls and library paths. Gate G5.
+- **LIT-022** [Winamp desktop player UI and playlists](https://support.winamp.com/winamp-desktop-player-for-windows) - Keep transport, playlist editing, library and search immediately reachable; adopt keyboard selection and direct playlist actions. Gate G5.
 
 ## Rust code quality, portability, and security
 
@@ -33,17 +34,12 @@ Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature
 - **LIT-015** [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) - Typed errors and portable Read-driven decoders with explicit no-panics. Gate G0.
 - **LIT-016** [Rust cargo features](https://doc.rust-lang.org/cargo/reference/features.html) - Keep optional OS backends gated and dependency-free core default. Gate G0.
 - **LIT-019** [Cargo offline and locked builds](https://doc.rust-lang.org/cargo/reference/config.html#netoffline) - Require offline locked workspace builds with no registry/git packages and no build.rs hooks. Gate G0.
+- **LIT-023** [Nielsen Norman Group ten usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) - Prioritize visible status, consistent controls, recognition over recall and user control. Gate G5.
+- **LIT-024** [Apple macOS design guidelines](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/) - Use resizable navigation, native keyboard conventions, discoverable toolbar/menu actions. Gate G5.
+- **LIT-025** [Apple progress indicator guidelines](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) - Do not invent track progress; show bounded frame-derived elapsed/total and honest unknown status. Gate G5.
+- **LIT-026** [Apple keyboard guidelines](https://developer.apple.com/design/human-interface-guidelines/keyboards/) - Preserve macOS standard shortcuts, Full Keyboard Access and explicit focus states. Gate G5.
+- **LIT-027** [Apple accessibility design guidelines](https://developer.apple.com/design/human-interface-guidelines/accessibility) - Ensure labeled status, VoiceOver navigation, scalable text and low cognitive burden. Gate G5.
 
 ## Embedding boundary with Rust Boy and sibling modules
 
 - **LIT-017** [Rust Radio standalone embedding](https://github.com/pskeffington/rust_radio/blob/main/docs/EMBEDDING.md) - Reuse module shape: independent lib, explicit Play, host-owned storage and output focus. Gate G5.
-
-
-## Winamp / macOS usability research (2026-10-31)
-
-- **LIT-022** [Winamp desktop player UI and playlists](https://support.winamp.com/winamp-desktop-player-for-windows) — Keep transport, playlist editing, library and search immediately reachable; adopt keyboard selection and direct playlist actions. Gate G5.
-- **LIT-023** [Nielsen Norman Group ten usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) — Prioritize visible status, consistent controls, recognition over recall and user control. Gate G5.
-- **LIT-024** [Apple macOS design guidelines](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/) — Use resizable navigation, native keyboard conventions, discoverable toolbar/menu actions. Gate G5.
-- **LIT-025** [Apple progress indicator guidelines](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) — Do not invent track progress; show bounded frame-derived elapsed/total and honest unknown status. Gate G5.
-- **LIT-026** [Apple keyboard guidelines](https://developer.apple.com/design/human-interface-guidelines/keyboards/) — Preserve macOS standard shortcuts, Full Keyboard Access and explicit focus states. Gate G5.
-- **LIT-027** [Apple accessibility design guidelines](https://developer.apple.com/design/human-interface-guidelines/accessibility) — Ensure labeled status, VoiceOver navigation, scalable text and low cognitive burden. Gate G5.
