@@ -1274,3 +1274,11 @@ changing playback snapshot accessibility and progress only; it is not audible
 playback, nonzero PCM, VoiceOver speech, or DAC evidence. The folder selection
 is not repeated here and no private filename or absolute path is recorded.
 MAC07-02 remains in progress.
+
+A second muted check observed `00:03 elapsed of 01:07` when Pause completed;
+the accessibility tree remained unchanged across a 1.6-second paused interval.
+After Resume, the value advanced to `00:07 elapsed of 01:07` with the progress
+indicator at 0.105 and submitted frames increasing. Stop returned the UI to
+`Not started; duration unknown` and zero progress. The app remained idle and
+the prior 100% volume setting was restored. This is a focused UI-state check
+with zero-volume output and does not verify audible pause/resume behavior.
