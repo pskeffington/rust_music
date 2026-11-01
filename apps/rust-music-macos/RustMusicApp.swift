@@ -146,11 +146,37 @@ private extension Data {
     }
 }
 
+// Stderr must never share stdout: stdout carries framed binary RBPK responses.
+// Retain only a bounded tail in memory; no file paths or diagnostics are logged.
+private final class PackageStderrTail {
+    private let lock = NSLock()
+    private var bytes = Data()
+    private let maximumBytes = 4_096
+
+    func append(_ data: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        bytes.append(data)
+        if bytes.count > maximumBytes {
+            bytes.removeFirst(bytes.count - maximumBytes)
+        }
+    }
+
+    // The UI displays only a non-sensitive count; raw stderr stays private.
+    var capturedByteCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return bytes.count
+    }
+}
+
 private final class PackageProcessClient {
     private let process: Process
     private let input: FileHandle
     private let output: FileHandle
     private var requestID: UInt64 = 1
+    private let stderrPipe = Pipe()
+    private let stderrTail = PackageStderrTail()
 
     init(executable: URL, root: URL) throws {
         let process = Process()
@@ -160,8 +186,20 @@ private final class PackageProcessClient {
         let outputPipe = Pipe()
         process.standardInput = inputPipe
         process.standardOutput = outputPipe
-        process.standardError = FileHandle.nullDevice
-        try process.run()
+        process.standardError = stderrPipe
+        // Drain on a dedicated queue so high-volume diagnostics cannot stall
+        // the child while the request thread waits for a binary stdout frame.
+        let diagnosticTail = stderrTail
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if !chunk.isEmpty { diagnosticTail.append(chunk) }
+        }
+        do {
+            try process.run()
+        } catch {
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            throw error
+        }
         self.process = process
         input = inputPipe.fileHandleForWriting
         output = outputPipe.fileHandleForReading
@@ -255,6 +293,8 @@ private final class PackageProcessClient {
         }
         try? input.close()
         ProcessTermination.drainAndReap(process, gracefulTimeout: 2, forcedTimeout: 1)
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+        try? stderrPipe.fileHandleForReading.close()
     }
 
     private func readExact(_ count: Int) throws -> Data {
