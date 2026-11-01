@@ -74,3 +74,17 @@ Enqueue Selected remained available. Selecting the visible result removed the
 notice and re-enabled Play actions. Playback and queue operations were not
 invoked. This is a focused live accessibility-tree check, not VoiceOver speech
 or audio-output acceptance.
+
+## Four-window focus routing
+
+In the rebuilt app session at Player / Ready / No Track with no library loaded,
+the native Window menu's Show Player, Show Playlist Editor, Show Media Library,
+and Show Equalizer actions each brought the named window to the front according
+to the resulting macOS accessibility-tree root. The in-window WINDOWS menu
+also raised Equalizer from Player. Equalizer continued to expose all ten
+disabled bands and the unavailable-DSP explanation. No library scan or
+playback occurred.
+
+This verifies window target and focus routing for both menu surfaces. No frame
+dimensions were captured, and no claim is made here about Arrange geometry,
+minimum-frame behavior, or simultaneous window visibility.
