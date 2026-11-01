@@ -71,14 +71,11 @@ enum CatalogSearch {
         matching searchText: String,
         sortedBy order: SortOrder = .title
     ) -> [CatalogTrack] {
-        let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
         let filtered: [CatalogTrack]
-        if query.isEmpty {
-            filtered = tracks
-        } else {
-            let foldedQuery = CatalogTextNormalizer.fold(query)
-            let queryBytes = Data(foldedQuery.utf8)
+        if let queryBytes = queryBytes(for: searchText) {
             filtered = tracks.filter { $0.searchableBytes.range(of: queryBytes) != nil }
+        } else {
+            filtered = tracks
         }
         return filtered.sorted { left, right in
             let leftKey: String
@@ -93,10 +90,14 @@ enum CatalogSearch {
     }
 
     static func matches(_ track: CatalogTrack, matching searchText: String) -> Bool {
-        let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return true }
-        let queryBytes = Data(CatalogTextNormalizer.fold(query).utf8)
+        guard let queryBytes = queryBytes(for: searchText) else { return true }
         return track.searchableBytes.range(of: queryBytes) != nil
+    }
+
+    private static func queryBytes(for searchText: String) -> Data? {
+        let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return nil }
+        return Data(CatalogTextNormalizer.fold(query).utf8)
     }
 
     static func boundedQuery(_ text: String) -> String {
