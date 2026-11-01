@@ -736,17 +736,30 @@ scan notices are source/build verified only. No live scan, failure, or cancel
 state was exercised. The prior live check covered only the first-run
 `NO LIBRARY LOADED` state. This does not establish scan-state UI acceptance.
 
-### 2026-11-01 Library minimum-size enforcement
+### 2026-11-01 Library minimum-size enforcement correction
 
-On candidate branch `codex/mac07-disabled-control-state`, source commit
-`3cef914` plus the uncommitted `RustMusicApp.swift` change, the Media Library
-window now applies the same 520×360-point minimum used by the saved-frame
-fitting logic. `git diff --check` passed and
-`sh scripts/build-macos-app.sh` exited **0**, including app signature
-validation, window geometry, catalog, protocol, and process lifecycle checks.
-The fresh app launch showed the Media Library at its large default size and
-its no-library empty state. A live corner-resize attempt could not be
-completed because the UI automation target did not resolve the window at the
-drag coordinate. Therefore native enforcement of the live resize minimum is
-source/build verified but not visually measured. The candidate remains on
-PR #9; this is not merged-mainline evidence.
+Correction to the initial source review: `playerWindow(_:)` already applied a
+SwiftUI minimum frame from `PlayerWindowKind.minimumWidth` and
+`minimumHeight`, including the Library's 520×360-point minimum. The additional
+scene-level frame in commit `ed078de` duplicated that constraint; it did not
+prove native resize enforcement. A fresh review moved the enforcement into
+`WindowFrameObserver`, which now assigns the matching value to
+`NSWindow.minSize` for each operator window while retaining the SwiftUI content
+minimum and restore-time frame fitting.
+
+`git diff --check` passed and the rebuilt candidate's
+`sh scripts/build-macos-app.sh` exited **0**, including strict local bundle
+signature validation, catalog/playlist/window/protocol checks, and repeated
+process lifecycle tests. This synthetic run measured 250k last-item search
+p95 at 78.330 ms, full-sort p95 at 809.712 ms, and catalog harness peak RSS at
+240,402,432 bytes; these are core harness measurements, not live UI scan or
+playback-under-load results.
+
+A fresh UI launch briefly reported Playlist Editor as the current window;
+after 1.8 seconds, `getApp` reported Player with Ready/No Track and no output
+snapshot. This matches the existing delayed Player focus behavior, but the
+initial transient remains visible to an immediate observer. The Library was
+observed at its large default size. A live resize below 520×360 points has
+not been measured; UI automation failed to target the corner consistently.
+MAC07-03 compact-size acceptance remains open. The candidate remains on PR #9,
+not merged-mainline evidence.

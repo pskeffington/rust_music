@@ -797,10 +797,6 @@ struct RustMusicApp: App {
         .windowResizability(.automatic)
         Window("Rust Music — Media Library", id: "library") {
             playerWindow(.library)
-                .frame(
-                    minWidth: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width,
-                    minHeight: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height
-                )
         }
         .defaultSize(width: 1000, height: 700)
         .windowResizability(.automatic)
@@ -1041,6 +1037,9 @@ private final class WindowFrameObserver: NSView {
         configured = true
         // Launch code restores visibility; named frame autosave below is separate.
         window.isRestorable = false
+        if let minimumSize = OperatorWindowLayout.minimumFrames[name] {
+            window.minSize = minimumSize
+        }
         let restored = window.setFrameUsingName(name)
         _ = window.setFrameAutosaveName(name)
         let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
