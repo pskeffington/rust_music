@@ -338,6 +338,7 @@ private struct AudioQueueDiagnosticRecord {
     let channels: UInt8
     let created: UInt64
     let createStatus: StatusCode
+    let routeStatus: StatusCode
     let allocated: UInt64
     let capacityBytes: UInt64
     let allocationStatus: StatusCode
@@ -345,6 +346,9 @@ private struct AudioQueueDiagnosticRecord {
     let frames: UInt64
     let starts: UInt64
     let startStatus: StatusCode
+    let deviceStatus: StatusCode
+    let deviceAssociated: String
+    let deviceMatchesDefault: String
     let callbacks: UInt64
     let teardown: UInt64
     let stopStatus: StatusCode
@@ -359,9 +363,9 @@ private struct AudioQueueDiagnosticRecord {
 
     private static let prefix = "RUST_MUSIC_AUDIO_DIAG "
     private static let expectedKeys: Set<String> = [
-        "rate", "bits", "channels", "created", "create_status", "allocated",
+        "rate", "bits", "channels", "created", "create_status", "route_status", "allocated",
         "capacity_bytes", "allocation_status", "enqueued", "frames", "starts",
-        "start_status", "callbacks", "teardown", "stop_status", "drained",
+        "start_status", "device_status", "device_associated", "device_default", "callbacks", "teardown", "stop_status", "drained",
         "immediate_stop_status", "dispose_status"
     ]
 
@@ -394,8 +398,14 @@ private struct AudioQueueDiagnosticRecord {
                   let callbacks = values["callbacks"].flatMap(UInt64.init),
                   let teardown = values["teardown"].flatMap(UInt64.init),
                   let createStatus = optionalStatus(values["create_status"]),
+                  let routeStatus = optionalStatus(values["route_status"]),
                   let allocationStatus = optionalStatus(values["allocation_status"]),
                   let startStatus = optionalStatus(values["start_status"]),
+                  let deviceStatus = optionalStatus(values["device_status"]),
+                  let deviceAssociated = values["device_associated"],
+                  ["0", "1", "none"].contains(deviceAssociated),
+                  let deviceMatchesDefault = values["device_default"],
+                  ["0", "1", "none"].contains(deviceMatchesDefault),
                   let stopStatus = optionalStatus(values["stop_status"]),
                   let immediateStopStatus = optionalStatus(values["immediate_stop_status"]),
                   let disposeStatus = optionalStatus(values["dispose_status"]),
@@ -404,9 +414,12 @@ private struct AudioQueueDiagnosticRecord {
             }
             return AudioQueueDiagnosticRecord(
                 rate: rate, bits: bits, channels: channels, created: created,
-                createStatus: createStatus, allocated: allocated, capacityBytes: capacityBytes,
+                createStatus: createStatus, routeStatus: routeStatus,
+                allocated: allocated, capacityBytes: capacityBytes,
                 allocationStatus: allocationStatus, enqueued: enqueued, frames: frames,
-                starts: starts, startStatus: startStatus, callbacks: callbacks,
+                starts: starts, startStatus: startStatus, deviceStatus: deviceStatus,
+                deviceAssociated: deviceAssociated, deviceMatchesDefault: deviceMatchesDefault,
+                callbacks: callbacks,
                 teardown: teardown, stopStatus: stopStatus, drained: drained,
                 immediateStopStatus: immediateStopStatus, disposeStatus: disposeStatus
             )
@@ -423,7 +436,9 @@ private struct AudioQueueDiagnosticRecord {
 
     var statusText: String {
         let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
-        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) alloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+        let deviceText = deviceAssociated == "1" ? "yes" : (deviceAssociated == "0" ? "no" : "unknown")
+        let defaultText = deviceMatchesDefault == "1" ? "yes" : (deviceMatchesDefault == "0" ? "no" : "unknown")
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) alloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
     }
 
     private func statusValue(_ value: StatusCode) -> String {

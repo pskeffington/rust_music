@@ -20,6 +20,12 @@ const FRAMES_PER_SLOT: usize = 4096;
 const MAX_WAIT: Duration = Duration::from_secs(5);
 const MAX_DRAIN_WAIT: Duration = Duration::from_secs(5);
 const FORMAT_LPCM: u32 = u32::from_be_bytes(*b"lpcm");
+const QUEUE_PROPERTY_CURRENT_DEVICE: u32 = u32::from_be_bytes(*b"aqcd");
+const AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE: u32 = u32::from_be_bytes(*b"dOut");
+const AUDIO_DEVICE_PROPERTY_DEVICE_UID: u32 = u32::from_be_bytes(*b"uid ");
+const AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL: u32 = u32::from_be_bytes(*b"glob");
+const AUDIO_OBJECT_SYSTEM_OBJECT_ID: u32 = 1;
+const AUDIOQUEUE_ERR_INVALID_DEVICE: i32 = -66_680;
 const FLAG_SIGNED: u32 = 1 << 2;
 const FLAG_PACKED: u32 = 1 << 3;
 const NO_STATUS: i64 = i64::MIN;
@@ -34,6 +40,7 @@ pub struct AudioQueueDiagnosticsSnapshot {
     pub channels: u8,
     pub output_creation_attempts: u64,
     pub output_creation_status: Option<i32>,
+    pub default_route_status: Option<i32>,
     pub allocated_buffers: u64,
     pub allocated_capacity_bytes: u64,
     pub buffer_allocation_status: Option<i32>,
@@ -41,6 +48,9 @@ pub struct AudioQueueDiagnosticsSnapshot {
     pub enqueued_frames: u64,
     pub start_attempts: u64,
     pub start_status: Option<i32>,
+    pub current_device_status: Option<i32>,
+    pub current_device_associated: Option<bool>,
+    pub current_device_matches_default: Option<bool>,
     pub completed_callbacks: u64,
     pub teardown_attempts: u64,
     pub stop_status: Option<i32>,
@@ -56,6 +66,7 @@ struct AudioQueueDiagnostics {
     channels: AtomicU64,
     output_creation_attempts: AtomicU64,
     output_creation_status: AtomicI64,
+    default_route_status: AtomicI64,
     allocated_buffers: AtomicU64,
     allocated_capacity_bytes: AtomicU64,
     buffer_allocation_status: AtomicI64,
@@ -63,6 +74,9 @@ struct AudioQueueDiagnostics {
     enqueued_frames: AtomicU64,
     start_attempts: AtomicU64,
     start_status: AtomicI64,
+    current_device_status: AtomicI64,
+    current_device_associated: AtomicI64,
+    current_device_matches_default: AtomicI64,
     completed_callbacks: AtomicU64,
     teardown_attempts: AtomicU64,
     stop_status: AtomicI64,
@@ -80,6 +94,7 @@ impl Default for AudioQueueDiagnostics {
             channels: AtomicU64::new(0),
             output_creation_attempts: AtomicU64::new(0),
             output_creation_status: AtomicI64::new(NO_STATUS),
+            default_route_status: AtomicI64::new(NO_STATUS),
             allocated_buffers: AtomicU64::new(0),
             allocated_capacity_bytes: AtomicU64::new(0),
             buffer_allocation_status: AtomicI64::new(NO_STATUS),
@@ -87,6 +102,9 @@ impl Default for AudioQueueDiagnostics {
             enqueued_frames: AtomicU64::new(0),
             start_attempts: AtomicU64::new(0),
             start_status: AtomicI64::new(NO_STATUS),
+            current_device_status: AtomicI64::new(NO_STATUS),
+            current_device_associated: AtomicI64::new(NO_STATUS),
+            current_device_matches_default: AtomicI64::new(NO_STATUS),
             completed_callbacks: AtomicU64::new(0),
             teardown_attempts: AtomicU64::new(0),
             stop_status: AtomicI64::new(NO_STATUS),
@@ -135,6 +153,7 @@ impl AudioQueueDiagnostics {
             channels: self.channels.load(Ordering::Relaxed) as u8,
             output_creation_attempts: self.output_creation_attempts.load(Ordering::Relaxed),
             output_creation_status: status(&self.output_creation_status),
+            default_route_status: status(&self.default_route_status),
             allocated_buffers: self.allocated_buffers.load(Ordering::Relaxed),
             allocated_capacity_bytes: self.allocated_capacity_bytes.load(Ordering::Relaxed),
             buffer_allocation_status: status(&self.buffer_allocation_status),
@@ -142,6 +161,21 @@ impl AudioQueueDiagnostics {
             enqueued_frames: self.enqueued_frames.load(Ordering::Relaxed),
             start_attempts: self.start_attempts.load(Ordering::Relaxed),
             start_status: status(&self.start_status),
+            current_device_status: status(&self.current_device_status),
+            current_device_associated: match self.current_device_associated.load(Ordering::Relaxed)
+            {
+                0 => Some(false),
+                1 => Some(true),
+                _ => None,
+            },
+            current_device_matches_default: match self
+                .current_device_matches_default
+                .load(Ordering::Relaxed)
+            {
+                0 => Some(false),
+                1 => Some(true),
+                _ => None,
+            },
             completed_callbacks: self.completed_callbacks.load(Ordering::Relaxed),
             teardown_attempts: self.teardown_attempts.load(Ordering::Relaxed),
             stop_status: status(&self.stop_status),
@@ -158,6 +192,19 @@ impl AudioQueueDiagnostics {
         }
     }
 
+    fn set_current_device(&self, status: i32, associated: bool, matches_default: Option<bool>) {
+        if self.enabled.load(Ordering::Relaxed) {
+            self.current_device_status
+                .store(i64::from(status), Ordering::Relaxed);
+            self.current_device_associated
+                .store(i64::from(associated), Ordering::Relaxed);
+            self.current_device_matches_default.store(
+                matches_default.map_or(NO_STATUS, i64::from),
+                Ordering::Relaxed,
+            );
+        }
+    }
+
     fn set_format(&self, format: AudioFormat) {
         self.sample_rate
             .store(u64::from(format.sample_rate), Ordering::Relaxed);
@@ -170,12 +217,13 @@ impl AudioQueueDiagnostics {
     fn record(&self) -> String {
         let snapshot = self.snapshot();
         format!(
-            "RUST_MUSIC_AUDIO_DIAG rate={} bits={} channels={} created={} create_status={} allocated={} capacity_bytes={} allocation_status={} enqueued={} frames={} starts={} start_status={} callbacks={} teardown={} stop_status={} drained={} immediate_stop_status={} dispose_status={}",
+            "RUST_MUSIC_AUDIO_DIAG rate={} bits={} channels={} created={} create_status={} route_status={} allocated={} capacity_bytes={} allocation_status={} enqueued={} frames={} starts={} start_status={} device_status={} device_associated={} device_default={} callbacks={} teardown={} stop_status={} drained={} immediate_stop_status={} dispose_status={}",
             snapshot.sample_rate,
             snapshot.bits_per_sample,
             snapshot.channels,
             snapshot.output_creation_attempts,
             format_status(snapshot.output_creation_status),
+            format_status(snapshot.default_route_status),
             snapshot.allocated_buffers,
             snapshot.allocated_capacity_bytes,
             format_status(snapshot.buffer_allocation_status),
@@ -183,6 +231,9 @@ impl AudioQueueDiagnostics {
             snapshot.enqueued_frames,
             snapshot.start_attempts,
             format_status(snapshot.start_status),
+            format_status(snapshot.current_device_status),
+            format_bool(snapshot.current_device_associated),
+            format_bool(snapshot.current_device_matches_default),
             snapshot.completed_callbacks,
             snapshot.teardown_attempts,
             format_status(snapshot.stop_status),
@@ -209,6 +260,97 @@ fn format_drain(drained: Option<bool>) -> &'static str {
     }
 }
 
+fn format_bool(value: Option<bool>) -> &'static str {
+    match value {
+        Some(false) => "0",
+        Some(true) => "1",
+        None => "none",
+    }
+}
+
+#[repr(C)]
+struct AudioObjectPropertyAddress {
+    selector: u32,
+    scope: u32,
+    element: u32,
+}
+
+#[link(name = "CoreAudio", kind = "framework")]
+unsafe extern "C" {
+    fn AudioObjectGetPropertyData(
+        object_id: u32,
+        address: *const AudioObjectPropertyAddress,
+        qualifier_data_size: u32,
+        qualifier_data: *const c_void,
+        data_size: *mut u32,
+        out_data: *mut c_void,
+    ) -> i32;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFEqual(left: *const c_void, right: *const c_void) -> i8;
+}
+
+fn default_output_device_uid() -> std::result::Result<*const c_void, i32> {
+    let default_output_address = AudioObjectPropertyAddress {
+        selector: AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE,
+        scope: AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+        element: 0,
+    };
+    let mut default_device_id = 0_u32;
+    let mut size = std::mem::size_of_val(&default_device_id) as u32;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            AUDIO_OBJECT_SYSTEM_OBJECT_ID,
+            &default_output_address,
+            0,
+            ptr::null(),
+            &mut size,
+            (&mut default_device_id as *mut u32).cast(),
+        )
+    };
+    if status != 0 {
+        return Err(status);
+    }
+    if default_device_id == 0 {
+        return Err(AUDIOQUEUE_ERR_INVALID_DEVICE);
+    }
+
+    let uid_address = AudioObjectPropertyAddress {
+        selector: AUDIO_DEVICE_PROPERTY_DEVICE_UID,
+        scope: AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+        element: 0,
+    };
+    let mut default_uid: *const c_void = ptr::null();
+    let mut size = std::mem::size_of_val(&default_uid) as u32;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            default_device_id,
+            &uid_address,
+            0,
+            ptr::null(),
+            &mut size,
+            (&mut default_uid as *mut *const c_void).cast(),
+        )
+    };
+    if status != 0 {
+        return Err(status);
+    }
+    if default_uid.is_null() {
+        return Err(AUDIOQUEUE_ERR_INVALID_DEVICE);
+    }
+    Ok(default_uid)
+}
+
+fn current_device_matches_default(device_uid: *const c_void) -> Option<bool> {
+    if device_uid.is_null() {
+        return None;
+    }
+    let default_uid = default_output_device_uid().ok()?;
+    Some(unsafe { CFEqual(device_uid, default_uid) != 0 })
+}
+
 fn record_start(
     api: &dyn AudioQueueApi,
     queue: AudioQueueRef,
@@ -217,6 +359,8 @@ fn record_start(
     diagnostics.add(&diagnostics.start_attempts, 1);
     let status = api.start(queue);
     diagnostics.status(&diagnostics.start_status, status);
+    let (device_status, associated, matches_default) = api.current_device(queue);
+    diagnostics.set_current_device(device_status, associated, matches_default);
     status
 }
 
@@ -267,6 +411,18 @@ unsafe extern "C" {
         descriptions: *const c_void,
     ) -> i32;
     fn AudioQueueStart(queue: AudioQueueRef, start: *const c_void) -> i32;
+    fn AudioQueueGetProperty(
+        queue: AudioQueueRef,
+        property_id: u32,
+        out_data: *mut c_void,
+        io_data_size: *mut u32,
+    ) -> i32;
+    fn AudioQueueSetProperty(
+        queue: AudioQueueRef,
+        property_id: u32,
+        property_data: *const c_void,
+        property_data_size: u32,
+    ) -> i32;
     fn AudioQueuePause(queue: AudioQueueRef) -> i32;
     fn AudioQueueStop(queue: AudioQueueRef, immediate: u8) -> i32;
     fn AudioQueueDispose(queue: AudioQueueRef, immediate: u8) -> i32;
@@ -280,6 +436,7 @@ trait AudioQueueApi: Send + Sync {
         user_data: *mut c_void,
         out_queue: *mut AudioQueueRef,
     ) -> i32;
+    fn route_to_default_output(&self, queue: AudioQueueRef) -> i32;
     fn allocate_buffer(
         &self,
         queue: AudioQueueRef,
@@ -288,6 +445,7 @@ trait AudioQueueApi: Send + Sync {
     ) -> i32;
     fn enqueue_buffer(&self, queue: AudioQueueRef, buffer: AudioQueueBufferRef) -> i32;
     fn start(&self, queue: AudioQueueRef) -> i32;
+    fn current_device(&self, queue: AudioQueueRef) -> (i32, bool, Option<bool>);
     fn pause(&self, queue: AudioQueueRef) -> i32;
     fn stop(&self, queue: AudioQueueRef, immediate: u8) -> i32;
     fn dispose(&self, queue: AudioQueueRef, immediate: u8) -> i32;
@@ -316,6 +474,21 @@ impl AudioQueueApi for SystemAudioQueue {
         }
     }
 
+    fn route_to_default_output(&self, queue: AudioQueueRef) -> i32 {
+        let default_uid = match default_output_device_uid() {
+            Ok(uid) => uid,
+            Err(status) => return status,
+        };
+        unsafe {
+            AudioQueueSetProperty(
+                queue,
+                QUEUE_PROPERTY_CURRENT_DEVICE,
+                (&default_uid as *const *const c_void).cast(),
+                std::mem::size_of_val(&default_uid) as u32,
+            )
+        }
+    }
+
     fn allocate_buffer(
         &self,
         queue: AudioQueueRef,
@@ -331,6 +504,28 @@ impl AudioQueueApi for SystemAudioQueue {
 
     fn start(&self, queue: AudioQueueRef) -> i32 {
         unsafe { AudioQueueStart(queue, ptr::null()) }
+    }
+
+    fn current_device(&self, queue: AudioQueueRef) -> (i32, bool, Option<bool>) {
+        let mut device_uid: *const c_void = ptr::null();
+        let mut size = std::mem::size_of_val(&device_uid) as u32;
+        let status = unsafe {
+            AudioQueueGetProperty(
+                queue,
+                QUEUE_PROPERTY_CURRENT_DEVICE,
+                (&mut device_uid as *mut *const c_void).cast(),
+                &mut size,
+            )
+        };
+        (
+            status,
+            !device_uid.is_null(),
+            if status == 0 {
+                current_device_matches_default(device_uid)
+            } else {
+                None
+            },
+        )
     }
 
     fn pause(&self, queue: AudioQueueRef) -> i32 {
@@ -581,14 +776,27 @@ impl PcmSink for MacAudioQueueSink {
         let mut queue = ptr::null_mut();
         self.diagnostics
             .add(&self.diagnostics.output_creation_attempts, 1);
-        let err = self.api.new_output(
+        let create_err = self.api.new_output(
             &desc,
             completed,
             (&mut *context as *mut CallbackContext).cast(),
             &mut queue,
         );
         self.diagnostics
-            .status(&self.diagnostics.output_creation_status, err);
+            .status(&self.diagnostics.output_creation_status, create_err);
+        let route_err = if create_err == 0 {
+            let status = self.api.route_to_default_output(queue);
+            self.diagnostics
+                .status(&self.diagnostics.default_route_status, status);
+            status
+        } else {
+            0
+        };
+        let err = if create_err != 0 {
+            create_err
+        } else {
+            route_err
+        };
         if err != 0 {
             let dispose_status = if queue.is_null() {
                 None
@@ -610,9 +818,12 @@ impl PcmSink for MacAudioQueueSink {
                 mark_pending_teardown();
             }
             self.emit_diagnostics_summary();
-            return Err(MusicError::Output(format!(
-                "AudioQueueNewOutput OSStatus {err}"
-            )));
+            let failed_stage = if create_err != 0 {
+                "AudioQueueNewOutput"
+            } else {
+                "AudioQueueSetProperty(CurrentDevice)"
+            };
+            return Err(MusicError::Output(format!("{failed_stage} OSStatus {err}")));
         }
         for slot in &mut context.slots {
             let err =
@@ -925,11 +1136,15 @@ mod tests {
     struct FakeState {
         new_status: i32,
         new_calls: usize,
+        route_status: Option<i32>,
         device_available: Option<bool>,
         fail_allocate_at: Option<usize>,
         allocate_calls: usize,
         enqueue_status: i32,
         start_status: i32,
+        current_device_status: Option<i32>,
+        current_device_associated: Option<bool>,
+        current_device_matches_default: Option<bool>,
         pause_status: i32,
         stop_status: i32,
         dispose_status: i32,
@@ -970,6 +1185,10 @@ mod tests {
                 unsafe { *out_queue = FAKE_QUEUE };
             }
             status
+        }
+
+        fn route_to_default_output(&self, _queue: AudioQueueRef) -> i32 {
+            self.0.lock().unwrap().route_status.unwrap_or(0)
         }
 
         fn allocate_buffer(
@@ -1013,6 +1232,15 @@ mod tests {
             let mut state = self.0.lock().unwrap();
             state.events.push("start");
             state.start_status
+        }
+
+        fn current_device(&self, _queue: AudioQueueRef) -> (i32, bool, Option<bool>) {
+            let state = self.0.lock().unwrap();
+            (
+                state.current_device_status.unwrap_or(0),
+                state.current_device_associated.unwrap_or(true),
+                state.current_device_matches_default.or(Some(true)),
+            )
         }
 
         fn pause(&self, _queue: AudioQueueRef) -> i32 {
@@ -1564,6 +1792,8 @@ mod tests {
         let snapshot = sink.diagnostics_snapshot();
         assert!(snapshot.enabled);
         assert_eq!(snapshot.output_creation_attempts, 1);
+        assert_eq!(snapshot.output_creation_status, Some(0));
+        assert_eq!(snapshot.default_route_status, Some(0));
         assert_eq!(snapshot.sample_rate, 44_100);
         assert_eq!(snapshot.bits_per_sample, 16);
         assert_eq!(snapshot.channels, 1);
@@ -1578,6 +1808,9 @@ mod tests {
         assert_eq!(snapshot.enqueued_frames, 4);
         assert_eq!(snapshot.start_attempts, 1);
         assert_eq!(snapshot.start_status, Some(0));
+        assert_eq!(snapshot.current_device_status, Some(0));
+        assert_eq!(snapshot.current_device_associated, Some(true));
+        assert_eq!(snapshot.current_device_matches_default, Some(true));
         assert_eq!(snapshot.completed_callbacks, 1);
         assert_eq!(snapshot.teardown_attempts, 1);
         assert_eq!(snapshot.stop_status, Some(0));
@@ -1586,7 +1819,7 @@ mod tests {
         assert_eq!(snapshot.dispose_status, Some(0));
         assert_eq!(
             sink.diagnostics.record(),
-            "RUST_MUSIC_AUDIO_DIAG rate=44100 bits=16 channels=1 created=1 create_status=0 allocated=3 capacity_bytes=24576 allocation_status=0 enqueued=1 frames=4 starts=1 start_status=0 callbacks=1 teardown=1 stop_status=0 drained=1 immediate_stop_status=none dispose_status=0"
+            "RUST_MUSIC_AUDIO_DIAG rate=44100 bits=16 channels=1 created=1 create_status=0 route_status=0 allocated=3 capacity_bytes=24576 allocation_status=0 enqueued=1 frames=4 starts=1 start_status=0 device_status=0 device_associated=1 device_default=1 callbacks=1 teardown=1 stop_status=0 drained=1 immediate_stop_status=none dispose_status=0"
         );
     }
 
@@ -1615,6 +1848,8 @@ mod tests {
         let snapshot = sink.diagnostics_snapshot();
         assert_eq!(snapshot.start_attempts, 1);
         assert_eq!(snapshot.start_status, Some(-77));
+        assert_eq!(snapshot.current_device_status, Some(0));
+        assert_eq!(snapshot.current_device_associated, Some(true));
         assert_eq!(snapshot.stop_status, Some(-50));
         assert_eq!(snapshot.drain_complete, Some(false));
         assert_eq!(snapshot.immediate_stop_status, Some(-50));
@@ -1651,5 +1886,41 @@ mod tests {
             (FRAMES_PER_SLOT * 2) as u64
         );
         assert_eq!(allocation.buffer_allocation_status, Some(-50));
+    }
+
+    #[test]
+    fn diagnostics_report_missing_current_output_device_after_start() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        sink.open(valid_format()).unwrap();
+        {
+            let mut state = api.0.lock().unwrap();
+            state.current_device_status = Some(FAKE_INVALID_DEVICE);
+            state.current_device_associated = Some(false);
+            state.current_device_matches_default = Some(false);
+        }
+        assert!(sink.write(&one_sample()).is_ok());
+        let snapshot = sink.diagnostics_snapshot();
+        assert_eq!(snapshot.start_status, Some(0));
+        assert_eq!(snapshot.current_device_status, Some(FAKE_INVALID_DEVICE));
+        assert_eq!(snapshot.current_device_associated, Some(false));
+        assert_eq!(snapshot.current_device_matches_default, Some(false));
+    }
+
+    #[test]
+    fn default_output_route_failure_disposes_queue_before_playback() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        api.0.lock().unwrap().route_status = Some(FAKE_INVALID_DEVICE);
+        assert!(sink.open(valid_format()).is_err());
+        let snapshot = sink.diagnostics_snapshot();
+        assert_eq!(snapshot.output_creation_status, Some(0));
+        assert_eq!(snapshot.default_route_status, Some(FAKE_INVALID_DEVICE));
+        assert_eq!(snapshot.allocated_buffers, 0);
+        assert_eq!(snapshot.dispose_status, Some(0));
+        assert!(sink.queue.is_null());
+        assert!(sink.context.is_none());
     }
 }

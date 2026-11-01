@@ -240,7 +240,14 @@ fn scan_rust(path: &Path, report: &mut Audit) -> Result<(), String> {
                 )?;
             }
             if line.starts_with("#[link(") {
-                if is_macos && line == "#[link(name = \"AudioToolbox\", kind = \"framework\")]" {
+                if is_macos
+                    && [
+                        "#[link(name = \"AudioToolbox\", kind = \"framework\")]",
+                        "#[link(name = \"CoreAudio\", kind = \"framework\")]",
+                        "#[link(name = \"CoreFoundation\", kind = \"framework\")]",
+                    ]
+                    .contains(&line)
+                {
                     report.allowed_os_links += 1;
                 } else {
                     return Err(format!("unapproved system library link: {loc}: {line}"));
@@ -339,8 +346,8 @@ fn audit(root: &Path) -> Result<Audit, String> {
     validate_lock(&root, &report.crates)?;
     scan_rust(&root.join("crates"), &mut report)?;
     requirement(
-        report.allowed_os_links == 1,
-        "expected exactly one approved Apple system framework link",
+        report.allowed_os_links == 3,
+        "expected exactly three approved Apple system framework links",
     )?;
     Ok(report)
 }
@@ -348,7 +355,7 @@ fn audit(root: &Path) -> Result<Audit, String> {
 fn main() {
     let root = env::args_os().nth(1).unwrap_or_else(|| ".".into());
     match audit(Path::new(&root)) {
-        Ok(report) => println!("PASS: {} local crates; {} path-only internal edges; {} Rust sources; 0 registry/git crates; 0 third-party system links; {} OS framework link", report.crates.len(), report.dependencies.len(), report.rust_files, report.allowed_os_links),
+        Ok(report) => println!("PASS: {} local crates; {} path-only internal edges; {} Rust sources; 0 registry/git crates; 0 third-party system links; {} approved OS framework links", report.crates.len(), report.dependencies.len(), report.rust_files, report.allowed_os_links),
         Err(error) => { eprintln!("FAIL: Rust Music offline dependency audit: {error}"); std::process::exit(1); }
     }
 }
