@@ -501,6 +501,24 @@ fn state_queue_command(
             queue.enqueue(PathBuf::from(&arguments[0]))?;
             changed = true;
         }
+        "add-many" if !arguments.is_empty() && arguments.len() <= 64 => {
+            let mut candidate = queue.clone();
+            for path in arguments {
+                candidate.enqueue(PathBuf::from(path))?;
+            }
+            queue = candidate;
+            changed = true;
+        }
+        "play-next" if arguments.len() == 1 => {
+            queue.enqueue_next(PathBuf::from(&arguments[0]))?;
+            changed = true;
+        }
+        "move" if arguments.len() == 2 => {
+            let from = parse_state_index(&arguments[0])?;
+            let to = parse_state_index(&arguments[1])?;
+            queue.move_entry(from, to)?;
+            changed = true;
+        }
         "remove" if arguments.len() == 1 => {
             let index = parse_state_index(&arguments[0])?;
             queue
@@ -617,9 +635,79 @@ fn state_playlist_command(
             store.push_entry(&arguments[0], PathBuf::from(&arguments[1]))?;
             true
         }
+        "add-many" if (2..=65).contains(&arguments.len()) => {
+            let mut candidate = store.clone();
+            for path in &arguments[1..] {
+                candidate.push_entry(&arguments[0], PathBuf::from(path))?;
+            }
+            store = candidate;
+            true
+        }
         "remove" if arguments.len() == 2 => {
             let index = parse_state_index(&arguments[1])?;
             store.remove_entry(&arguments[0], index)?;
+            true
+        }
+        "remove-many" if (2..=65).contains(&arguments.len()) => {
+            let mut indices = arguments[1..]
+                .iter()
+                .map(|value| parse_state_index(value))
+                .collect::<Result<Vec<_>>>()?;
+            indices.sort_unstable();
+            if indices.windows(2).any(|pair| pair[0] == pair[1]) {
+                return Err(MusicError::Invalid("playlist entry indexes must be unique"));
+            }
+            let mut candidate = store.clone();
+            for index in indices.into_iter().rev() {
+                candidate.remove_entry(&arguments[0], index)?;
+            }
+            store = candidate;
+            true
+        }
+        "move" if arguments.len() == 3 => {
+            let from = parse_state_index(&arguments[1])?;
+            let to = parse_state_index(&arguments[2])?;
+            store.move_entry(&arguments[0], from, to)?;
+            true
+        }
+        "move-many" if (3..=66).contains(&arguments.len()) => {
+            let offset = arguments[1]
+                .parse::<i8>()
+                .map_err(|_| MusicError::Invalid("playlist move direction must be -1 or 1"))?;
+            if !matches!(offset, -1 | 1) {
+                return Err(MusicError::Invalid(
+                    "playlist move direction must be -1 or 1",
+                ));
+            }
+            let mut indices = arguments[2..]
+                .iter()
+                .map(|value| parse_state_index(value))
+                .collect::<Result<Vec<_>>>()?;
+            indices.sort_unstable();
+            if indices.windows(2).any(|pair| pair[0] == pair[1]) {
+                return Err(MusicError::Invalid("playlist entry indexes must be unique"));
+            }
+            if offset > 0 {
+                indices.reverse();
+            }
+            let mut candidate = store.clone();
+            for index in indices {
+                let count = candidate
+                    .get(&arguments[0])
+                    .ok_or(MusicError::Invalid("playlist does not exist"))?
+                    .len();
+                let target = if offset < 0 {
+                    index.checked_sub(1)
+                } else {
+                    index.checked_add(1).filter(|next| *next < count)
+                };
+                if let Some(target) = target {
+                    candidate.move_entry(&arguments[0], index, target)?;
+                } else if index >= count {
+                    return Err(MusicError::Invalid("playlist entry index is out of bounds"));
+                }
+            }
+            store = candidate;
             true
         }
         _ => {
@@ -2028,6 +2116,205 @@ mod tests {
             .map(|value| (*value).to_owned())
             .collect::<Vec<_>>();
         state_command(base, category, root, operation, &arguments)
+    }
+
+    #[test]
+    fn queue_bulk_play_next_and_reorder_are_atomic_and_selection_only() {
+        let root = temp_root("queue-bulk-root");
+        let base = temp_root("queue-bulk-base").join("app-support");
+        let added = state_call(
+            &base,
+            "queue",
+            &root,
+            "add-many",
+            &["a.flac", "b.wav", "c.aiff"],
+        )
+        .unwrap();
+        assert!(added.contains("meta\tcurrent\t-\n"));
+        assert!(state_call(
+            &base,
+            "queue",
+            &root,
+            "add-many",
+            &["valid.flac", "../escape.flac"]
+        )
+        .is_err());
+        let oversized_batch = vec!["extra.flac"; 65];
+        assert!(state_call(&base, "queue", &root, "add-many", &oversized_batch).is_err());
+        assert_eq!(
+            state_call(&base, "queue", &root, "list", &[]).unwrap(),
+            added
+        );
+
+        let priority = state_call(&base, "queue", &root, "play-next", &["priority.flac"]).unwrap();
+        assert!(priority.contains("meta\tcurrent\t-\n"));
+        assert!(priority
+            .lines()
+            .nth(3)
+            .unwrap()
+            .ends_with("7072696f726974792e666c6163"));
+        state_call(&base, "queue", &root, "select", &["2"]).unwrap();
+        let inserted =
+            state_call(&base, "queue", &root, "play-next", &["up-next.ogg.flac"]).unwrap();
+        assert!(inserted.contains("meta\tcurrent\t2\n"));
+        assert!(inserted
+            .lines()
+            .nth(6)
+            .unwrap()
+            .ends_with("75702d6e6578742e6f67672e666c6163"));
+        let moved = state_call(&base, "queue", &root, "move", &["4", "1"]).unwrap();
+        assert!(moved.contains("meta\tcurrent\t3\n"));
+        assert!(moved.lines().nth(4).unwrap().ends_with("632e61696666"));
+        assert!(moved.contains("entry\t3\t1\t622e776176\n"));
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn playlist_bulk_add_is_atomic_for_multiselection() {
+        let root = temp_root("playlist-bulk-root");
+        let base = temp_root("playlist-bulk-base").join("app-support");
+        state_call(&base, "playlist", &root, "create", &["Batch Set"]).unwrap();
+        let added = state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "one.flac", "two.wav"],
+        )
+        .unwrap();
+        assert!(added.contains("playlist\t426174636820536574\t2\n"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "valid.flac", "../escape.flac"]
+        )
+        .is_err());
+        let mut oversized_batch = vec!["Batch Set"];
+        oversized_batch.extend(vec!["extra.flac"; 65]);
+        assert!(state_call(&base, "playlist", &root, "add-many", &oversized_batch).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            added
+        );
+        state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "three.flac", "four.flac"],
+        )
+        .unwrap();
+        let moved_up = state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "2"],
+        )
+        .unwrap();
+        assert!(moved_up
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t74776f2e776176"));
+        assert!(moved_up
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74687265652e666c6163"));
+        assert!(moved_up
+            .lines()
+            .nth(3)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        let moved_down = state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "1", "0", "1"],
+        )
+        .unwrap();
+        assert!(moved_down
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        assert!(moved_down
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74776f2e776176"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "99"]
+        )
+        .is_err());
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "1"]
+        )
+        .is_err());
+        let mut oversized_move = vec!["Batch Set", "-1"];
+        oversized_move.extend(vec!["0"; 65]);
+        assert!(state_call(&base, "playlist", &root, "move-many", &oversized_move).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            moved_down
+        );
+        let removed = state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "1", "3"],
+        )
+        .unwrap();
+        assert!(removed.contains("playlist\t426174636820536574\t2\n"));
+        assert!(removed
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        assert!(removed
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74687265652e666c6163"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "0", "99"]
+        )
+        .is_err());
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "0", "0"]
+        )
+        .is_err());
+        let mut oversized_remove = vec!["Batch Set"];
+        oversized_remove.extend(vec!["0"; 65]);
+        assert!(state_call(&base, "playlist", &root, "remove-many", &oversized_remove).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            removed
+        );
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
