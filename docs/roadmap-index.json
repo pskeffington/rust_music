@@ -840,7 +840,7 @@
       "priority": "P0",
       "depends_on": [],
       "acceptance": "Same real FLAC file plays audibly via macOS GUI and native CLI, failing regression turns green, truthful output diagnostics captured.",
-      "blocker": "GUI is reported silent. Same-file CLI AudioQueueStart failed with OSStatus -66680 while this host lists no output devices; operator-confirmed audible CLI baseline and usable output route are unavailable. CountingSink coverage is decode/frame-delivery evidence, not device or audible acceptance."
+      "blocker": "The operator still reports silence. Current CoreAudio and system_profiler probes show no default or enumerated output device, and the CLI route setup fails before PCM submission; a usable output route and audible acceptance are unavailable. A SwiftUI repair removes 500 ms snapshot-poll status/transport flicker, but fresh-launch verification remains pending. CountingSink coverage is decode/frame-delivery evidence, not device or audible acceptance."
     },
     {
       "gate": "G15",

@@ -562,6 +562,8 @@ final class PlayerModel: ObservableObject {
     nonisolated(unsafe) private var packageClient: PackageProcessClient?
     nonisolated(unsafe) private var packageRootPath: String?
     private var snapshotPollScheduled = false
+    private var snapshotPollGeneration: UInt64 = 0
+    private var snapshotPollInFlightGeneration: UInt64?
     private var pendingStateReload = false
     private let shutdownGate = ShutdownCompletionGate()
     private let transientChildOperations = DispatchGroup()
@@ -1053,6 +1055,7 @@ final class PlayerModel: ObservableObject {
         completion: @escaping (PackageResponse) -> Void
     ) {
         guard shutdownGate.acceptsWork, let root = libraryRoot, !isTransportBusy, !isStateBusy else { return }
+        invalidateSnapshotPolls()
         isTransportBusy = true
         status = label
         let executable = decoderURL
@@ -1090,6 +1093,11 @@ final class PlayerModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func invalidateSnapshotPolls() {
+        snapshotPollGeneration &+= 1
+        snapshotPollScheduled = false
     }
 
     private func applyPlaybackResponse(
@@ -1152,32 +1160,135 @@ final class PlayerModel: ObservableObject {
     }
 
     private func scheduleSnapshotPoll() {
-        guard !snapshotPollScheduled else { return }
+        guard !snapshotPollScheduled, snapshotPollInFlightGeneration == nil else { return }
         snapshotPollScheduled = true
+        let generation = snapshotPollGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self else { return }
+            guard generation == self.snapshotPollGeneration else { return }
             self.snapshotPollScheduled = false
-            guard self.isPlaying, !self.isTransportBusy else { return }
-            self.runPackageCommands([.snapshot(0)], label: "") { [weak self] response in
-                guard let self else { return }
-                if case .view(let snapshot, let diagnostic) = response, snapshot.state == 4 {
-                    if let diagnostic { self.audioQueueDiagnosticSummary = diagnostic }
-                    if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: self.selectedIndex) {
-                        self.playbackSnapshot = snapshot
-                    }
-                    self.isPlaying = false
-                    self.status = diagnostic.map { "Playback finished. | \($0)" } ?? "Playback finished."
-                    self.advanceQueueAfterEnd()
-                    return
+            guard self.isPlaying, !self.isTransportBusy, !self.isStateBusy else { return }
+            self.requestSnapshotPoll(generation: generation)
+        }
+    }
+
+    private func requestSnapshotPoll(generation: UInt64) {
+        guard generation == snapshotPollGeneration,
+              snapshotPollInFlightGeneration == nil,
+              shutdownGate.acceptsWork,
+              isPlaying,
+              !isTransportBusy,
+              !isStateBusy,
+              let root = libraryRoot else { return }
+        snapshotPollInFlightGeneration = generation
+        let rootPath = root.standardizedFileURL.path
+
+        // Polls share the package-process serial queue but do not set the
+        // interactive transport lock or replace the visible status message.
+        packageQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                guard self.packageRootPath == rootPath,
+                      let client = self.packageClient else {
+                    throw RustMusicFailure(message: "Rust Music playback process is unavailable.")
                 }
-                self.applyPlaybackResponse(response, fallback: "Playback active.")
-                if self.isPlaying { self.scheduleSnapshotPoll() }
+                let response = try client.request(.snapshot(0))
+                DispatchQueue.main.async {
+                    self.finishSnapshotPoll(response, generation: generation)
+                }
+            } catch {
+                let message = error.localizedDescription
+                DispatchQueue.main.async {
+                    self.finishSnapshotPollFailure(message, generation: generation)
+                }
             }
+        }
+    }
+
+    private func finishSnapshotPoll(_ response: PackageResponse, generation: UInt64) {
+        guard snapshotPollInFlightGeneration == generation else { return }
+        snapshotPollInFlightGeneration = nil
+        guard generation == snapshotPollGeneration else {
+            // A user command may have completed before this poll's main-queue
+            // handler. If its response tried to schedule while this slot was
+            // still occupied, restart polling now that the stale slot is clear.
+            if isPlaying, !isPaused, !isTransportBusy, !isStateBusy {
+                scheduleSnapshotPoll()
+            }
+            return
+        }
+
+        switch response {
+        case .view(let snapshot, let diagnostic):
+            if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
+            if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+                playbackSnapshot = snapshot
+            }
+            let flags = PlaybackUIState.flags(for: snapshot.state)
+            isPlaying = flags.playing
+            isPaused = flags.paused
+            switch snapshot.state {
+            case 2:
+                // Keep the status stable while only the progress snapshot changes.
+                scheduleSnapshotPoll()
+            case 4:
+                status = diagnostic.map { "Playback finished. | \($0)" } ?? "Playback finished."
+                advanceQueueAfterEnd()
+            case 3:
+                status = "Playback stopped."
+                snapshotPollScheduled = false
+            case 5:
+                status = "Playback failed. Check the macOS sound output and retry."
+                snapshotPollScheduled = false
+            case 6:
+                status = "Paused. Audio focus is released until Resume is requested."
+                snapshotPollScheduled = false
+            default:
+                status = "Playback state updated."
+                snapshotPollScheduled = false
+            }
+        case .failure(let message, let diagnostic):
+            if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
+            playbackSnapshot = nil
+            isPlaying = false
+            isPaused = false
+            snapshotPollScheduled = false
+            status = diagnostic.map { "\(message) | \($0)" } ?? message
+        case .hello, .ack:
+            snapshotPollScheduled = false
+            status = "Rust Music returned an invalid playback snapshot."
+            isPlaying = false
+            isPaused = false
+        }
+    }
+
+    private func finishSnapshotPollFailure(_ message: String, generation: UInt64) {
+        guard snapshotPollInFlightGeneration == generation else { return }
+        snapshotPollInFlightGeneration = nil
+        guard generation == snapshotPollGeneration else {
+            if isPlaying, !isPaused, !isTransportBusy, !isStateBusy {
+                scheduleSnapshotPoll()
+            }
+            return
+        }
+        snapshotPollScheduled = false
+        isPlaying = false
+        isPaused = false
+        playbackSnapshot = nil
+        status = "Rust Music playback failed: \(message)"
+        // Cleanup is serialized behind this poll and ahead of any action the
+        // user can issue after the failure state becomes visible. Stale poll
+        // errors never tear down a client used by a newer transport command.
+        packageQueue.async { [weak self] in
+            self?.packageClient?.shutdown(force: true)
+            self?.packageClient = nil
+            self?.packageRootPath = nil
         }
     }
 
     func shutdownPackage(completion: (() -> Void)? = nil) {
         shutdownGate.run(completion: completion) { [self] finish in
+            invalidateSnapshotPolls()
             cancelScan(); cancelStateOperation()
             isTransportBusy = true
             let transientProcesses = [scanProcess, stateProcess].compactMap { $0 }
