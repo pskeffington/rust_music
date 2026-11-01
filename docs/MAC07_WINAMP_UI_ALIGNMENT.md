@@ -49,7 +49,7 @@ The default arrangement tiles Player, Playlist, and Equalizer down the left and 
 
 - Folder selection triggers an explicit bounded scan and persistent catalog update. Never scan or play at startup, refresh or reconnect.
 - Single click selects only; double click or Enter plays. Document whether Play Now replaces the queue or moves its cursor without destroying saved playlists.
-- Context menu offers Play Now, Play Next, Add to Queue, Add to Playlist and File Info. Support Shift/Cmd multi-selection and stable batch ordering.
+- Track-row context actions are scoped to the clicked track: Enqueue Track, Play Next, and Add to Selected Playlist. They do not start playback; Play Now remains the explicit transport action. Support Shift/Cmd multi-selection and stable batch ordering.
 - Finder import must enforce path/symlink boundaries and never write source media.
 - Queue reorder has keyboard Move Up/Down alternatives; queue persistence must not trigger playback on restart.
 - Previous/Next starts the adjacent queued item. Natural EOF advances once, without double play or overlapping sinks.
