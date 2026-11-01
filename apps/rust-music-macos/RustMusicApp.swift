@@ -1359,6 +1359,7 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var selectedOutputDeviceUID: String
     @Published private(set) var outputDeviceStatus = "Checking available outputs…"
     @Published var isScanning = false
+    @Published private(set) var libraryScanNotice: String?
     @Published var isStateBusy = false
     @Published var queueEntries: [QueueEntry] = []
     @Published var queueSelection: Int?
@@ -1962,6 +1963,7 @@ final class PlayerModel: ObservableObject {
 
     private func loadLibrary(at root: URL) {
         guard shutdownGate.acceptsWork, !isScanning, !isStateBusy, !isTransportBusy else { return }
+        libraryScanNotice = nil
         playbackSnapshot = nil
         stop()
         let process = Process()
@@ -1976,6 +1978,7 @@ final class PlayerModel: ObservableObject {
             try process.run()
         } catch {
             try? input.fileHandleForWriting.close()
+            libraryScanNotice = "The library scanner could not start. Choose a folder and try again."
             status = "Could not start the Rust Music catalog: \(error.localizedDescription)"
             return
         }
@@ -2031,6 +2034,7 @@ final class PlayerModel: ObservableObject {
             self.scanCancellationRequested = false
             switch result {
             case .success(let tracks):
+                self.libraryScanNotice = nil
                 self.libraryRoot = root
                 self.tracks = tracks
                 self.selectedIndex = tracks.first?.id
@@ -2038,6 +2042,9 @@ final class PlayerModel: ObservableObject {
                 self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
                 self.reloadPersistentState()
             case .failure(let failure):
+                self.libraryScanNotice = wasCancelled
+                    ? "The scan was canceled; the previous catalog is preserved."
+                    : "The folder scan failed. Choose another local folder or try again."
                 self.status = wasCancelled
                     ? "Library scan canceled; the previous catalog is preserved."
                     : failure.message
@@ -2833,6 +2840,40 @@ private struct PlayerView: View {
 
     private var libraryPanel: some View {
         let visibleTracks = model.visibleTracks
+        let emptyState: (title: String, detail: String)?
+        if model.isScanning && model.tracks.isEmpty {
+            emptyState = (
+                title: "SCANNING LIBRARY",
+                detail: "Tracks will appear here when the scan finishes."
+            )
+        } else if let scanNotice = model.libraryScanNotice, model.tracks.isEmpty {
+            emptyState = (
+                title: "LIBRARY SCAN ISSUE",
+                detail: scanNotice
+            )
+        } else if model.tracks.isEmpty && model.libraryRoot == nil {
+            emptyState = (
+                title: "NO LIBRARY LOADED",
+                detail: "Choose LOAD LIBRARY to select a local music folder."
+            )
+        } else if model.tracks.isEmpty {
+            emptyState = (
+                title: "NO LOSSLESS TRACKS FOUND",
+                detail: "Choose LOAD LIBRARY to select another local folder."
+            )
+        } else if model.isScanning && visibleTracks.isEmpty {
+            emptyState = (
+                title: "NO MATCHES",
+                detail: "No current tracks match. A folder scan is in progress; the previous catalog remains active."
+            )
+        } else if visibleTracks.isEmpty {
+            emptyState = (
+                title: "NO MATCHES",
+                detail: "Try a different title, artist, album, or path."
+            )
+        } else {
+            emptyState = nil
+        }
         return GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -2850,55 +2891,89 @@ private struct PlayerView: View {
                     .frame(width: 108)
                     .accessibilityLabel("Sort library tracks")
                     .accessibilityIdentifier("library-sort-order")
-                    Text("\(visibleTracks.count) TRACKS")
+                    Text(model.isScanning
+                        ? "SCANNING · \(visibleTracks.count) PRIOR RESULTS"
+                        : "\(visibleTracks.count) TRACKS")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize()
                 }
 
-                List(selection: Binding<Set<Int>>(
-                    get: { model.selectedTrackIDs },
-                    set: { model.selectTracksManually($0) }
-                )) {
-                    ForEach(visibleTracks) { track in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(track.title)
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .lineLimit(1)
-                            Text([track.artist, track.album, track.container.uppercased()]
-                                .filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                if model.isScanning && !model.tracks.isEmpty {
+                    Text("A folder scan is in progress. The previous catalog remains active.")
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let scanNotice = model.libraryScanNotice, !model.tracks.isEmpty {
+                    Text(scanNotice)
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Group {
+                    if let emptyState {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(emptyState.title)
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .tracking(0.8)
+                                .foregroundStyle(RustMusicPalette.phosphor)
+                            Text(emptyState.detail)
+                                .font(.system(size: 11, weight: .regular, design: .monospaced))
                                 .foregroundStyle(RustMusicPalette.muted)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .padding(.vertical, 2)
-                        .tag(track.id)
-                        .listRowBackground(RustMusicPalette.display)
-                        .contextMenu {
-                            Button("Enqueue Track") { model.enqueueTrack(track.id) }
-                                .disabled(model.isStateBusy || model.isTransportBusy)
-                            Button("Play Next") { model.enqueueTrack(track.id, next: true) }
-                                .disabled(model.isStateBusy || model.isTransportBusy)
-                            Divider()
-                            Button("Add to Selected Playlist") {
-                                model.addTrackToSelectedPlaylist(track.id)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(12)
+                        .background(RustMusicPalette.display)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("library-empty-state")
+                    } else {
+                        List(selection: Binding<Set<Int>>(
+                            get: { model.selectedTrackIDs },
+                            set: { model.selectTracksManually($0) }
+                        )) {
+                            ForEach(visibleTracks) { track in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(track.title)
+                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                        .lineLimit(1)
+                                    Text([track.artist, track.album, track.container.uppercased()]
+                                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                        .foregroundStyle(RustMusicPalette.muted)
+                                        .lineLimit(1)
+                                }
+                                .padding(.vertical, 2)
+                                .tag(track.id)
+                                .listRowBackground(RustMusicPalette.display)
+                                .contextMenu {
+                                    Button("Enqueue Track") { model.enqueueTrack(track.id) }
+                                        .disabled(model.isStateBusy || model.isTransportBusy)
+                                    Button("Play Next") { model.enqueueTrack(track.id, next: true) }
+                                        .disabled(model.isStateBusy || model.isTransportBusy)
+                                    Divider()
+                                    Button("Add to Selected Playlist") {
+                                        model.addTrackToSelectedPlaylist(track.id)
+                                    }
+                                    .disabled(
+                                        model.selectedPlaylist == nil
+                                            || model.isStateBusy
+                                            || model.isTransportBusy
+                                    )
+                                }
                             }
-                            .disabled(
-                                model.selectedPlaylist == nil
-                                    || model.isStateBusy
-                                    || model.isTransportBusy
-                            )
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .background(RustMusicPalette.display)
+                        .disabled(model.isTransportBusy || model.isStateBusy)
+                        .accessibilityLabel("Library tracks")
+                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions. Open a track's context menu for queue and playlist actions.")
+                        .accessibilityIdentifier("library-track-list")
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(RustMusicPalette.display)
                 .frame(minHeight: 96, maxHeight: .infinity)
-                .disabled(model.isTransportBusy || model.isStateBusy)
-                .accessibilityLabel("Library tracks")
-                .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions. Open a track's context menu for queue and playlist actions.")
-                .accessibilityIdentifier("library-track-list")
 
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }

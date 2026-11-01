@@ -704,3 +704,34 @@ edges, zero registry/Git crates, and Rust workspace tests passed. The
 macOS app build and signature verification at this same source commit also
 exited **0**. These checks do not establish private FLAC parity or GUI/hardware
 acceptance.
+
+### 2026-11-01 MAC07-03 empty-library first-run guidance
+
+On branch `codex/mac07-disabled-control-state`, source base `dc5d0a4` with an
+uncommitted `RustMusicApp.swift` UI diff, `sh scripts/build-macos-app.sh`
+exited **0**. The local signature verified; catalog profiles at
+2k/20k/100k/250k, playlist selection, layout, protocol, catalog, and process
+lifecycle harnesses passed.
+
+A fresh CUA launch showed Player first, then Library. The Library accessibility
+tree and screenshot showed `NO LIBRARY LOADED` and `Choose LOAD LIBRARY to
+select a local music folder.` No library was loaded, scanned, or played. Source
+also defines states for scanning an initially empty catalog, a successfully
+loaded empty catalog, and no search matches, but only the first-run no-library
+state was exercised live. This is bounded evidence; the other no-rows states,
+compact sizing, keyboard navigation, and VoiceOver remain unverified.
+
+### 2026-11-01 scan-notice source/build evidence addendum
+
+Correction for the uncommitted `RustMusicApp.swift` change on source base
+`dc5d0a4`: a fresh `sh scripts/build-macos-app.sh` exited **0**, and the local
+app signature verified. The build harness passed synthetic catalog search
+profiles through 250k tracks along with playlist selection, layout, protocol,
+catalog, and process lifecycle checks. These are bounded harness results;
+previously recorded catalog timings and RSS describe synthetic harness runs,
+not live UI scanning or imported-library memory.
+
+The scan-in-progress, scanner-start failure, folder-scan failure, and canceled
+scan notices are source/build verified only. No live scan, failure, or cancel
+state was exercised. The prior live check covered only the first-run
+`NO LIBRARY LOADED` state. This does not establish scan-state UI acceptance.
