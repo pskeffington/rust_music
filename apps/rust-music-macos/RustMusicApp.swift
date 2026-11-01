@@ -1035,6 +1035,8 @@ private final class WindowFrameObserver: NSView {
         super.viewDidMoveToWindow()
         guard !configured, let window else { return }
         configured = true
+        // Launch code restores visibility; named frame autosave below is separate.
+        window.isRestorable = false
         let restored = window.setFrameUsingName(name)
         _ = window.setFrameAutosaveName(name)
         let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
@@ -2590,27 +2592,34 @@ private struct PlayerView: View {
     var body: some View {
         PipBoyChassis {
             VStack(spacing: 0) {
-                ScrollView {
+                if kind == .library {
                     VStack(alignment: .leading, spacing: 12) {
                         header
-                        Group {
-                            switch kind {
-                            case .player:
-                                nowPlayingPanel
-                            case .playlist:
-                                VStack(alignment: .leading, spacing: 12) {
-                                    queuePanel
-                                    playlistPanel
-                                }
-                            case .library:
-                                libraryPanel
-                            }
-                        }
+                        libraryPanel
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                     .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            header
+                            Group {
+                                if kind == .player {
+                                    nowPlayingPanel
+                                } else {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        queuePanel
+                                        playlistPanel
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .scrollIndicators(.visible)
                 }
-                .scrollIndicators(.visible)
 
                 if kind == .player { transportBar }
             }
@@ -2885,7 +2894,7 @@ private struct PlayerView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(RustMusicPalette.display)
-                .frame(minHeight: 170, maxHeight: 230)
+                .frame(minHeight: 96, maxHeight: .infinity)
                 .disabled(model.isTransportBusy || model.isStateBusy)
                 .accessibilityLabel("Library tracks")
                 .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions. Open a track's context menu for queue and playlist actions.")

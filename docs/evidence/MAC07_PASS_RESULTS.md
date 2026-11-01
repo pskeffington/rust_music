@@ -670,3 +670,30 @@ path-only edges, zero registry/Git crates, and passing workspace tests.
 and `python3 scripts/check_literature.py` exited **0** (27 references, 16
 standards). This follow-up does not cover private FLAC corpus parity or GUI,
 physical hardware, and release acceptance.
+
+### 2026-11-01 MAC07-03 Library vertical sizing correction
+
+Correction for the UI worktree at branch `codex/mac07-disabled-control-state`,
+pre-change HEAD `29c32cf` plus the uncommitted startup-restoration tweak: the
+current source change in `apps/rust-music-macos/RustMusicApp.swift` keeps the
+Library header and action row fixed while the track list takes the remaining
+vertical height. `sh scripts/build-macos-app.sh` exited **0**; the local signed
+bundle verified. Its harness passed synthetic catalog search at 2k/20k/100k/
+250k tracks, playlist selection, layout, protocol, catalog, and process
+lifecycle checks. Harness RSS exceeded 220 MiB; this is not UI-process memory
+measurement.
+
+A fresh CUA-launched rebuilt bundle showed Player first and all four named
+operator windows in the Window menu. At 1,000×900 screenshot pixels, the
+Library screenshot showed the list filling the area between its search row and
+action row. No library was loaded and no playback occurred. Manual compact
+resizing, scrolling through populated track rows, keyboard traversal, and
+VoiceOver were not tested.
+This is a bounded visual check; MAC07-03 remains in progress and is not fully
+accepted.
+
+Correction to the Library sizing check above: after independent review flagged
+crowding at compact heights, the list minimum was lowered to 96 points. The
+final build and a fresh CUA Library screenshot were rerun at 1,000×900
+screenshot pixels and passed. No live resize to its declared 520×360-point
+window minimum was performed, so compact reachability remains unverified.
