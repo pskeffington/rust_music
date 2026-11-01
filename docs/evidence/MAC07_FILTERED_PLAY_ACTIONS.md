@@ -58,6 +58,14 @@ minimum window frame.
 bounded, whitespace-trimmed, Unicode-folded query representation. The catalog
 search harness adds a regression case with a decomposed accent in the query.
 
+`sh scripts/build-macos-app.sh` exited **0** for source `5dceb78`; strict local
+bundle signature validation and the catalog, playlist, geometry, playback
+snapshot, catalog-bounds, and process-lifecycle harnesses passed. Synthetic
+catalog results were: 2,000 tracks, search p95 0.617 ms and sort p95 4.280 ms;
+20,000, 5.852 ms and 40.332 ms; 100,000, 29.280 ms and 244.908 ms; 250,000,
+72.440 ms and 706.366 ms. Catalog-harness peak RSS was 240,451,584 bytes; these
+measurements do not represent full-app memory or interactive UI latency.
+
 The rebuilt candidate loaded two generated metadata-only FLAC entries with no
 audio frames. A canonically decomposed accent query returned the matching
 composed-accent row while the prior selection remained hidden. The outside-
