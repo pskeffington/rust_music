@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import Darwin
 import SwiftUI
 import UniformTypeIdentifiers
@@ -25,6 +26,128 @@ struct UserPlaylist: Identifiable, Equatable {
     let name: String
     let paths: [String]
     var id: String { name }
+}
+
+struct AudioOutputChoice: Identifiable, Equatable {
+    let uid: String
+    let name: String
+    let isSystemDefault: Bool
+    var id: String { uid }
+}
+
+private enum CoreAudioOutputDiscovery {
+    private static let maximumDevices = 256
+    private static let maximumDeviceTextBytes = 1024
+
+    static func list() throws -> [AudioOutputChoice] {
+        var devicesAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), &devicesAddress, 0, nil, &dataSize
+        )
+        guard status == noErr else { throw failure("device list", status) }
+        let deviceBytes = MemoryLayout<AudioDeviceID>.size
+        guard dataSize > 0, dataSize.isMultiple(of: UInt32(deviceBytes)),
+              dataSize / UInt32(deviceBytes) <= maximumDevices else {
+            return []
+        }
+
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: Int(dataSize) / deviceBytes)
+        status = deviceIDs.withUnsafeMutableBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else { return kAudioHardwareBadDeviceError }
+            return AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &devicesAddress,
+                0,
+                nil,
+                &dataSize,
+                UnsafeMutableRawPointer(baseAddress)
+            )
+        }
+        guard status == noErr else { throw failure("device list", status) }
+        guard dataSize <= UInt32(deviceIDs.count * deviceBytes), dataSize.isMultiple(of: UInt32(deviceBytes)) else {
+            throw RustMusicFailure(message: "CoreAudio returned an invalid output device list.")
+        }
+
+        let defaultID = defaultOutputDeviceID()
+        var outputs: [AudioOutputChoice] = []
+        for deviceID in deviceIDs.prefix(Int(dataSize) / deviceBytes) {
+            var streamsAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreams,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var streamBytes: UInt32 = 0
+            let streamStatus = AudioObjectGetPropertyDataSize(
+                deviceID, &streamsAddress, 0, nil, &streamBytes
+            )
+            guard streamStatus == noErr, streamBytes >= UInt32(MemoryLayout<AudioStreamID>.size) else {
+                continue
+            }
+            guard let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
+                  let name = stringProperty(deviceID, selector: kAudioObjectPropertyName),
+                  !uid.isEmpty, !name.isEmpty,
+                  uid.utf8.count <= maximumDeviceTextBytes,
+                  name.utf8.count <= maximumDeviceTextBytes,
+                  !uid.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+                  !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+                continue
+            }
+            outputs.append(AudioOutputChoice(uid: uid, name: name, isSystemDefault: deviceID == defaultID))
+        }
+        return outputs
+    }
+
+    private static func defaultOutputDeviceID() -> AudioDeviceID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = withUnsafeMutablePointer(to: &deviceID) { pointer in
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                0,
+                nil,
+                &size,
+                UnsafeMutableRawPointer(pointer)
+            )
+        }
+        return status == noErr && deviceID != 0 ? deviceID : nil
+    }
+
+    private static func stringProperty(_ deviceID: AudioDeviceID, selector: AudioObjectPropertySelector) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var result: UnsafeRawPointer?
+        var size = UInt32(MemoryLayout<UnsafeRawPointer?>.size)
+        let status = withUnsafeMutablePointer(to: &result) { pointer in
+            AudioObjectGetPropertyData(
+                deviceID,
+                &address,
+                0,
+                nil,
+                &size,
+                UnsafeMutableRawPointer(pointer)
+            )
+        }
+        guard status == noErr, let result else { return nil }
+        return Unmanaged<CFString>.fromOpaque(result).takeRetainedValue() as String
+    }
+
+    private static func failure(_ stage: String, _ status: OSStatus) -> RustMusicFailure {
+        RustMusicFailure(message: "CoreAudio could not read the \(stage) (OSStatus \(status)).")
+    }
 }
 
 struct ParsedQueue {
@@ -112,7 +235,7 @@ private final class PackageProcessClient {
     private let stderrCapture: BoundedChildStderrCapture
     private var requestID: UInt64 = 1
 
-    init(executable: URL, root: URL) throws {
+    init(executable: URL, root: URL, outputDeviceUID: String?) throws {
         let process = Process()
         process.executableURL = executable
         process.arguments = ["serve", "--desktop"]
@@ -124,6 +247,11 @@ private final class PackageProcessClient {
         process.standardError = stderrPipe
         var childEnvironment = process.environment ?? ProcessInfo.processInfo.environment
         childEnvironment["RUST_MUSIC_AUDIO_DIAGNOSTICS"] = "1"
+        if let outputDeviceUID {
+            childEnvironment["RUST_MUSIC_OUTPUT_DEVICE_UID"] = outputDeviceUID
+        } else {
+            childEnvironment.removeValue(forKey: "RUST_MUSIC_OUTPUT_DEVICE_UID")
+        }
         process.environment = childEnvironment
         try process.run()
         self.process = process
@@ -359,16 +487,20 @@ private struct AudioQueueDiagnosticRecord {
     let routeStatus: StatusCode
     let routeDeviceListStatus: StatusCode
     let routeDefaultListed: String
+    let routeTargetListed: String
     let allocated: UInt64
     let capacityBytes: UInt64
     let allocationStatus: StatusCode
     let enqueued: UInt64
     let frames: UInt64
+    let nonzeroSamples: UInt64
+    let peakSample: UInt64
     let starts: UInt64
     let startStatus: StatusCode
     let deviceStatus: StatusCode
     let deviceAssociated: String
     let deviceMatchesDefault: String
+    let deviceMatchesTarget: String
     let deviceListStatus: StatusCode
     let deviceListed: String
     let callbacks: UInt64
@@ -386,9 +518,9 @@ private struct AudioQueueDiagnosticRecord {
     private static let prefix = "RUST_MUSIC_AUDIO_DIAG "
     private static let expectedKeys: Set<String> = [
         "rate", "bits", "channels", "created", "create_status", "route_status",
-        "route_device_list_status", "route_default_listed", "allocated",
-        "capacity_bytes", "allocation_status", "enqueued", "frames", "starts",
-        "start_status", "device_status", "device_associated", "device_default",
+        "route_device_list_status", "route_default_listed", "route_target_listed", "allocated",
+        "capacity_bytes", "allocation_status", "enqueued", "frames", "nonzero_samples", "peak_sample", "starts",
+        "start_status", "device_status", "device_associated", "device_default", "device_target",
         "device_list_status", "device_listed", "callbacks", "teardown", "stop_status", "drained",
         "immediate_stop_status", "dispose_status"
     ]
@@ -418,6 +550,8 @@ private struct AudioQueueDiagnosticRecord {
                   let capacityBytes = values["capacity_bytes"].flatMap(UInt64.init),
                   let enqueued = values["enqueued"].flatMap(UInt64.init),
                   let frames = values["frames"].flatMap(UInt64.init),
+                  let nonzeroSamples = values["nonzero_samples"].flatMap(UInt64.init),
+                  let peakSample = values["peak_sample"].flatMap(UInt64.init),
                   let starts = values["starts"].flatMap(UInt64.init),
                   let callbacks = values["callbacks"].flatMap(UInt64.init),
                   let teardown = values["teardown"].flatMap(UInt64.init),
@@ -426,6 +560,8 @@ private struct AudioQueueDiagnosticRecord {
                   let routeDeviceListStatus = optionalStatus(values["route_device_list_status"]),
                   let routeDefaultListed = values["route_default_listed"],
                   ["0", "1", "none"].contains(routeDefaultListed),
+                  let routeTargetListed = values["route_target_listed"],
+                  ["0", "1", "none"].contains(routeTargetListed),
                   let allocationStatus = optionalStatus(values["allocation_status"]),
                   let startStatus = optionalStatus(values["start_status"]),
                   let deviceStatus = optionalStatus(values["device_status"]),
@@ -433,6 +569,8 @@ private struct AudioQueueDiagnosticRecord {
                   ["0", "1", "none"].contains(deviceAssociated),
                   let deviceMatchesDefault = values["device_default"],
                   ["0", "1", "none"].contains(deviceMatchesDefault),
+                  let deviceMatchesTarget = values["device_target"],
+                  ["0", "1", "none"].contains(deviceMatchesTarget),
                   let deviceListStatus = optionalStatus(values["device_list_status"]),
                   let deviceListed = values["device_listed"],
                   ["0", "1", "none"].contains(deviceListed),
@@ -447,10 +585,14 @@ private struct AudioQueueDiagnosticRecord {
                 createStatus: createStatus, routeStatus: routeStatus,
                 routeDeviceListStatus: routeDeviceListStatus,
                 routeDefaultListed: routeDefaultListed,
+                routeTargetListed: routeTargetListed,
                 allocated: allocated, capacityBytes: capacityBytes,
                 allocationStatus: allocationStatus, enqueued: enqueued, frames: frames,
+                nonzeroSamples: nonzeroSamples, peakSample: peakSample,
                 starts: starts, startStatus: startStatus, deviceStatus: deviceStatus,
-                deviceAssociated: deviceAssociated, deviceMatchesDefault: deviceMatchesDefault,
+                deviceAssociated: deviceAssociated,
+                deviceMatchesDefault: deviceMatchesDefault,
+                deviceMatchesTarget: deviceMatchesTarget,
                 deviceListStatus: deviceListStatus, deviceListed: deviceListed,
                 callbacks: callbacks,
                 teardown: teardown, stopStatus: stopStatus, drained: drained,
@@ -471,7 +613,8 @@ private struct AudioQueueDiagnosticRecord {
         let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
         let deviceText = deviceAssociated == "1" ? "yes" : (deviceAssociated == "0" ? "no" : "unknown")
         let defaultText = deviceMatchesDefault == "1" ? "yes" : (deviceMatchesDefault == "0" ? "no" : "unknown")
-        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) route-list \(statusValue(routeDeviceListStatus))/\(listedText(routeDefaultListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText)\ncurrent-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+        let targetText = deviceMatchesTarget == "1" ? "yes" : (deviceMatchesTarget == "0" ? "no" : "unknown")
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) list \(statusValue(routeDeviceListStatus)) default/target \(listedText(routeDefaultListed))/\(listedText(routeTargetListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) target \(targetText)\nPCM nonzero \(nonzeroSamples) peak \(peakSample) · current-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
     }
 
     private func listedText(_ value: String) -> String {
@@ -585,6 +728,9 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var audioQueueDiagnosticSummary: String?
     @Published var isTransportBusy = false
     @Published var volumePercent = 100
+    @Published private(set) var outputDevices: [AudioOutputChoice] = []
+    @Published private(set) var selectedOutputDeviceUID: String
+    @Published private(set) var outputDeviceStatus = "Checking available outputs…"
     @Published var isScanning = false
     @Published var isStateBusy = false
     @Published var queueEntries: [QueueEntry] = []
@@ -602,6 +748,7 @@ final class PlayerModel: ObservableObject {
     private let packageQueue = DispatchQueue(label: "dev.rustmusic.package-process")
     nonisolated(unsafe) private var packageClient: PackageProcessClient?
     nonisolated(unsafe) private var packageRootPath: String?
+    nonisolated(unsafe) private var packageOutputDeviceUID: String?
     private var snapshotPollScheduled = false
     private var snapshotPollGeneration: UInt64 = 0
     private var snapshotPollInFlightGeneration: UInt64?
@@ -610,7 +757,9 @@ final class PlayerModel: ObservableObject {
     private let transientChildOperations = DispatchGroup()
 
     init() {
+        selectedOutputDeviceUID = UserDefaults.standard.string(forKey: "RustMusic.outputDeviceUID") ?? ""
         RustMusicPlayerRegistry.register(self)
+        refreshOutputDevices()
     }
 
     private var decoderURL: URL {
@@ -624,6 +773,78 @@ final class PlayerModel: ObservableObject {
     var selectedTrack: CatalogTrack? {
         guard let selectedIndex else { return nil }
         return tracks.first(where: { $0.id == selectedIndex })
+    }
+
+    func refreshOutputDevices() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            do {
+                let devices = try CoreAudioOutputDiscovery.list()
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.outputDevices = devices
+                    if !self.selectedOutputDeviceUID.isEmpty,
+                       !devices.contains(where: { $0.uid == self.selectedOutputDeviceUID }) {
+                        if self.isPlaying || self.isPaused {
+                            self.outputDeviceStatus = "Selected output disappeared; stop playback to switch to System Default."
+                        } else {
+                            self.selectedOutputDeviceUID = ""
+                            UserDefaults.standard.removeObject(forKey: "RustMusic.outputDeviceUID")
+                            self.outputDeviceStatus = "Saved output is unavailable; using System Default."
+                            self.recreatePackageClientForOutputChange()
+                        }
+                    } else {
+                        self.outputDeviceStatus = devices.isEmpty
+                            ? "No output devices were returned by CoreAudio."
+                            : "Choose the output Rust Music should use."
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if !self.selectedOutputDeviceUID.isEmpty, !self.isPlaying, !self.isPaused {
+                        self.selectedOutputDeviceUID = ""
+                        UserDefaults.standard.removeObject(forKey: "RustMusic.outputDeviceUID")
+                        self.recreatePackageClientForOutputChange()
+                        self.outputDeviceStatus = "Could not verify saved output; using System Default."
+                    } else {
+                        self.outputDeviceStatus = "Could not list audio outputs: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+
+    func selectOutputDevice(_ uid: String) {
+        guard !isPlaying, !isPaused, !isTransportBusy, !isStateBusy else {
+            outputDeviceStatus = "Stop playback before changing its output device."
+            return
+        }
+        guard uid.isEmpty || outputDevices.contains(where: { $0.uid == uid }) else {
+            outputDeviceStatus = "That output is no longer available; refresh the list."
+            return
+        }
+        guard uid != selectedOutputDeviceUID else { return }
+        selectedOutputDeviceUID = uid
+        if uid.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "RustMusic.outputDeviceUID")
+            outputDeviceStatus = "Rust Music will use the macOS System Default output."
+        } else {
+            UserDefaults.standard.set(uid, forKey: "RustMusic.outputDeviceUID")
+            outputDeviceStatus = "Output changed. Press Play to route through the selected device."
+        }
+        recreatePackageClientForOutputChange()
+    }
+
+    private func recreatePackageClientForOutputChange() {
+        isTransportBusy = true
+        packageQueue.async { [weak self] in
+            guard let self else { return }
+            self.packageClient?.shutdown()
+            self.packageClient = nil
+            self.packageRootPath = nil
+            self.packageOutputDeviceUID = nil
+            DispatchQueue.main.async { self.isTransportBusy = false }
+        }
     }
 
     func boundSearchText() {
@@ -1100,14 +1321,20 @@ final class PlayerModel: ObservableObject {
         isTransportBusy = true
         status = label
         let executable = decoderURL
+        let outputDeviceUID = selectedOutputDeviceUID.isEmpty ? nil : selectedOutputDeviceUID
         packageQueue.async { [weak self] in
             guard let self else { return }
             do {
                 let rootPath = root.standardizedFileURL.path
-                if self.packageRootPath != rootPath {
+                if self.packageRootPath != rootPath || self.packageOutputDeviceUID != outputDeviceUID {
                     self.packageClient?.shutdown()
-                    self.packageClient = try PackageProcessClient(executable: executable, root: root)
+                    self.packageClient = try PackageProcessClient(
+                        executable: executable,
+                        root: root,
+                        outputDeviceUID: outputDeviceUID
+                    )
                     self.packageRootPath = rootPath
+                    self.packageOutputDeviceUID = outputDeviceUID
                 }
                 guard let client = self.packageClient else {
                     throw RustMusicFailure(message: "Rust Music playback process is unavailable.")
@@ -1125,6 +1352,7 @@ final class PlayerModel: ObservableObject {
                 self.packageClient?.shutdown(force: true)
                 self.packageClient = nil
                 self.packageRootPath = nil
+                self.packageOutputDeviceUID = nil
                 DispatchQueue.main.async {
                     self.finishTransportOperation()
                     self.isPlaying = false
@@ -1324,6 +1552,7 @@ final class PlayerModel: ObservableObject {
             self?.packageClient?.shutdown(force: true)
             self?.packageClient = nil
             self?.packageRootPath = nil
+            self?.packageOutputDeviceUID = nil
         }
     }
 
@@ -1340,6 +1569,7 @@ final class PlayerModel: ObservableObject {
                 self.packageClient?.shutdown()
                 self.packageClient = nil
                 self.packageRootPath = nil
+                self.packageOutputDeviceUID = nil
                 for process in transientProcesses {
                     ProcessTermination.ensureStopped(process, gracefulTimeout: 2, terminationTimeout: 1)
                 }
@@ -1717,6 +1947,40 @@ struct PlayerView: View {
                 }
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(RustMusicPalette.muted)
+                HStack(spacing: 8) {
+                    Picker("OUTPUT", selection: Binding(
+                        get: { model.selectedOutputDeviceUID },
+                        set: { model.selectOutputDevice($0) }
+                    )) {
+                        Text("SYSTEM DEFAULT").tag("")
+                        if !model.selectedOutputDeviceUID.isEmpty,
+                           !model.outputDevices.contains(where: { $0.uid == model.selectedOutputDeviceUID }) {
+                            Text("SAVED OUTPUT UNAVAILABLE").tag(model.selectedOutputDeviceUID)
+                        }
+                        ForEach(model.outputDevices) { device in
+                            Text(device.isSystemDefault ? "\(device.name) · SYSTEM DEFAULT" : device.name)
+                                .tag(device.uid)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityLabel("Audio output device")
+                    .accessibilityIdentifier("audio-output-device-picker")
+                    .disabled(model.isPlaying || model.isPaused || model.isTransportBusy || model.isStateBusy)
+                    Button {
+                        model.refreshOutputDevices()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Refresh available audio outputs")
+                    .accessibilityLabel("Refresh audio outputs")
+                    .disabled(model.isTransportBusy || model.isStateBusy)
+                    Text(model.outputDeviceStatus.uppercased())
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("audio-output-device-status")
+                }
                 if let snapshot = model.playbackSnapshot,
                    let progress = snapshot.progressPerMille {
                     ProgressView(value: Double(progress), total: 1000)
@@ -1738,7 +2002,7 @@ struct PlayerView: View {
                      ?? model.playbackSnapshot?.outputSummary
                      ?? "NO OUTPUT SNAPSHOT · AUDIO NOT CONFIRMED")
                     .font(.system(size: 9, weight: .regular, design: .monospaced))
-                    .lineLimit(3)
+                    .lineLimit(4)
                     .foregroundStyle(RustMusicPalette.muted)
                     .accessibilityIdentifier("playback-output-diagnostics")
                 Spacer(minLength: 0)

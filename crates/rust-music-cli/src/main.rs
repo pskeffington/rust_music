@@ -1662,7 +1662,30 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog [--managed-parent-stdin] DIRECTORY [QUERY] | state [--managed-parent-stdin] queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli audio-devices | scan DIRECTORY | catalog [--managed-parent-stdin] DIRECTORY [QUERY] | state [--managed-parent-stdin] queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
+    if action == "audio-devices" {
+        if args.next().is_some() {
+            return Err(MusicError::Invalid("audio-devices accepts no arguments"));
+        }
+        #[cfg(all(target_os = "macos", feature = "macos-output"))]
+        {
+            let mut output = String::new();
+            for (uid, name) in rust_music::MacAudioQueueSink::available_output_devices()? {
+                append_hex(&mut output, &uid);
+                output.push('\t');
+                append_hex(&mut output, &name);
+                output.push('\n');
+            }
+            std::io::stdout().lock().write_all(output.as_bytes())?;
+            return Ok(());
+        }
+        #[cfg(not(all(target_os = "macos", feature = "macos-output")))]
+        {
+            return Err(MusicError::Unsupported(
+                "output-device enumeration needs macos-output on macOS",
+            ));
+        }
+    }
     #[cfg(all(
         debug_assertions,
         feature = "test-support",

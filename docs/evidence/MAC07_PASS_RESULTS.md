@@ -36,16 +36,16 @@ change. Runtime flicker acceptance is pending a fresh app launch. The full
 `sh scripts/offline-gate.sh` exited 0, including all 24 native macOS tests.
 
 **Status:** the flicker source defect is repaired at source/build level; the
-audio route and audible MAC07-01 acceptance remain **BLOCKED** until macOS
-exposes an output device and the operator confirms sound from the rebuilt app.
+audio route and audible MAC07-01 acceptance remain **UNVERIFIED** pending
+current-session CoreAudio route inspection and operator listening confirmation.
 
 ## Interpretation
 
-The direct CLI route-binding error and CoreAudio's absence of a default/enumerated device remain relevant. Earlier Sound settings showed the built-in speakers selected, while current independent probes expose no usable route. The GUI previously reported a queue UID matching default during playback, while a direct CLI attempt could not bind in the same environment. Neither a route match nor successful callbacks prove sound. The 11/11 `CountingSink` result is decoder/frame-delivery evidence only. No MAC07 audio, hardware, or production acceptance pass is recorded.
+The direct CLI route-binding error and empty command-line CoreAudio probe results remain historical observations. The operator confirms other Mac apps are audible. A rebuilt GUI run later verified its queue UID was listed and matched the default output; this proves association, not sound. Neither a route match nor successful callbacks prove sound. The 11/11 `CountingSink` result is decoder/frame-delivery evidence only. No MAC07 audible, hardware, or production acceptance pass is recorded.
 
 ## Remaining acceptance sequence
 
-Restore a CoreAudio-visible output device, rerun the direct CLI and GUI, and confirm both bind to the selected default and produce audible sound. Investigate why idle CoreAudio enumeration returns no devices while the GUI can bind during playback. Then validate progress/state, layout, transport, playlists, and A/B behavior. Capture sanitized commands, source SHA, and operator audibility confirmation. Run release checks at the accepted candidate; retain hardware/device and distribution blockers until separately observed.
+Verify playback through an explicitly chosen CoreAudio output as well as System Default, then classify direct CLI/GUI audible behavior. A text-only in-app selector is implemented and lists outputs from the GUI process. Then validate device changes, progress/state, layout, transport, playlists, and A/B behavior. Capture sanitized commands, source SHA, and operator audibility confirmation. Run release checks at the accepted candidate; retain hardware/device and distribution blockers until separately observed.
 
 
 ### 2026-11-01 operator correction and signal check
@@ -104,3 +104,33 @@ literature checker and `git diff --check` also exited 0. Independent source
 review found no high-confidence native-routing blocker and noted scalar
 CoreAudio property result-size checks as optional hardening. No DAC,
 device-switch recovery, direct CLI A/B, or acoustic acceptance was performed.
+
+On a subsequent instrumented GUI run after the explicit unity-gain setting,
+the route remained listed/default and the native sink observed 276,224 enqueued
+frames, 545,919 nonzero samples, and peak absolute sample 22,494. The player
+was stopped after this trace. The operator has since confirmed the interface
+jitter is cleaned up and reported that the player remains silent. The
+nonzero-sample count locates the remaining failure after PCM reaches the
+AudioQueue buffers; it does not prove render or acoustic output. A user-facing
+output selector is implemented and was used to test the route handoff.
+
+
+### 2026-11-01 output selector runtime check
+
+The rebuilt GUI enumerated three output-capable devices in the GUI process,
+including the selected system default. The operator explicitly selected the
+built-in speakers, then explicitly loaded the supplied album and started
+playback. Post-stop AudioQueue diagnostics reported route status 0, current
+device listed=yes and target=yes, default=yes, 331,264 frames enqueued,
+662,327 nonzero samples with peak absolute sample 7,961, 1,294 callbacks, and
+successful stop/drain/dispose. This confirms the explicit UID was accepted as
+the queue target and that nonzero PCM reached its buffers. The operator confirmed that this exact selected-route run was still silent;
+MAC07-01 remains unverified. The output picker works, but selecting the
+built-in speakers did not resolve the audible-output defect.
+
+Integrated verification after adding the selector passed: `sh
+scripts/offline-gate.sh`, native tests (31/31), native Clippy with warnings
+denied, CLI macOS-output tests (21 passed, 1 ignored, plus 3 integration
+tests), app build/signature checks, Swift compile/typecheck, formatting,
+roadmap-index/literature validators, and `git diff --check`. These checks do
+not substitute for listening acceptance.
