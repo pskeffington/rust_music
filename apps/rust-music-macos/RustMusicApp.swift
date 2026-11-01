@@ -902,8 +902,7 @@ private struct RustMusicCommands: Commands {
             Button("Play Selected Track") { model.play() }
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(
-                    model.selectedTrack == nil
-                        || !model.selectedTrackMatchesCurrentSearch
+                    !model.selectedTrackIsActionableInLibrary
                         || model.isPlaying
                         || model.isPaused
                         || model.isScanning
@@ -920,8 +919,7 @@ private struct RustMusicCommands: Commands {
             Button("Play Next Selected Track") { model.addSelectedTrackNext() }
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(
-                    model.selectedTrack == nil
-                        || !model.selectedTrackMatchesCurrentSearch
+                    !model.selectedTrackIsActionableInLibrary
                         || model.isStateBusy
                         || model.isTransportBusy
                 )
@@ -1482,9 +1480,12 @@ final class PlayerModel: ObservableObject {
         return CatalogSearch.matches(selectedTrack, matching: searchText)
     }
 
-    var selectedTrackIsInLibrarySelection: Bool {
-        guard let selectedTrack else { return false }
-        return selectedTrackIDs.contains(selectedTrack.id)
+    var selectedTrackIsActionableInLibrary: Bool {
+        CatalogSearch.isActionableSelectedTrack(
+            selectedTrack,
+            selectedTrackIDs: selectedTrackIDs,
+            matching: searchText
+        )
     }
 
     var selectedTracksInCatalogOrder: [CatalogTrack] {
@@ -3107,9 +3108,7 @@ private struct PlayerView: View {
                             model.addSelectionToQueue()
                         }
                         .conditionalAccessibilityAction(
-                            model.selectedTrack != nil
-                                && model.selectedTrackIsInLibrarySelection
-                                && model.selectedTrackMatchesCurrentSearch
+                            model.selectedTrackIsActionableInLibrary
                                 && !model.isStateBusy
                                 && !model.isTransportBusy,
                             named: "Play Next Selected Track"
@@ -3124,13 +3123,13 @@ private struct PlayerView: View {
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }
                         .buttonStyle(RustMusicButtonStyle(prominent: true))
-                        .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
                         model.addSelectionToQueue()
                     }
                     .disabled(model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
                     Button("PLAY NEXT") { model.addSelectedTrackNext() }
-                        .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isStateBusy || model.isTransportBusy)
+                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isStateBusy || model.isTransportBusy)
                 }
             }
         } label: {
