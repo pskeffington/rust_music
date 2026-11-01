@@ -1121,6 +1121,25 @@ which other windows were visible. The app was left idle in Player. These
 observations do not establish compact Library acceptance, complete keyboard
 traversal, VoiceOver, or overall MAC07-03 completion.
 
+### 2026-11-01 MAC07-03 compact Library tile check
+
+On the rebuilt app at source `0c5c095`, macOS `Window > Move & Resize > Top
+Left` tiled Media Library to a captured **736×462 screenshot pixels**. A
+generated three-track metadata-only FLAC catalog (147, 147, and 149 bytes; no
+audio frames) showed Alpha, Bravo, and Charlie together with artist, album,
+and format details. The count was 3 TRACKS; no search or queue action was
+performed. Playback remained stopped with no output snapshot. This confirms
+those three rows at this tiled size; screenshot pixels are not AppKit points
+and this is not a test at the declared minimum window frame or of larger
+catalog row scrolling.
+
+The app's Arrange Operator Windows command returned focus to Player. After
+quitting, removing the generated fixture, and relaunching, the initial CUA
+snapshot focused Playlist Editor; after 2.5 seconds Player was front with
+Ready / No Track, an empty queue and playlist list, and no output snapshot.
+This records a delayed startup-focus transition without inferring which
+windows were simultaneously visible. No playback or unrequested scan occurred.
+
 ### 2026-11-01 MAC07-03 loaded Library hint inspection
 
 To inspect the Library list's accessibility help on a loaded catalog, the
