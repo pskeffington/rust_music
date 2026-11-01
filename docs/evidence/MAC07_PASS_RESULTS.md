@@ -609,3 +609,33 @@ p95 was 0.695/7.466/34.126/105.984 ms; full-sort p95 was
 220,889,088 bytes. These synthetic harness results are not end-to-end UI
 latency. Keyboard order across the operator windows, VoiceOver, compact-size
 interaction, and live multi-display behavior remain open.
+
+### 2026-11-01 disabled library action styling and launch observation
+
+At app source commit `9a65c91f2a1dee17128cfa682a29faae16cb6a73`, the custom
+Rust Boy button style now respects SwiftUI's enabled state. In a fresh empty
+library, Play Selected, Enqueue Selected, and Play Next appeared muted and the
+accessibility tree marked all three disabled. No library was loaded and no
+playback was started. Enabled button colors and prominent styling are
+unchanged. Independent gate and safety reviews found no blocker for this
+narrow styling change; VoiceOver, contrast, and complete keyboard acceptance
+were not part of those reviews.
+
+`sh scripts/build-macos-app.sh` exited **0**. The signed bundle passed
+validation; operator-window geometry, protocol, catalog, shutdown, and process
+lifecycle harnesses passed. Synthetic search and full-sort harness p95 values
+at 2k/20k/100k/250k entries were 1.036/10.724/53.999/141.769 ms and
+7.497/66.559/463.292/1,326.506 ms, respectively. Catalog-harness peak RSS
+was 242,237,440 bytes. These synthetic measurements are harness results, not
+end-to-end UI latency or memory profiling of an imported library.
+
+The operator reported that launch starts with Player and then shows the other
+windows. In this pass, a fresh launch showed only Player after about 2.2
+seconds, and the app source contained no startup call that opens the other
+scenes. With Player as the only visible window, invoking Window > Arrange
+Operator Windows returned focus to Player after about 900 ms. Playlist and
+Equalizer were subsequently reachable from the native Window menu. This
+pass does not resolve whether macOS scene restoration explains the operator's
+startup observation, nor independently establish the complete desktop
+composition after arranging. MAC07-03 remains in progress; this evidence does
+not make the change merge-ready or establish release readiness.
