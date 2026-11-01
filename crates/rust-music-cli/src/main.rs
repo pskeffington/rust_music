@@ -2629,6 +2629,94 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    // Explicit real-world corpus gate. Do not substitute synthetic WAV for FLAC.
+    // Example: RUST_MUSIC_TEST_FLAC=/absolute/path/song.flac cargo test \
+    //   --locked --offline -p rust-music-cli --features macos-output \
+    //   -- --ignored package_stream_external_flac_transport
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    #[ignore = "requires RUST_MUSIC_TEST_FLAC pointing to a real local FLAC file"]
+    fn package_stream_external_flac_transport() {
+        let source = std::path::PathBuf::from(
+            std::env::var_os("RUST_MUSIC_TEST_FLAC")
+                .expect("set RUST_MUSIC_TEST_FLAC to an absolute real-world FLAC"),
+        );
+        assert!(source.is_absolute() && source.is_file(), "FLAC must exist");
+        assert_eq!(
+            source.extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase),
+            Some("flac".to_owned()),
+            "fixture must be FLAC"
+        );
+        let root = temp_root("package-external-flac");
+        let destination = root.join("real-world.flac");
+        fs::copy(&source, &destination).expect("copy local FLAC into isolated scan root");
+        let requests = [
+            Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+            Request::Activate { width: 640, height: 520 },
+            Request::ScanLibrary {
+                root: root.to_string_lossy().into_owned(),
+            },
+            Request::Select { index: 0 },
+            Request::SetVolumePercent { percent: 100 },
+            Request::Play,
+            Request::Snapshot { page: 0 },
+            Request::Stop,
+            Request::Shutdown,
+        ];
+        let mut input = Vec::new();
+        for (offset, body) in requests.into_iter().enumerate() {
+            write_frame(
+                &mut input,
+                &Envelope {
+                    package_id: MUSIC_PACKAGE_ID.into(),
+                    request_id: offset as u64 + 1,
+                    body,
+                }
+                .encode()
+                .unwrap(),
+            )
+            .unwrap();
+        }
+        let mut output = Vec::new();
+        serve_stream_with_limits::<NullSink, _, _, _>(
+            || Ok(NullSink::default()),
+            std::io::Cursor::new(input),
+            &mut output,
+            STANDALONE_SCAN_LIMITS,
+        )
+        .expect("persistent desktop FLAC server should complete");
+        let mut replies = output.as_slice();
+        for step in 0..requests.len() {
+            let bytes = read_frame(&mut replies).unwrap().expect("missing protocol reply");
+            let response = Envelope::<Reply>::decode(&bytes).unwrap();
+            assert_eq!(response.request_id, step as u64 + 1);
+            match (step, response.body) {
+                (0, Reply::Hello { .. }) | (8, Reply::Ack) => {}
+                (1..=7, Reply::View(view)) => {
+                    if step >= 2 {
+                        assert_eq!(view.track_count, 1, "FLAC scan lost the selected file");
+                    }
+                    if step == 5 {
+                        assert_eq!(
+                            view.playback,
+                            Playback::Playing,
+                            "real FLAC failed to enter playback"
+                        );
+                    }
+                }
+                (_, other) => panic!("step {step} failed: {other:?}"),
+            }
+        }
+        assert!(read_frame(&mut replies).unwrap().is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[cfg(any(
         all(target_os = "macos", feature = "macos-output"),
         all(target_os = "linux", feature = "alsa-output")
