@@ -884,6 +884,16 @@ private struct RustMusicCommands: Commands {
                 model.requestLibrarySearchFocus()
             }
             .keyboardShortcut("f", modifiers: [.command])
+            Button("New Playlist") {
+                openWindow(id: "playlist")
+                model.prepareNewPlaylist()
+            }
+            .keyboardShortcut("n", modifiers: [.command])
+            .disabled(
+                model.libraryRoot == nil
+                    || model.isStateBusy
+                    || model.isTransportBusy
+            )
             Divider()
             Button("Play Selected Track") { model.play() }
                 .keyboardShortcut(.return, modifiers: [.command])
@@ -906,6 +916,14 @@ private struct RustMusicCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(
                     model.selectedTrack == nil
+                        || model.isStateBusy
+                        || model.isTransportBusy
+                )
+            Button("Add Selected Tracks to Selected Playlist") { model.addSelectionToPlaylist() }
+                .keyboardShortcut("p", modifiers: [.command, .option])
+                .disabled(
+                    model.selectedPlaylist == nil
+                        || model.selectedTrackIDs.isEmpty
                         || model.isStateBusy
                         || model.isTransportBusy
                 )
@@ -1366,6 +1384,7 @@ final class PlayerModel: ObservableObject {
     }
     @Published var selectedTrackIDs: Set<Int> = []
     @Published private(set) var librarySearchFocusGeneration: UInt64 = 0
+    @Published private(set) var playlistNameFocusGeneration: UInt64 = 0
     @Published var searchText = "" {
         didSet { refreshVisibleTracks() }
     }
@@ -1504,6 +1523,14 @@ final class PlayerModel: ObservableObject {
 
     func requestLibrarySearchFocus() {
         librarySearchFocusGeneration &+= 1
+    }
+
+    func prepareNewPlaylist() {
+        guard libraryRoot != nil, !isStateBusy, !isTransportBusy else { return }
+        selectedPlaylist = nil
+        selectedPlaylistEntryIDs = []
+        newPlaylistName = ""
+        playlistNameFocusGeneration &+= 1
     }
 
     private func recreatePackageClientForOutputChange() {
@@ -2617,7 +2644,9 @@ private struct PlayerView: View {
     @ObservedObject private var model: PlayerModel
     private let kind: PlayerWindowKind
     @FocusState private var librarySearchIsFocused: Bool
+    @FocusState private var playlistNameIsFocused: Bool
     @State private var handledLibrarySearchFocusGeneration: UInt64 = 0
+    @State private var handledPlaylistNameFocusGeneration: UInt64 = 0
 
     init(model: PlayerModel, kind: PlayerWindowKind) {
         self.model = model
@@ -2664,8 +2693,12 @@ private struct PlayerView: View {
         .preferredColorScheme(.dark)
         .tint(RustMusicPalette.phosphor)
         .onChange(of: model.searchText) { _ in model.boundSearchText() }
-        .onAppear { focusLibrarySearchIfRequested() }
+        .onAppear {
+            focusLibrarySearchIfRequested()
+            focusPlaylistNameIfRequested()
+        }
         .onChange(of: model.librarySearchFocusGeneration) { _ in focusLibrarySearchIfRequested() }
+        .onChange(of: model.playlistNameFocusGeneration) { _ in focusPlaylistNameIfRequested() }
     }
 
     private func focusLibrarySearchIfRequested() {
@@ -2674,6 +2707,15 @@ private struct PlayerView: View {
         handledLibrarySearchFocusGeneration = model.librarySearchFocusGeneration
         DispatchQueue.main.async {
             librarySearchIsFocused = true
+        }
+    }
+
+    private func focusPlaylistNameIfRequested() {
+        guard kind == .playlist,
+              model.playlistNameFocusGeneration > handledPlaylistNameFocusGeneration else { return }
+        handledPlaylistNameFocusGeneration = model.playlistNameFocusGeneration
+        DispatchQueue.main.async {
+            playlistNameIsFocused = true
         }
     }
 
@@ -2997,7 +3039,7 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play Selected, Enqueue Selected, and Play Next actions, or open a track's context menu for row actions.")
+                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
                         .accessibilityIdentifier("library-track-list")
                     }
                 }
@@ -3026,6 +3068,16 @@ private struct PlayerView: View {
             VStack(alignment: .leading, spacing: 7) {
                 TextField("NEW PLAYLIST NAME", text: $model.newPlaylistName)
                     .modifier(RustMusicTextFieldStyle())
+                    .focused($playlistNameIsFocused)
+                    .accessibilityLabel("New playlist name or rename selected playlist")
+                    .accessibilityHint("Press Return to create a playlist or rename the selected playlist.")
+                    .onSubmit {
+                        if model.selectedPlaylist == nil {
+                            model.createPlaylist()
+                        } else {
+                            model.renameSelectedPlaylist()
+                        }
+                    }
 
                 List {
                     ForEach(model.playlists) { playlist in

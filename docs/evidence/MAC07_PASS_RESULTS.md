@@ -918,3 +918,36 @@ search p95 **74.091 ms**, full-sort p95 **708.465 ms**, and peak RSS
 memory, imported-library UI latency, or playback-under-load acceptance. The
 candidate remains on open PR #9 and is not merged-mainline or production
 readiness evidence.
+
+### 2026-11-01 Playlist creation and batch-add keyboard workflow
+
+On candidate branch `codex/mac07-disabled-control-state`, source `0abffa0`
+plus the uncommitted SwiftUI change, the rebuilt app was exercised with an
+explicitly loaded three-file metadata-only FLAC fixture (137 bytes per file,
+no audio frames). Command-N opened Playlist Editor and focused the new-playlist
+name field; typing `Keyboard Set` and pressing Return created and selected the
+playlist. Command-F opened Library search. Shift-click selected all three
+catalog rows, and Command-Option-P added them to the selected playlist. The
+Playlist Editor showed `Keyboard Set, 3` and the three filename paths. The queue
+remained empty. No transport action or playback occurred.
+
+The temporary playlist was deleted through the UI, the app was quit, the
+generated fixture was removed, and the rebuilt app was relaunched. Its fresh
+accessibility state showed Player / Ready / No Track, an empty queue, and no
+output snapshot. This confirms the exercised keyboard path for playlist
+creation and batch add; it does not establish complete keyboard traversal,
+VoiceOver operation, audio playback, or the full MAC07 acceptance gate.
+
+`sh scripts/build-macos-app.sh` exited **0** on source `0abffa0` plus the
+uncommitted SwiftUI change. Bundle signature validation and the catalog-search,
+playlist-selection, operator-window geometry, playback-snapshot,
+catalog-bounds, and process-lifecycle harnesses passed. The 250k synthetic
+catalog harness reported search p95 **73.554 ms**, full-sort p95 **821.209 ms**,
+and peak RSS **240,484,352 bytes**. These are catalog-harness measurements,
+not full-app UI or playback-under-load measurements. The compiler emitted
+unused diagnostic-code warnings in the native macOS audio module. A shell
+`open` attempt returned Launch Services `kLSNoExecutableErr`; the CUA desktop
+controller subsequently launched the exact rebuilt bundle and the live UI
+workflow completed. The candidate remains on open PR #9 and is not
+merged-mainline evidence. A read-only safety review found no actionable issue
+in the keyboard-command diff.
