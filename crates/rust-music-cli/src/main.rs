@@ -2669,6 +2669,40 @@ mod tests {
             Request::Stop,
             Request::Shutdown,
         ];
+        struct CountingSink {
+            inner: NullSink,
+            total: Arc<std::sync::atomic::AtomicU64>,
+        }
+        impl PcmSink for CountingSink {
+            fn open(&mut self, format: AudioFormat) -> Result<()> { self.inner.open(format) }
+            fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+                self.inner.write(block)?;
+                self.total.fetch_add(block.frames() as u64, Ordering::Relaxed);
+                Ok(())
+            }
+            fn pause(&mut self) -> Result<()> { self.inner.pause() }
+            fn resume(&mut self) -> Result<()> { self.inner.resume() }
+            fn finish(&mut self) -> Result<()> { self.inner.finish() }
+        }
+        struct PacedInput {
+            inner: std::io::Cursor<Vec<u8>>,
+            pause_at: u64,
+            paused: bool,
+        }
+        impl std::io::Read for PacedInput {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                if !self.paused && self.inner.position() >= self.pause_at {
+                    self.paused = true;
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                let cap = if self.paused { buf.len() } else {
+                    buf.len().min((self.pause_at - self.inner.position()) as usize)
+                };
+                self.inner.read(&mut buf[..cap])
+            }
+        }
+        let total_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let mut pause_at = 0u64;
         let mut input = Vec::new();
         for (offset, body) in requests.into_iter().enumerate() {
             write_frame(
@@ -2682,11 +2716,13 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
+            if offset == 5 { pause_at = input.len() as u64; }
         }
         let mut output = Vec::new();
-        serve_stream_with_limits::<NullSink, _, _, _>(
-            || Ok(NullSink::default()),
-            std::io::Cursor::new(input),
+        let frames_in_sink = Arc::clone(&total_frames);
+        serve_stream_with_limits::<CountingSink, _, _, _>(
+            move || Ok(CountingSink { inner: NullSink::default(), total: frames_in_sink }),
+            PacedInput { inner: std::io::Cursor::new(input), pause_at, paused: false },
             &mut output,
             STANDALONE_SCAN_LIMITS,
         )
@@ -2714,6 +2750,8 @@ mod tests {
             }
         }
         assert!(read_frame(&mut replies).unwrap().is_none());
+        assert!(total_frames.load(Ordering::Relaxed) > 0,
+            "persistent server entered Playing but submitted zero decoded FLAC frames");
         fs::remove_dir_all(root).unwrap();
     }
 
