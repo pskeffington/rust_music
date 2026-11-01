@@ -865,11 +865,18 @@ private struct RustMusicCommands: Commands {
     }
 
     private func showAllWindows() {
-        openWindow(id: "equalizer")
-        openWindow(id: "library")
-        openWindow(id: "playlist")
-        // Present the primary transport last so it owns focus when the menu closes.
-        openWindow(id: "player")
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.equalizer) {
+            openWindow(id: "equalizer")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.library) {
+            openWindow(id: "library")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.playlist) {
+            openWindow(id: "playlist")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.player) {
+            openWindow(id: "player")
+        }
     }
 
     private func arrangeWindows() {
@@ -932,11 +939,18 @@ private struct WindowSwitcher: View {
     }
 
     private func showAllWindows() {
-        openWindow(id: "equalizer")
-        openWindow(id: "library")
-        openWindow(id: "playlist")
-        // Present the primary transport last so it owns focus when the menu closes.
-        openWindow(id: "player")
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.equalizer) {
+            openWindow(id: "equalizer")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.library) {
+            openWindow(id: "library")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.playlist) {
+            openWindow(id: "playlist")
+        }
+        if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.player) {
+            openWindow(id: "player")
+        }
     }
 
     private func arrangeWindows() {
@@ -1037,6 +1051,11 @@ private final class OperatorWindowDocking: NSObject {
         }
     }
 
+    func isVisible(_ name: String) -> Bool {
+        guard let window = windows[name]?.value else { return false }
+        return window.isVisible && !window.isMiniaturized
+    }
+
     func requestArrangement() {
         arrangementPending = true
         // `openWindow` returns before SwiftUI has finished presenting every
@@ -1064,7 +1083,7 @@ private final class OperatorWindowDocking: NSObject {
         changingFrames = true
         for name in OperatorWindowLayout.windowOrder {
             guard let window = windows[name]?.value, let frame = frames[name] else { continue }
-            window.setFrame(frame, display: true, animate: true)
+            window.setFrame(frame, display: true, animate: false)
         }
         changingFrames = false
         windows[OperatorWindowLayout.player]?.value?.makeKeyAndOrderFront(nil)
