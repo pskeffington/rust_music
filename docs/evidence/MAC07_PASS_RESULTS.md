@@ -763,3 +763,11 @@ observed at its large default size. A live resize below 520×360 points has
 not been measured; UI automation failed to target the corner consistently.
 MAC07-03 compact-size acceptance remains open. The candidate remains on PR #9,
 not merged-mainline evidence.
+
+After that build, macOS Window → Move & Resize → Top Left reduced the live
+Media Library to a 736×454-pixel CUA screenshot. Search, sort, the no-library
+message, and the action row remained visible; the accessibility tree retained
+the search, sort, and action controls. No library was loaded and no playback
+started. This is a compact live layout observation in screenshot pixels; it
+does not establish AppKit point dimensions or minimum-size enforcement. The
+direct corner resize still could not be targeted by UI automation.
