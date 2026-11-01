@@ -68,7 +68,7 @@
       "review_agent": "safety_reviewer",
       "scope": "Four native operator windows with shared playback state, searchable library, queue/playlist editor, disabled EQ shell, frame persistence and adaptive resizing",
       "acceptance": "Layout checks at two sizes and keyboard order validation",
-      "evidence_status": "deferred_arrangement_player_front_live_verified_four_scenes_in_window_menu_magnetic_geometry_pass_cmd_o_cmd_f_search_focus_smoke_compact_library_top_left_tile_tab_shift_down_and_scroll_40_rows_live_verified_compact_scroll_search_filtered_shift_multiselect_and_hidden_play_target_guard_live_verified_in_library_player_and_playback_menu_40_row_rebuilt_candidate_guard_confirmation_canonical_unicode_query_play_guard_live_verified_live_drag_minimum_frame_multisize_voiceover_open",
+      "evidence_status": "deferred_arrangement_player_front_live_verified_four_scenes_in_window_menu_magnetic_geometry_pass_cmd_o_cmd_f_search_focus_smoke_compact_library_top_left_tile_tab_shift_down_and_scroll_40_rows_live_verified_compact_scroll_search_filtered_shift_multiselect_and_hidden_play_target_guard_live_verified_in_library_player_and_playback_menu_40_row_rebuilt_candidate_guard_confirmation_canonical_unicode_query_play_guard_four_window_focus_routing_live_verified_live_drag_minimum_frame_multisize_voiceover_open",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md",
       "supplemental_evidence_document": "docs/evidence/MAC07_FILTERED_PLAY_ACTIONS.md"
     },
