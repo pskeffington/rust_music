@@ -17,7 +17,15 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths. N
 
 **Source of truth:** the checked-out code and measured validation evidence take precedence over dated handoffs. Historical draft-PR instructions are not current merge policy. `main` and `build/native-codecs-g0` were identical at `deb6f879` on 2026-10-31.
 
-## Current status — 2026-10-31
+## Active development notice — 2026-11-01: debugging the audio stream
+
+**Current status: audio-stream debugging in progress (MAC-07, PR #3).** Real FLAC playback has been reported audible through the native CLI but silent or unreliable through the macOS graphical player. This is an unresolved regression; prior successful listening and build evidence must not be interpreted as current GUI playback acceptance.
+
+The engineering branch includes bounded playback-process stderr capture, a same-file CLI/GUI A/B harness (`scripts/mac07_flac_ab.sh`), and an opt-in real-FLAC persistent-server regression with PCM frame-count assertions. These changes improve diagnostic coverage but **have not established a root-cause fix or confirmed audible GUI output**. The current focus is native AudioQueue PCM submission, start/callback behavior, and playback-state reconciliation. Run the macOS listening gate before release; keep PR #3 draft.
+
+For implementation scope and evidence, see [MAC-07 roadmap](docs/ROADMAP.md) and [macOS player notes](apps/rust-music-macos/README.md).
+
+
 
 The merged implementation and latest local macOS app build are on [`main` at `e8e5ff8`](https://github.com/pskeffington/rust_music/commit/e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b); PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The pushed `main` commit descends from that merge commit. The native macOS bundle compiled and launched successfully; library loading and audible output have been exercised. This is an engineering checkpoint, **not a production release**.
 
