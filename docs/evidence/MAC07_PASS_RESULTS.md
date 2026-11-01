@@ -470,6 +470,12 @@ and no audio or track identifiers were copied into Git. The private six-track
 FLAC parity gate remains required before merge; captured gate transcripts are
 outside Git.
 
+The documented pre-merge script was repeated at clean candidate
+`cfb1b130edab07e159d42e5673cb9411f71e1e40` after the authorized path check.
+It again passed the offline Rust gate, WAVE 6/6, and AIFF/AIFF-C 7/7, then
+exited **3** at the absent `/private/corpus` directory. The six expected FLAC
+hashes were not available among the specifically listed files.
+
 At app source commit `91607a5`, `sh scripts/build-macos-app.sh` exited **0**.
 Catalog, playlist, compact/tiled window geometry, snapshot bounds, strict local
 signature, shutdown coordination, and child-process lifecycle checks passed.
