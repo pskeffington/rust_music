@@ -1258,3 +1258,19 @@ visible display remained `--:--` at both ends. No folder was scanned and no
 playback occurred. This confirms the no-snapshot accessibility label/value
 through macOS accessibility APIs only. Real-playback elapsed/duration values,
 VoiceOver speech and rotor navigation, and MAC07-02 acceptance remain open.
+
+### 2026-11-01 MAC07-02 live playback-time accessibility value
+
+The rebuilt app explicitly loaded a user-supplied local FLAC folder and began
+one track with software volume set to 0% for this UI-state check. Through the
+macOS accessibility tree, `Playback time` changed from `00:01 elapsed of
+01:07` to `00:04 elapsed of 01:07`; the progress indicator changed from 0.027
+to 0.068 and the output queue's submitted-frame count advanced from 81,920 to
+204,800. The UI reported `PLAYING` and `OUTPUT CLAIMED`, while explicitly
+stating that audible output was not confirmed. The terminal diagnostic
+reported zero nonzero PCM samples at the intentionally muted volume. Playback
+was stopped and the prior 100% volume setting restored. The test validates
+changing playback snapshot accessibility and progress only; it is not audible
+playback, nonzero PCM, VoiceOver speech, or DAC evidence. The folder selection
+is not repeated here and no private filename or absolute path is recorded.
+MAC07-02 remains in progress.
