@@ -697,3 +697,10 @@ crowding at compact heights, the list minimum was lowered to 96 points. The
 final build and a fresh CUA Library screenshot were rerun at 1,000×900
 screenshot pixels and passed. No live resize to its declared 520×360-point
 window minimum was performed, so compact reachability remains unverified.
+
+At exact source HEAD `ddd18547d663ca45a0fb20d920435526c5489c9f`,
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+edges, zero registry/Git crates, and Rust workspace tests passed. The
+macOS app build and signature verification at this same source commit also
+exited **0**. These checks do not establish private FLAC parity or GUI/hardware
+acceptance.
