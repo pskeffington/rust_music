@@ -1,5 +1,8 @@
 # Rust Music — phased engineering roadmap
 
+**2026-11-01 active blocker — debugging macOS audio stream:** direct CLI real-FLAC audio has been reported working, but SwiftUI GUI output remains silent/unreliable. MAC07 diagnostic stderr capture, same-file CLI/GUI A/B script, and opt-in real-FLAC PCM-frame regression are implemented; the actual cause and audible GUI repair remain unverified. Next: instrument AudioQueue enqueue/start/completion, compare exact same file and device, repair the first demonstrated divergence, then validate library lifecycle and queue synchronization. Keep [PR #3](https://github.com/pskeffington/rust_music/pull/3) draft until operator listening and automated tests pass. Do not replace historical success evidence with a claim of current functionality.
+
+
 **MAC-07 execution index:** [machine pass index](mac07-pass-index.json) and [pass evidence ledger](evidence/MAC07_PASS_RESULTS.md). MAC07-00 is first runnable; MAC07-01 must fix GUI FLAC before downstream UX gates. Individual passes remain planned until evidenced.
 
 ## Active priority — MAC-07 desktop GUI playback and Winamp-style management (2026-10-31)
