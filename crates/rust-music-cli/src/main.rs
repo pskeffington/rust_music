@@ -1463,6 +1463,7 @@ fn handle_unit_request_with_limits<S: PcmSink>(
         Request::SetVolumePercent { percent } => slot
             .handle(Command::SetVolumePercent(percent), focus)
             .map(|_| ()),
+        Request::SeekFrame { frame } => slot.handle(Command::SeekFrame(frame), focus).map(|_| ()),
         Request::Play => {
             focus.grant.store(true, Ordering::Release);
             let result = slot.handle(Command::Play, focus).map(|_| ());

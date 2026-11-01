@@ -90,21 +90,45 @@ pub struct View {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
-    Hello { min_version: u16, max_version: u16 },
-    Activate { width: u16, height: u16 },
+    Hello {
+        min_version: u16,
+        max_version: u16,
+    },
+    Activate {
+        width: u16,
+        height: u16,
+    },
     Suspend,
-    Resume { width: u16, height: u16 },
-    Resize { width: u16, height: u16 },
-    ScanLibrary { root: String },
-    Select { index: u16 },
+    Resume {
+        width: u16,
+        height: u16,
+    },
+    Resize {
+        width: u16,
+        height: u16,
+    },
+    ScanLibrary {
+        root: String,
+    },
+    Select {
+        index: u16,
+    },
     Previous,
     Next,
     Play,
     Stop,
     Pause,
     ResumePlayback,
-    SetVolumePercent { percent: u8 },
-    Snapshot { page: u16 },
+    SetVolumePercent {
+        percent: u8,
+    },
+    /// Seek a loaded, seek-capable lossless track to a sample frame.
+    SeekFrame {
+        frame: u64,
+    },
+    Snapshot {
+        page: u16,
+    },
     Shutdown,
 }
 
@@ -301,6 +325,10 @@ impl Envelope<Request> {
                 body.byte(15);
                 body.byte(*percent);
             }
+            Request::SeekFrame { frame } => {
+                body.byte(16);
+                body.u64(*frame);
+            }
         }
         encode_header(1, &self.package_id, self.request_id, body)
     }
@@ -343,6 +371,9 @@ impl Envelope<Request> {
             14 => Request::ResumePlayback,
             15 => Request::SetVolumePercent {
                 percent: reader.byte()?,
+            },
+            16 => Request::SeekFrame {
+                frame: reader.u64()?,
             },
             _ => return Err(ProtocolError::Invalid("unknown request tag")),
         };
@@ -690,6 +721,19 @@ mod tests {
         }
         .encode()
         .is_err());
+    }
+
+    #[test]
+    fn seek_frame_request_roundtrips_full_width_frame_positions() {
+        for frame in [0, 1, 44_100, u64::MAX] {
+            let request = Envelope {
+                package_id: ID.into(),
+                request_id: 9,
+                body: Request::SeekFrame { frame },
+            };
+            let bytes = request.encode().unwrap();
+            assert_eq!(Envelope::<Request>::decode(&bytes).unwrap(), request);
+        }
     }
 
     #[test]

@@ -144,6 +144,15 @@ struct PackagePlaybackSnapshot: Equatable {
         return UInt16(totalFrames.dividingFullWidth(product).quotient)
     }
 
+    static func seekFrame(totalFrames: UInt64, perMille: Int) -> UInt64? {
+        guard totalFrames > 0 else { return nil }
+        let bounded = UInt64(min(1000, max(0, perMille)))
+        // Split before multiplying so even UInt64.max frame counts cannot
+        // overflow while converting the scrubber's 0...1000 range.
+        return (totalFrames / 1000) * bounded
+            + ((totalFrames % 1000) * bounded) / 1000
+    }
+
     var elapsedText: String? {
         guard let format, format.sampleRate > 0 else { return nil }
         let frames = totalFrames.map { min(framesDelivered, $0) } ?? framesDelivered

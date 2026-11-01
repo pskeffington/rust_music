@@ -170,6 +170,7 @@ private enum PackageRequest {
     case pause
     case resumePlayback
     case setVolumePercent(UInt8)
+    case seekFrame(UInt64)
     case snapshot(UInt16)
     case shutdown
 
@@ -196,6 +197,8 @@ private enum PackageRequest {
         case .setVolumePercent(let percent):
             guard percent <= 100 else { throw RustMusicFailure(message: "Volume must be from 0 to 100 percent.") }
             body.append(15); body.append(percent)
+        case .seekFrame(let frame):
+            body.append(16); body.appendBE(frame)
         }
         var payload = Data([1, 1]) // RBPK v1 request envelope
         payload.appendBE(requestID)
@@ -1446,6 +1449,25 @@ final class PlayerModel: ObservableObject {
         }
     }
 
+    func seek(toPerMille perMille: Int) {
+        guard isPlaying, !isTransportBusy, !isStateBusy,
+              let totalFrames = playbackSnapshot?.totalFrames,
+              let frame = PackagePlaybackSnapshot.seekFrame(
+                totalFrames: totalFrames,
+                perMille: perMille
+              ) else { return }
+        // Seeking drains and closes the current AudioQueue, then leaves the
+        // decoder Ready. Reissue Play explicitly so scrubbing during playback
+        // resumes from the requested position with a fresh output queue.
+        let volume = UInt8(volumePercent)
+        runPackageCommands(
+            [.seekFrame(frame), .setVolumePercent(volume), .play],
+            label: "Seeking…"
+        ) { [weak self] response in
+            self?.applyPlaybackResponse(response, fallback: "Playback resumed from the selected position.")
+        }
+    }
+
     private func runPackageCommands(
         _ requests: [PackageRequest],
         label: String,
@@ -1952,6 +1974,7 @@ private enum PlayerSection: String, CaseIterable, Identifiable {
 struct PlayerView: View {
     @StateObject private var model = PlayerModel()
     @State private var activeSection: PlayerSection = .nowPlaying
+    @State private var progressScrubPerMille: Double?
 
     var body: some View {
         PipBoyChassis {
@@ -2118,10 +2141,30 @@ struct PlayerView: View {
                 }
                 if let snapshot = model.playbackSnapshot,
                    let progress = snapshot.progressPerMille {
-                    ProgressView(value: Double(progress), total: 1000)
-                        .accessibilityLabel("Playback progress")
-                        .accessibilityValue(snapshot.progressAccessibilityValue)
-                        .accessibilityIdentifier("playback-progress")
+                    Slider(
+                        value: Binding(
+                            get: { progressScrubPerMille ?? Double(progress) },
+                            set: { progressScrubPerMille = min(1000, max(0, $0)) }
+                        ),
+                        in: 0...1000,
+                        onEditingChanged: { editing in
+                            if editing {
+                                progressScrubPerMille = Double(progress)
+                            } else {
+                                let target = Int((progressScrubPerMille ?? Double(progress)).rounded())
+                                progressScrubPerMille = nil
+                                model.seek(toPerMille: target)
+                            }
+                        }
+                    )
+                    .disabled(
+                        !model.isPlaying || model.isTransportBusy || model.isStateBusy
+                            || snapshot.totalFrames == nil || model.selectedTrack?.container != "flac"
+                    )
+                    .accessibilityLabel("Playback position")
+                    .accessibilityValue(snapshot.progressAccessibilityValue)
+                    .accessibilityHint("Drag left to rewind or right to seek forward. Playback resumes when released.")
+                    .accessibilityIdentifier("playback-progress")
                 } else if model.playbackSnapshot != nil {
                     ProgressView()
                         .accessibilityLabel("Playback progress")

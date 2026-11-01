@@ -71,6 +71,12 @@ struct PlaybackUIStateTests {
             precondition(known.audioClaimed)
             precondition(known.elapsedText == "00:01" && known.durationText == "00:10")
             precondition(known.progressPerMille == 130)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: 441_000, perMille: 0) == 0)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: 441_000, perMille: 500) == 220_500)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: 441_000, perMille: 1000) == 441_000)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: 441_000, perMille: 1200) == 441_000)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: UInt64.max, perMille: 1000) == UInt64.max)
+            precondition(PackagePlaybackSnapshot.seekFrame(totalFrames: 0, perMille: 500) == nil)
 
             let unknown = try decodeSnapshot(snapshotBody(state: 6, totalFrames: nil, audioClaimed: 0))
             precondition(unknown.state == 6 && !unknown.audioClaimed)
