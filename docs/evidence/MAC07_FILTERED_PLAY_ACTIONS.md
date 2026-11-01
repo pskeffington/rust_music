@@ -89,3 +89,9 @@ playback occurred. After explicitly returning to Player, a follow-up AX check
 This verifies window target and focus routing for both menu surfaces. No frame
 dimensions were captured, and no claim is made here about Arrange geometry,
 minimum-frame behavior, or simultaneous window visibility.
+
+## Library selection accessibility actions
+
+On 2026-11-01, a rebuilt app explicitly loaded one generated metadata-only FLAC fixture with no audio frames. The Library list exposed `Enqueue Selected Tracks` and `Play Next Selected Track` as macOS accessibility secondary actions. Invoking Enqueue changed the queue from zero to one entry; invoking Play Next changed it from one to two. Clearing the temporary queue returned it to zero. Player remained stopped with no output snapshot throughout. This verifies action exposure and queue effects on that candidate; it does not verify VoiceOver speech or rotor navigation.
+
+A follow-up change makes Enqueue available only with a nonempty selection while commands are idle. Play Next additionally requires the transport target to be part of the Library selection and visible under the current search. The latest `sh scripts/build-macos-app.sh` exited 0. The final live no-selection check was interrupted when the desktop session reported that the app bundle had changed during user interaction; dynamic action removal for the latest build remains unverified. The fixture remains loaded in the stopped app at the last observation and is outside Git.

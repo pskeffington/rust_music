@@ -1482,6 +1482,11 @@ final class PlayerModel: ObservableObject {
         return CatalogSearch.matches(selectedTrack, matching: searchText)
     }
 
+    var selectedTrackIsInLibrarySelection: Bool {
+        guard let selectedTrack else { return false }
+        return selectedTrackIDs.contains(selectedTrack.id)
+    }
+
     var selectedTracksInCatalogOrder: [CatalogTrack] {
         tracks.filter { selectedTrackIDs.contains($0.id) }
     }
@@ -3095,6 +3100,22 @@ private struct PlayerView: View {
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
                         .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .conditionalAccessibilityAction(
+                            !model.selectedTrackIDs.isEmpty && !model.isStateBusy && !model.isTransportBusy,
+                            named: "Enqueue Selected Tracks"
+                        ) {
+                            model.addSelectionToQueue()
+                        }
+                        .conditionalAccessibilityAction(
+                            model.selectedTrack != nil
+                                && model.selectedTrackIsInLibrarySelection
+                                && model.selectedTrackMatchesCurrentSearch
+                                && !model.isStateBusy
+                                && !model.isTransportBusy,
+                            named: "Play Next Selected Track"
+                        ) {
+                            model.addSelectedTrackNext()
+                        }
                         .accessibilityIdentifier("library-track-list")
                     }
                 }
@@ -3447,6 +3468,21 @@ private struct RustMusicGroupBoxStyle: GroupBoxStyle {
         .overlay {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(RustMusicPalette.line, lineWidth: 1)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func conditionalAccessibilityAction(
+        _ isAvailable: Bool,
+        named name: String,
+        perform action: @escaping () -> Void
+    ) -> some View {
+        if isAvailable {
+            self.accessibilityAction(named: Text(name)) { action() }
+        } else {
+            self
         }
     }
 }
