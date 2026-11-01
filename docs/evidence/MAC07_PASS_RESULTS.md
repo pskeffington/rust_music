@@ -1009,3 +1009,28 @@ and the app was left open idle. This is a focused keyboard and preference
 check only: MAC07-03 remains in progress, the compact Player transport
 fallback still lacks live verification, and full keyboard traversal,
 VoiceOver, layout, playback, and hardware gates remain open.
+
+### 2026-11-01 MAC07-03 operator-window controls smoke
+
+On candidate `0a4c343bda129cb7034dc55f38d8de2c5ed5e26c`,
+`sh scripts/build-macos-app.sh` exited **0** and the rebuilt bundle signature
+verified. The desktop CUA launched the bundle with Player in front; it showed
+Ready / No Track and no output snapshot. The Window menu exposed Player,
+Playlist Editor, Media Library, Equalizer, individual Show actions, Show All,
+and Arrange Operator Windows. Raising Playlist Editor showed an empty queue
+and empty named-playlist list. Raising Equalizer showed all ten band sliders
+disabled with the message that no verified DSP processor is connected. Raising
+Media Library showed 0 tracks, `NO LIBRARY LOADED`, and disabled search and
+track actions. Arrange Operator Windows executed and Player was the front
+window afterward. This confirms those exercised window controls and empty
+states; it does not establish that all windows were simultaneously visible or
+that their arranged geometry was visually accepted.
+
+No folder was loaded, no scan was performed, and no playback occurred. Compact
+and expanded geometry and full keyboard traversal were not verified in this
+smoke. A Full Keyboard Access toggle attempt did not produce a reliable
+comparison, so that traversal check is inconclusive. A shell `open` attempt
+returned Launch Services `kLSNoExecutableErr` even though the executable was
+present and the signature valid; the CUA controller subsequently launched the
+same bundle successfully. MAC07-03 remains in progress; compact sizing,
+keyboard, VoiceOver, playback, and hardware acceptance remain open.
