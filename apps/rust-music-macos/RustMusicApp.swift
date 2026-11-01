@@ -2969,7 +2969,8 @@ private struct PlayerView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(width: 108)
+                    .frame(width: 132)
+                    .layoutPriority(1)
                     .accessibilityLabel("Sort library tracks")
                     .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
                     .accessibilityIdentifier("library-sort-order")

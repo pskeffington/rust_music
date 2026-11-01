@@ -1203,3 +1203,23 @@ and catalog-harness peak RSS **225,263,616 bytes**. These harness measurements
 are machine-load-sensitive synthetic catalog results, not full-app memory,
 interactive scan latency, or playback-under-load evidence. The app was left
 open idle in Player. MAC07-03 remains in progress.
+
+### 2026-11-01 MAC07-03 Library sort control visibility
+
+In the rebuilt workspace app, the Media Library sort picker clipped the
+selected value to `AL...` at its 108-point frame. The picker width is now 132
+points with higher HStack layout priority so the active Title, Artist, or Album
+sort remains readable as the window narrows. After rebuilding, the live
+Library showed the full `ALBUM`, `TITLE`, and `ARTIST` values in turn; the
+existing Album preference was restored. Rust Boy colors and the rest of the
+library layout were unchanged.
+
+`sh scripts/build-macos-app.sh` exited **0**, including the focused catalog,
+playlist-selection, window-geometry, playback-snapshot, catalog-bound and
+process-lifecycle harnesses; strict app signature verification passed. The
+rebuilt app was quit and relaunched from `target/macos/RustMusic.app`; after
+2.5 seconds Player was focused with Ready / No Track and no output snapshot.
+The Library check used an empty catalog: no folder was loaded, scanned, or
+played. This verifies sort-label visibility and the observed startup focus
+only. Compact Library sizing with rows, scrolling, VoiceOver, and overall
+MAC07-03 acceptance remain open.
