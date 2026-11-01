@@ -83,7 +83,8 @@ and Show Equalizer actions each brought the named window to the front according
 to the resulting macOS accessibility-tree root. The in-window WINDOWS menu
 also raised Equalizer from Player. Equalizer continued to expose all ten
 disabled bands and the unavailable-DSP explanation. No library scan or
-playback occurred.
+playback occurred. After explicitly returning to Player, a follow-up AX check
+2.5 seconds later still showed Player / Ready / No Track as the active window.
 
 This verifies window target and focus routing for both menu surfaces. No frame
 dimensions were captured, and no claim is made here about Arrange geometry,
