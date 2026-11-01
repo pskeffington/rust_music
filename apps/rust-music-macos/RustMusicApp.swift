@@ -781,16 +781,239 @@ private enum PackageResponse {
 @main
 struct RustMusicApp: App {
     @NSApplicationDelegateAdaptor(RustMusicApplicationDelegate.self) private var appDelegate
+    @StateObject private var model = PlayerModel()
 
     var body: some Scene {
-        WindowGroup {
-            PlayerView()
-                .frame(minWidth: 600, minHeight: 390)
+        Window("Rust Music — Player", id: "player") {
+            playerWindow(.player)
+        }
+        .defaultSize(width: 620, height: 380)
+        .windowResizability(.automatic)
+        .commands {
+            RustMusicCommands(model: model)
+        }
+        Window("Rust Music — Playlist Editor", id: "playlist") {
+            playerWindow(.playlist)
+        }
+        .defaultSize(width: 720, height: 560)
+        .windowResizability(.automatic)
+        Window("Rust Music — Media Library", id: "library") {
+            playerWindow(.library)
+        }
+        .defaultSize(width: 1000, height: 700)
+        .windowResizability(.automatic)
+        Window("Rust Music — Equalizer", id: "equalizer") {
+            EqualizerWindow()
+                .frame(minWidth: 480, minHeight: 200)
+                .background(WindowFramePersistence(name: "RustMusic.Equalizer"))
                 .background(RustMusicPalette.background)
                 .preferredColorScheme(.dark)
                 .tint(RustMusicPalette.phosphor)
         }
-        .windowResizability(.contentSize)
+        .defaultSize(width: 520, height: 300)
+        .windowResizability(.automatic)
+    }
+
+    private func playerWindow(_ kind: PlayerWindowKind) -> some View {
+        PlayerView(model: model, kind: kind)
+            .frame(minWidth: kind.minimumWidth, minHeight: kind.minimumHeight)
+            .background(WindowFramePersistence(name: kind.frameName))
+            .background(RustMusicPalette.background)
+            .preferredColorScheme(.dark)
+            .tint(RustMusicPalette.phosphor)
+    }
+}
+
+private struct RustMusicCommands: Commands {
+    @ObservedObject var model: PlayerModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("Load Music Library…") { model.chooseLibrary() }
+                .keyboardShortcut("o", modifiers: [.command])
+        }
+        CommandGroup(after: .windowArrangement) {
+            Button("Show Player") { openWindow(id: "player") }
+            Button("Show Playlist Editor") { openWindow(id: "playlist") }
+            Button("Show Media Library") { openWindow(id: "library") }
+            Button("Show Equalizer") { openWindow(id: "equalizer") }
+            Button("Show All Operator Windows") { showAllWindows() }
+        }
+        CommandMenu("Playback") {
+            Button("Play / Pause") {
+                if model.isPlaying || model.isPaused { model.togglePause() } else { model.play() }
+            }
+            .keyboardShortcut(.space, modifiers: [])
+            Button("Stop") { model.stop() }
+                .keyboardShortcut(".", modifiers: [.command])
+            Button("Previous Track") { model.previous() }
+                .keyboardShortcut(.leftArrow, modifiers: [.command])
+            Button("Next Track") { model.next() }
+                .keyboardShortcut(.rightArrow, modifiers: [.command])
+        }
+    }
+
+    private func showAllWindows() {
+        openWindow(id: "player")
+        openWindow(id: "playlist")
+        openWindow(id: "library")
+        openWindow(id: "equalizer")
+    }
+}
+
+private enum PlayerWindowKind {
+    case player
+    case playlist
+    case library
+
+    var minimumWidth: CGFloat {
+        switch self {
+        case .player: 520
+        case .playlist: 520
+        case .library: 680
+        }
+    }
+
+    var minimumHeight: CGFloat {
+        switch self {
+        case .player: 200
+        case .playlist: 200
+        case .library: 420
+        }
+    }
+
+    var frameName: String {
+        switch self {
+        case .player: "RustMusic.Player"
+        case .playlist: "RustMusic.Playlist"
+        case .library: "RustMusic.Library"
+        }
+    }
+
+}
+
+private struct WindowSwitcher: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Menu("WINDOWS") {
+            Button("Show All Operator Windows") {
+                openWindow(id: "player")
+                openWindow(id: "playlist")
+                openWindow(id: "library")
+                openWindow(id: "equalizer")
+            }
+            Divider()
+            Button("Player") { openWindow(id: "player") }
+            Button("Playlist Editor") { openWindow(id: "playlist") }
+            Button("Media Library") { openWindow(id: "library") }
+            Button("Equalizer") { openWindow(id: "equalizer") }
+        }
+        .buttonStyle(RustMusicButtonStyle())
+        .accessibilityLabel("Show or focus an operator window")
+    }
+}
+
+private struct WindowFramePersistence: NSViewRepresentable {
+    let name: String
+
+    func makeNSView(context: Context) -> NSView {
+        WindowFrameObserver(name: name)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class WindowFrameObserver: NSView {
+    private let name: String
+    private var configured = false
+
+    init(name: String) {
+        self.name = name
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is unavailable")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard !configured, let window else { return }
+        configured = true
+        let restored = window.setFrameUsingName(name)
+        _ = window.setFrameAutosaveName(name)
+        if !restored {
+            window.setFrame(initialWindowFrame(for: name, in: window), display: true)
+        }
+    }
+
+    private func initialWindowFrame(for name: String, in window: NSWindow) -> NSRect {
+        guard let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return window.frame }
+        let gap: CGFloat = 12
+        let leftWidth = min(620, max(520, visible.width - 680 - gap * 3))
+        let slotHeight = max(200, (visible.height - gap * 4) / 3)
+        let leftX = visible.minX + gap
+        let topY = visible.maxY - slotHeight - gap
+        switch name {
+        case "RustMusic.Player":
+            return NSRect(x: leftX, y: topY, width: leftWidth, height: slotHeight)
+        case "RustMusic.Playlist":
+            return NSRect(x: leftX, y: topY - slotHeight - gap, width: leftWidth, height: slotHeight)
+        case "RustMusic.Equalizer":
+            return NSRect(x: leftX, y: visible.minY + gap, width: leftWidth, height: slotHeight)
+        case "RustMusic.Library":
+            let x = leftX + leftWidth + gap
+            let availableWidth = max(1, visible.maxX - x - gap)
+            let width = min(max(window.frame.width, 680), availableWidth)
+            return NSRect(x: x, y: visible.minY + gap, width: width, height: visible.height - gap * 2)
+        default:
+            return window.frame
+        }
+    }
+}
+
+private struct EqualizerWindow: View {
+    var body: some View {
+        PipBoyChassis {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("EQUALIZER")
+                            .font(.system(size: 19, weight: .bold, design: .monospaced))
+                            .tracking(1.1)
+                        Text("10 BAND · UNAVAILABLE")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(RustMusicPalette.muted)
+                    }
+                    Spacer()
+                    WindowSwitcher()
+                }
+                Text("No verified DSP processor is connected. Equalizer controls remain disabled.")
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .foregroundStyle(RustMusicPalette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(["31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"], id: \.self) { band in
+                    HStack(spacing: 10) {
+                        Text(band)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .frame(width: 52, alignment: .trailing)
+                        Slider(value: .constant(0.5), in: 0...1)
+                            .disabled(true)
+                            .accessibilityLabel("\(band) equalizer band unavailable")
+                        Text("OFF")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(RustMusicPalette.muted)
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .background(RustMusicPalette.background.ignoresSafeArea())
+        .foregroundStyle(RustMusicPalette.phosphor)
+        .preferredColorScheme(.dark)
+        .tint(RustMusicPalette.phosphor)
     }
 }
 
@@ -849,16 +1072,45 @@ private enum RustMusicPlayerRegistry {
     }
 }
 
+private final class CatalogViewCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+}
+
 @MainActor
 final class PlayerModel: ObservableObject {
     @Published var libraryRoot: URL?
-    @Published var tracks: [CatalogTrack] = []
+    @Published var tracks: [CatalogTrack] = [] {
+        didSet { refreshVisibleTracks() }
+    }
     @Published var selectedIndex: Int? {
         didSet {
             if oldValue != selectedIndex { playbackSnapshot = nil }
         }
     }
-    @Published var searchText = ""
+    @Published var selectedTrackIDs: Set<Int> = []
+    @Published var searchText = "" {
+        didSet { refreshVisibleTracks() }
+    }
+    @Published var sortOrder: CatalogSearch.SortOrder {
+        didSet {
+            UserDefaults.standard.set(sortOrder.rawValue, forKey: "RustMusic.catalogSortOrder")
+            refreshVisibleTracks()
+        }
+    }
+    @Published private(set) var visibleTracks: [CatalogTrack] = []
     @Published var status = "Choose a local library folder."
     @Published var isPlaying = false
     @Published var isPaused = false
@@ -877,13 +1129,21 @@ final class PlayerModel: ObservableObject {
     @Published var repeatMode = "off"
     @Published var shuffleSeed: String?
     @Published var playlists: [UserPlaylist] = []
-    @Published var selectedPlaylist: String?
+    @Published var selectedPlaylist: String? {
+        didSet {
+            if oldValue != selectedPlaylist { selectedPlaylistEntryIDs = [] }
+        }
+    }
+    @Published var selectedPlaylistEntryIDs: Set<Int> = []
     @Published var newPlaylistName = ""
 
     private var scanCancellationRequested = false
     private var scanProcess: Process?
     private var stateProcess: Process?
     private let packageQueue = DispatchQueue(label: "dev.rustmusic.package-process")
+    private let catalogViewQueue = DispatchQueue(label: "dev.rustmusic.catalog-view", qos: .userInitiated)
+    private var catalogViewGeneration: UInt64 = 0
+    private var catalogViewCancellation: CatalogViewCancellation?
     nonisolated(unsafe) private var packageClient: PackageProcessClient?
     nonisolated(unsafe) private var packageRootPath: String?
     nonisolated(unsafe) private var packageOutputDeviceUID: String?
@@ -895,6 +1155,9 @@ final class PlayerModel: ObservableObject {
     private let transientChildOperations = DispatchGroup()
 
     init() {
+        sortOrder = CatalogSearch.SortOrder(
+            rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogSortOrder") ?? "title"
+        ) ?? .title
         selectedOutputDeviceUID = UserDefaults.standard.string(forKey: "RustMusic.outputDeviceUID") ?? ""
         RustMusicPlayerRegistry.register(self)
         refreshOutputDevices()
@@ -904,13 +1167,13 @@ final class PlayerModel: ObservableObject {
         Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/rust-music-cli")
     }
 
-    var visibleTracks: [CatalogTrack] {
-        CatalogSearch.visibleTracks(in: tracks, matching: searchText)
-    }
-
     var selectedTrack: CatalogTrack? {
         guard let selectedIndex else { return nil }
         return tracks.first(where: { $0.id == selectedIndex })
+    }
+
+    var selectedTracksInCatalogOrder: [CatalogTrack] {
+        tracks.filter { selectedTrackIDs.contains($0.id) }
     }
 
     func refreshOutputDevices() {
@@ -990,6 +1253,25 @@ final class PlayerModel: ObservableObject {
         if bounded != searchText { searchText = bounded }
         // Filtering never changes the selected playback target. A playing
         // track may be outside the current search results without switching.
+    }
+
+    private func refreshVisibleTracks() {
+        catalogViewGeneration &+= 1
+        let generation = catalogViewGeneration
+        catalogViewCancellation?.cancel()
+        let cancellation = CatalogViewCancellation()
+        catalogViewCancellation = cancellation
+        let catalog = tracks
+        let query = CatalogSearch.boundedQuery(searchText)
+        let order = sortOrder
+        catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard !cancellation.isCancelled else { return }
+            let result = CatalogSearch.visibleTracks(in: catalog, matching: query, sortedBy: order)
+            DispatchQueue.main.async {
+                guard let self, self.catalogViewGeneration == generation else { return }
+                self.visibleTracks = result
+            }
+        }
     }
 
     private func runStateCommand(
@@ -1095,6 +1377,7 @@ final class PlayerModel: ObservableObject {
                    let entry = queue.entries.first(where: { $0.index == current }),
                    let track = self.tracks.first(where: { $0.relativePath == entry.relativePath }) {
                     self.selectedIndex = track.id
+                    self.selectedTrackIDs = [track.id]
                 }
                 self.reloadPlaylists()
             case .failure(let failure):
@@ -1118,6 +1401,11 @@ final class PlayerModel: ObservableObject {
                    !playlists.contains(where: { $0.name == selected }) {
                     self.selectedPlaylist = nil
                 }
+                if let selected = self.playlists.first(where: { $0.name == self.selectedPlaylist }) {
+                    self.selectedPlaylistEntryIDs = Set(
+                        self.selectedPlaylistEntryIDs.filter { $0 >= 0 && $0 < selected.paths.count }
+                    )
+                }
             case .failure(let failure):
                 self.status = failure.message
             }
@@ -1125,8 +1413,21 @@ final class PlayerModel: ObservableObject {
     }
 
     func addSelectionToQueue() {
+        guard let libraryRoot else { return }
+        let selected = selectedTracksInCatalogOrder
+        guard !selected.isEmpty else { return }
+        guard selected.count <= 64 else {
+            status = "Select at most 64 tracks for one queue operation."
+            return
+        }
+        runStateCommand(["queue", libraryRoot.path, "add-many"] + selected.map(\.relativePath)) { [weak self] result in
+            self?.applyQueueResult(result)
+        }
+    }
+
+    func addSelectedTrackNext() {
         guard let libraryRoot, let selectedTrack else { return }
-        runStateCommand(["queue", libraryRoot.path, "add", selectedTrack.relativePath]) { [weak self] result in
+        runStateCommand(["queue", libraryRoot.path, "play-next", selectedTrack.relativePath]) { [weak self] result in
             self?.applyQueueResult(result)
         }
     }
@@ -1138,11 +1439,28 @@ final class PlayerModel: ObservableObject {
         }
     }
 
+    func moveQueueSelection(by offset: Int) {
+        guard let libraryRoot, let selectedQueueIndex else { return }
+        let target = selectedQueueIndex + offset
+        guard target >= 0, target < queueEntries.count else { return }
+        runStateCommand(["queue", libraryRoot.path, "move", String(selectedQueueIndex), String(target)]) { [weak self] result in
+            self?.applyQueueResult(result)
+            self?.selectedQueueIndex = target
+        }
+    }
+
+    func clearQueue() {
+        guard let libraryRoot, !queueEntries.isEmpty else { return }
+        runStateCommand(["queue", libraryRoot.path, "clear"]) { [weak self] result in
+            self?.applyQueueResult(result)
+        }
+    }
+
     func selectQueueEntry(_ index: Int) {
         guard let libraryRoot else { return }
         selectedQueueIndex = index
         runStateCommand(["queue", libraryRoot.path, "select", String(index)]) { [weak self] result in
-            self?.applyQueueResult(result)
+            self?.applyQueueResult(result, reflectQueueSelection: true)
         }
     }
 
@@ -1199,8 +1517,9 @@ final class PlayerModel: ObservableObject {
         let name = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.utf8.count <= 128 else { return }
         runStateCommand(["playlist", libraryRoot.path, "create", name]) { [weak self] result in
-            self?.applyPlaylistResult(result)
-            if case .success = result { self?.newPlaylistName = "" }
+            guard let self, self.applyPlaylistResult(result) else { return }
+            self.selectedPlaylist = name
+            self.newPlaylistName = ""
         }
     }
 
@@ -1209,18 +1528,64 @@ final class PlayerModel: ObservableObject {
         let name = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.utf8.count <= 128 else { return }
         runStateCommand(["playlist", libraryRoot.path, "rename", selectedPlaylist, name]) { [weak self] result in
-            self?.applyPlaylistResult(result)
-            if case .success = result {
-                self?.selectedPlaylist = name
-                self?.newPlaylistName = ""
-            }
+            guard let self, self.applyPlaylistResult(result) else { return }
+            self.selectedPlaylist = name
+            self.newPlaylistName = ""
         }
     }
 
     func addSelectionToPlaylist() {
-        guard let libraryRoot, let selectedTrack, let selectedPlaylist else { return }
-        runStateCommand(["playlist", libraryRoot.path, "add", selectedPlaylist, selectedTrack.relativePath]) { [weak self] result in
+        guard let libraryRoot, let selectedPlaylist else { return }
+        let selected = selectedTracksInCatalogOrder
+        guard !selected.isEmpty else { return }
+        guard selected.count <= 64 else {
+            status = "Select at most 64 tracks for one playlist operation."
+            return
+        }
+        runStateCommand(["playlist", libraryRoot.path, "add-many", selectedPlaylist] + selected.map(\.relativePath)) { [weak self] result in
             self?.applyPlaylistResult(result)
+        }
+    }
+
+    func moveSelectedPlaylistEntries(by offset: Int) {
+        guard (-1...1).contains(offset), offset != 0,
+              let libraryRoot, let selectedPlaylist,
+              let playlist = playlists.first(where: { $0.name == selectedPlaylist }),
+              !selectedPlaylistEntryIDs.isEmpty,
+              selectedPlaylistEntryIDs.allSatisfy({ $0 >= 0 && $0 < playlist.paths.count }) else { return }
+        guard selectedPlaylistEntryIDs.count <= 64 else {
+            status = "Select at most 64 playlist tracks for one reorder."
+            return
+        }
+        let ordered = selectedPlaylistEntryIDs.sorted()
+        let movedSelection = PlaylistSelection.indices(
+            afterMoving: selectedPlaylistEntryIDs,
+            in: playlist.paths.count,
+            by: offset
+        )
+        guard !movedSelection.isEmpty else { return }
+        let arguments = ordered.map { String($0) }
+        runStateCommand([
+            "playlist", libraryRoot.path, "move-many", selectedPlaylist, String(offset)
+        ] + arguments) { [weak self] result in
+            guard let self, self.applyPlaylistResult(result) else { return }
+            self.selectedPlaylistEntryIDs = movedSelection
+        }
+    }
+
+    func removeSelectedPlaylistEntries() {
+        guard let libraryRoot, let selectedPlaylist,
+              let playlist = playlists.first(where: { $0.name == selectedPlaylist }),
+              !selectedPlaylistEntryIDs.isEmpty,
+              selectedPlaylistEntryIDs.allSatisfy({ $0 >= 0 && $0 < playlist.paths.count }) else { return }
+        guard selectedPlaylistEntryIDs.count <= 64 else {
+            status = "Select at most 64 playlist tracks for one removal."
+            return
+        }
+        let ordered = selectedPlaylistEntryIDs.sorted(by: >).map { String($0) }
+        runStateCommand(["playlist", libraryRoot.path, "remove-many", selectedPlaylist] + ordered) { [weak self] result in
+            guard let self, self.applyPlaylistResult(result) else { return }
+            self.selectedPlaylistEntryIDs = []
         }
     }
 
@@ -1241,7 +1606,8 @@ final class PlayerModel: ObservableObject {
     private func applyQueueResult(
         _ result: Result<Data, RustMusicFailure>,
         continuePlayback: Bool = false,
-        finishedAtEnd: Bool = false
+        finishedAtEnd: Bool = false,
+        reflectQueueSelection: Bool = false
     ) {
         switch result {
         case .success(let bytes):
@@ -1271,6 +1637,7 @@ final class PlayerModel: ObservableObject {
                let track = tracks.first(where: { $0.relativePath == entry.relativePath }) {
                 let selectionChanged = selectedIndex != track.id
                 selectedIndex = track.id
+                if reflectQueueSelection || continuePlayback { selectedTrackIDs = [track.id] }
                 if continuePlayback { restartQueuePlayback() }
                 else if selectionChanged && (isPlaying || isPaused) { stop() }
             }
@@ -1280,17 +1647,27 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    private func applyPlaylistResult(_ result: Result<Data, RustMusicFailure>) {
+    @discardableResult
+    private func applyPlaylistResult(_ result: Result<Data, RustMusicFailure>) -> Bool {
         switch result {
         case .success(let bytes):
             guard let playlists = Self.parsePlaylists(bytes) else {
                 status = "Rust Music returned malformed playlist state."
-                return
+                return false
             }
             self.playlists = playlists
+            if let selected = playlists.first(where: { $0.name == self.selectedPlaylist }) {
+                self.selectedPlaylistEntryIDs = Set(
+                    self.selectedPlaylistEntryIDs.filter { $0 >= 0 && $0 < selected.paths.count }
+                )
+            } else {
+                self.selectedPlaylistEntryIDs = []
+            }
             status = "Playlists saved. Source audio remains unchanged."
+            return true
         case .failure(let failure):
             status = failure.message
+            return false
         }
     }
 
@@ -1343,7 +1720,7 @@ final class PlayerModel: ObservableObject {
         let childOperations = transientChildOperations
         childOperations.enter()
         Task { [weak self] in
-            let (bytes, outputFailure, exitStatus) = await Task.detached(priority: .userInitiated) {
+            let result = await Task.detached(priority: .userInitiated) {
                 defer { try? input.fileHandleForWriting.close() }
                 let bytes: Data
                 let outputFailure: String?
@@ -1366,22 +1743,22 @@ final class PlayerModel: ObservableObject {
                     outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
                 }
                 process.waitUntilExit()
+                let result: Result<[CatalogTrack], RustMusicFailure>
+                if let outputFailure {
+                    result = .failure(RustMusicFailure(message: outputFailure))
+                } else if process.terminationStatus == 0 {
+                    result = Self.parseCatalog(bytes)
+                } else {
+                    let message = String(data: bytes, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    result = .failure(RustMusicFailure(
+                        message: message?.isEmpty == false ? message ?? "" : "The catalog scan failed."
+                    ))
+                }
                 childOperations.leave()
-                return (bytes, outputFailure, process.terminationStatus)
+                return result
             }.value
             guard let self, self.scanProcess === process else { return }
-            let result: Result<[CatalogTrack], RustMusicFailure>
-            if let outputFailure {
-                result = .failure(RustMusicFailure(message: outputFailure))
-            } else if exitStatus == 0 {
-                result = Self.parseCatalog(bytes)
-            } else {
-                let message = String(data: bytes, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                result = .failure(RustMusicFailure(
-                    message: message?.isEmpty == false ? message ?? "" : "The catalog scan failed."
-                ))
-            }
             self.scanProcess = nil
             self.isScanning = false
             let wasCancelled = self.scanCancellationRequested
@@ -1391,6 +1768,7 @@ final class PlayerModel: ObservableObject {
                 self.libraryRoot = root
                 self.tracks = tracks
                 self.selectedIndex = tracks.first?.id
+                self.selectedTrackIDs = tracks.first.map { Set([$0.id]) } ?? []
                 self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
                 self.reloadPersistentState()
             case .failure(let failure):
@@ -1720,8 +2098,7 @@ final class PlayerModel: ObservableObject {
             isTransportBusy = true
             let transientProcesses = [scanProcess, stateProcess].compactMap { $0 }
             let childOperations = transientChildOperations
-            // Retain the model through serialized cleanup. Window close and
-            // app termination join this one operation and receive completion.
+            // Retain the shared model through serialized app-termination cleanup.
             packageQueue.async { [self] in
                 self.packageClient?.shutdown()
                 self.packageClient = nil
@@ -1744,11 +2121,10 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    func prepareForPresentation() {
-        shutdownGate.prepareForReuse()
-    }
-
-    func selectTrackManually(_ id: Int?) {
+    func selectTracksManually(_ ids: Set<Int>) {
+        selectedTrackIDs = ids
+        guard let selected = visibleTracks.last(where: { ids.contains($0.id) })?.id else { return }
+        let id: Int? = selected
         guard selectedIndex != id else { return }
         selectedIndex = id
         if isPlaying || isPaused { stop() }
@@ -1778,6 +2154,7 @@ final class PlayerModel: ObservableObject {
         }
         let changed = selectedIndex != tracks[next].id
         selectedIndex = tracks[next].id
+        selectedTrackIDs = [tracks[next].id]
         status = "Selected \(tracks[next].title). Press Play to start output."
         return changed
     }
@@ -1954,27 +2331,15 @@ final class PlayerModel: ObservableObject {
     }
 }
 
-private enum PlayerSection: String, CaseIterable, Identifiable {
-    case nowPlaying
-    case library
-    case queue
-    case playlists
-
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .nowPlaying: return "PLAYER"
-        case .library: return "LIBRARY"
-        case .queue: return "QUEUE"
-        case .playlists: return "PLAYLISTS"
-        }
-    }
-}
-
-struct PlayerView: View {
-    @StateObject private var model = PlayerModel()
-    @State private var activeSection: PlayerSection = .nowPlaying
+private struct PlayerView: View {
+    @ObservedObject private var model: PlayerModel
+    private let kind: PlayerWindowKind
     @State private var progressScrubPerMille: Double?
+
+    init(model: PlayerModel, kind: PlayerWindowKind) {
+        self.model = model
+        self.kind = kind
+    }
 
     var body: some View {
         PipBoyChassis {
@@ -1982,19 +2347,26 @@ struct PlayerView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         header
-                        HStack(alignment: .top, spacing: 12) {
-                            navigationRail
-                                .frame(width: 112)
-                            sectionContent
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        Group {
+                            switch kind {
+                            case .player:
+                                nowPlayingPanel
+                            case .playlist:
+                                VStack(alignment: .leading, spacing: 12) {
+                                    queuePanel
+                                    playlistPanel
+                                }
+                            case .library:
+                                libraryPanel
+                            }
                         }
                     }
-                    .padding(12)
-                    .frame(minWidth: 600, alignment: .leading)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollIndicators(.visible)
 
-                transportBar
+                if kind == .player { transportBar }
             }
         }
         .background(RustMusicPalette.background.ignoresSafeArea())
@@ -2002,52 +2374,6 @@ struct PlayerView: View {
         .preferredColorScheme(.dark)
         .tint(RustMusicPalette.phosphor)
         .onChange(of: model.searchText) { _ in model.boundSearchText() }
-        .onAppear { model.prepareForPresentation() }
-        .onDisappear { model.shutdownPackage() }
-    }
-
-    private var navigationRail: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ForEach(PlayerSection.allCases) { section in
-                Button {
-                    activeSection = section
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(section == activeSection ? "▶" : " ")
-                            .frame(width: 10)
-                        Text(section.title)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(RustMusicButtonStyle(prominent: section == activeSection))
-                .accessibilityIdentifier("navigation-\(section.rawValue)")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(8)
-        .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 6))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(RustMusicPalette.line, lineWidth: 1)
-        }
-        .accessibilityIdentifier("navigation-rail")
-    }
-
-    @ViewBuilder
-    private var sectionContent: some View {
-        switch activeSection {
-        case .nowPlaying:
-            nowPlayingPanel
-        case .library:
-            libraryPanel
-        case .queue:
-            queuePanel
-        case .playlists:
-            playlistPanel
-        }
     }
 
     private var header: some View {
@@ -2063,6 +2389,7 @@ struct PlayerView: View {
                     .foregroundStyle(RustMusicPalette.muted)
             }
             Spacer(minLength: 12)
+            WindowSwitcher()
             Button(model.isScanning ? "CANCEL SCAN" : "LOAD LIBRARY") {
                 if model.isScanning { model.cancelScan() } else { model.chooseLibrary() }
             }
@@ -2232,14 +2559,18 @@ struct PlayerView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(RustMusicPalette.display)
-                .frame(height: activeSection == .queue ? 220 : 86)
+                .frame(height: kind == .playlist ? 220 : 86)
                 .disabled(model.isTransportBusy || model.isStateBusy)
 
                 HStack(spacing: 6) {
-                    Button("ADD") { model.addSelectionToQueue() }
-                        .disabled(model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
+                    Button("MOVE UP") { model.moveQueueSelection(by: -1) }
+                        .disabled(model.selectedQueueIndex == nil || model.selectedQueueIndex == 0 || model.isStateBusy || model.isTransportBusy)
+                    Button("MOVE DOWN") { model.moveQueueSelection(by: 1) }
+                        .disabled(model.selectedQueueIndex == nil || (model.selectedQueueIndex ?? 0) >= model.queueEntries.count - 1 || model.isStateBusy || model.isTransportBusy)
                     Button("REMOVE") { model.removeQueueSelection() }
                         .disabled(model.selectedQueueIndex == nil || model.isStateBusy || model.isTransportBusy)
+                    Button("CLEAR") { model.clearQueue() }
+                        .disabled(model.queueEntries.isEmpty || model.isStateBusy || model.isTransportBusy)
                 }
                 HStack(spacing: 6) {
                     Button("REPEAT: \(model.repeatMode.uppercased())") { model.cycleRepeatMode() }
@@ -2262,15 +2593,25 @@ struct PlayerView: View {
                     TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
                         .modifier(RustMusicTextFieldStyle())
                         .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
+                        .accessibilityLabel("Search library by title, artist, album, or path")
+                    Picker("SORT", selection: $model.sortOrder) {
+                        ForEach(CatalogSearch.SortOrder.allCases) { order in
+                            Text(order.label).tag(order)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 108)
+                    .accessibilityLabel("Sort library tracks")
+                    .accessibilityIdentifier("library-sort-order")
                     Text("\(visibleTracks.count) TRACKS")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize()
                 }
 
-                List(selection: Binding(
-                    get: { model.selectedIndex },
-                    set: { model.selectTrackManually($0) }
+                List(selection: Binding<Set<Int>>(
+                    get: { model.selectedTrackIDs },
+                    set: { model.selectTracksManually($0) }
                 )) {
                     ForEach(visibleTracks) { track in
                         VStack(alignment: .leading, spacing: 2) {
@@ -2293,6 +2634,21 @@ struct PlayerView: View {
                 .background(RustMusicPalette.display)
                 .frame(minHeight: 170, maxHeight: 230)
                 .disabled(model.isTransportBusy || model.isStateBusy)
+                .accessibilityLabel("Library tracks")
+                .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions.")
+                .accessibilityIdentifier("library-track-list")
+
+                HStack(spacing: 8) {
+                    Button("PLAY SELECTED") { model.play() }
+                        .buttonStyle(RustMusicButtonStyle(prominent: true))
+                        .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                    Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
+                        model.addSelectionToQueue()
+                    }
+                    .disabled(model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
+                    Button("PLAY NEXT") { model.addSelectedTrackNext() }
+                        .disabled(model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
+                }
             }
         } label: {
             Text("LIBRARY")
@@ -2328,16 +2684,54 @@ struct PlayerView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(RustMusicPalette.display)
-                .frame(height: activeSection == .playlists ? 220 : 112)
+                .frame(height: 112)
                 .disabled(model.isTransportBusy || model.isStateBusy)
+
+                if let selectedPlaylist = model.playlists.first(where: { $0.name == model.selectedPlaylist }) {
+                    Text("TRACKS · \(selectedPlaylist.name)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                    List(selection: Binding<Set<Int>>(
+                        get: { model.selectedPlaylistEntryIDs },
+                        set: { model.selectedPlaylistEntryIDs = $0 }
+                    )) {
+                        ForEach(Array(selectedPlaylist.paths.enumerated()), id: \.offset) { index, path in
+                            HStack(spacing: 6) {
+                                Text(model.tracks.first(where: { $0.relativePath == path })?.title
+                                    ?? URL(fileURLWithPath: path).lastPathComponent)
+                                    .lineLimit(1)
+                            }
+                            .tag(index)
+                            .listRowBackground(RustMusicPalette.display)
+                            .accessibilityLabel("Playlist track \(index + 1): \(URL(fileURLWithPath: path).lastPathComponent)")
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(RustMusicPalette.display)
+                    .frame(height: 140)
+                    .disabled(model.isTransportBusy || model.isStateBusy)
+                    .accessibilityLabel("Tracks in selected playlist")
+                    .accessibilityHint("Select one or more tracks, then Tab to reorder or remove actions.")
+                    .accessibilityIdentifier("playlist-entry-list")
+
+                    HStack(spacing: 6) {
+                        Button("MOVE TRACKS UP") { model.moveSelectedPlaylistEntries(by: -1) }
+                            .disabled(model.selectedPlaylistEntryIDs.isEmpty || model.selectedPlaylistEntryIDs.allSatisfy { $0 == 0 } || model.selectedPlaylistEntryIDs.count > 64 || model.isStateBusy || model.isTransportBusy)
+                        Button("MOVE TRACKS DOWN") { model.moveSelectedPlaylistEntries(by: 1) }
+                            .disabled(model.selectedPlaylistEntryIDs.isEmpty || model.selectedPlaylistEntryIDs.allSatisfy { $0 == selectedPlaylist.paths.count - 1 } || model.selectedPlaylistEntryIDs.count > 64 || model.isStateBusy || model.isTransportBusy)
+                        Button("REMOVE TRACKS · \(model.selectedPlaylistEntryIDs.count)") { model.removeSelectedPlaylistEntries() }
+                            .disabled(model.selectedPlaylistEntryIDs.isEmpty || model.selectedPlaylistEntryIDs.count > 64 || model.isStateBusy || model.isTransportBusy)
+                    }
+                }
 
                 HStack(spacing: 6) {
                     Button("CREATE") { model.createPlaylist() }
                         .disabled(model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
                     Button("RENAME") { model.renameSelectedPlaylist() }
                         .disabled(model.selectedPlaylist == nil || model.newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isStateBusy || model.isTransportBusy)
-                    Button("ADD TRACK") { model.addSelectionToPlaylist() }
-                        .disabled(model.selectedPlaylist == nil || model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
+                    Button("ADD SELECTED · \(model.selectedTrackIDs.count)") { model.addSelectionToPlaylist() }
+                        .disabled(model.selectedPlaylist == nil || model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
                 }
                 HStack(spacing: 6) {
                     Button("QUEUE PLAYLIST") { model.addSelectedPlaylistToQueue() }
@@ -2362,7 +2756,6 @@ struct PlayerView: View {
                 Button("PLAY") { model.play() }
                     .buttonStyle(RustMusicButtonStyle(prominent: true))
                     .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                    .keyboardShortcut(.space, modifiers: [])
                     .accessibilityIdentifier("transport-play")
                 Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
                     .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 private struct UnindexedCatalogTrack {
     let id: Int
@@ -32,6 +33,16 @@ struct CatalogSearchTests {
         precondition(CatalogSearch.visibleTracks(in: [unicodeTrack], matching: String(repeating: "x", count: 512) + "björk").isEmpty)
         precondition(CatalogSearch.visibleTracks(in: [unicodeTrack], matching: " \t\n") == [unicodeTrack])
         precondition(CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "not-present").isEmpty)
+
+        let sortTracks = [
+            CatalogTrack(id: 2, container: "flac", title: "Beta", artist: "Zulu", album: "Two", relativePath: "b.flac"),
+            CatalogTrack(id: 0, container: "flac", title: "alpha", artist: "Able", album: "Three", relativePath: "a.flac"),
+            CatalogTrack(id: 1, container: "flac", title: "Alpha", artist: "Able", album: "One", relativePath: "c.flac")
+        ]
+        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "").map(\.id) == [0, 1, 2])
+        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "Able", sortedBy: .artist).map(\.id) == [0, 1])
+        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "", sortedBy: .album).map(\.id) == [1, 0, 2])
+        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "Beta", sortedBy: .album).map(\.id) == [2])
 
         let tracks = (0..<20_000).map { index in
             let title = String(format: "Track %05d", index)
@@ -128,5 +139,65 @@ struct CatalogSearchTests {
             indexPayloadBytes,
             Double(indexPayloadBytes) / Double(tracks.count)
         ))
+
+        for count in [2_000, 20_000, 100_000, 250_000] {
+            let profile = scaleProfile(count: count)
+            print(profile)
+        }
+        var resourceUsage = rusage()
+        precondition(getrusage(RUSAGE_SELF, &resourceUsage) == 0)
+        print("PASS: catalog test process peak RSS=\(resourceUsage.ru_maxrss) bytes")
+    }
+
+    private static func scaleProfile(count: Int) -> String {
+        let tracks = (0..<count).map { index in
+            let title = String(format: "Track %06d", index)
+            return CatalogTrack(
+                id: index,
+                container: "wave",
+                title: title,
+                artist: "Synthetic Artist",
+                album: "Scale Profile",
+                relativePath: "folder/\(title).wav"
+            )
+        }
+        let targetID = count - 1
+        let query = String(format: "track %06d", targetID)
+        _ = CatalogSearch.visibleTracks(in: tracks, matching: query)
+
+        var durations: [UInt64] = []
+        durations.reserveCapacity(21)
+        for _ in 0..<21 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = CatalogSearch.visibleTracks(in: tracks, matching: query)
+            durations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(result.count == 1 && result[0].id == targetID)
+        }
+        durations.sort()
+        let p50 = Double(durations[10]) / 1_000
+        let p95 = Double(durations[19]) / 1_000
+
+        let unsortedTracks = (0..<count).map { tracks[($0 * 7_919) % count] }
+        var sortDurations: [UInt64] = []
+        sortDurations.reserveCapacity(5)
+        for _ in 0..<5 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = CatalogSearch.visibleTracks(in: unsortedTracks, matching: "")
+            sortDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(result.count == count && result.first?.id == 0 && result.last?.id == targetID)
+        }
+        sortDurations.sort()
+        let sortP50 = Double(sortDurations[2]) / 1_000_000
+        let sortP95 = Double(sortDurations[4]) / 1_000_000
+        let indexPayloadBytes = tracks.reduce(0) { $0 + $1.searchableBytes.count }
+        return String(format:
+            "PASS: synthetic search scale n=%d; last-item p50=%.3fµs p95=%.3fµs; full-sort p50=%.3fms p95=%.3fms; cached-index payload=%d bytes",
+            count,
+            p50,
+            p95,
+            sortP50,
+            sortP95,
+            indexPayloadBytes
+        )
     }
 }

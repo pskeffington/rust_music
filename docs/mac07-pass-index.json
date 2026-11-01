@@ -26,7 +26,7 @@
       "review_agent": "host_integrator",
       "scope": "Pin current source; reproduce same-file CLI/GUI and establish selected output route",
       "acceptance": "Classify audible CLI versus GUI failure on a usable output route with sanitized commands and observations",
-      "evidence_status": "partial_blocked",
+      "evidence_status": "partial_blocked_cli_route_context",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
     },
     {
@@ -34,13 +34,13 @@
       "title": "Repair native GUI playback handoff",
       "roadmap_task": "RM-028",
       "priority": "P0",
-      "status": "blocked",
+      "status": "in_progress",
       "depends_on": ["MAC07-00"],
       "owner_agent": "host_integrator",
       "review_agent": "gate_verifier",
       "scope": "Add managed-process regression and fix a proven handoff defect while preserving native decoders",
       "acceptance": "A real FLAC is audible from the Mac GUI; tests pass and Playing is truthful",
-      "evidence_status": "in_progress_unverified",
+      "evidence_status": "gui_audible_for_supplied_album_cli_parity_open",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
     },
     {
@@ -48,13 +48,13 @@
       "title": "Truthful progress and state",
       "roadmap_task": "RM-029",
       "priority": "P1",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": ["MAC07-01"],
       "owner_agent": "host_integrator",
       "review_agent": "gate_verifier",
       "scope": "Typed playback snapshot, elapsed/duration, output state, pause/end/error reset and accessibility labels",
       "acceptance": "Progress and state track real output; malformed IPC cases pass",
-      "evidence_status": "not_run",
+      "evidence_status": "snapshot_parser_checks_pass_ui_layout_in_progress",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
     },
     {
@@ -62,13 +62,13 @@
       "title": "Winamp-layout skeleton",
       "roadmap_task": "RM-029",
       "priority": "P1",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": ["MAC07-02"],
       "owner_agent": "host_integrator",
       "review_agent": "safety_reviewer",
-      "scope": "Compact player, navigation sidebar, sortable/searchable table, docked queue and adaptive resizing",
+      "scope": "Four native operator windows with shared playback state, searchable library, queue/playlist editor, disabled EQ shell, frame persistence and adaptive resizing",
       "acceptance": "Layout checks at two sizes and keyboard order validation",
-      "evidence_status": "not_run",
+      "evidence_status": "synthetic_actions_observed_four_scene_build_pass_live_layout_matrix_open",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
     },
     {

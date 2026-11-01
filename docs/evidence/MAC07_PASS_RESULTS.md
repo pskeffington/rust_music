@@ -246,6 +246,71 @@ concurrent native diagnostic changes. MAC07 hardware/device recovery, DAC
 measurement, broader corpus, host-focus, and distribution gates remain
 separate and open.
 
+### 2026-11-01 native library and queue interaction pass
+
+The standalone app rebuilt from the current worktree with
+`sh scripts/build-macos-app.sh` (exit 0). It passed catalog and snapshot
+checks, local ad-hoc signature validation, graceful/protocol-error shutdown,
+three repeated process lifecycle cycles, and forced-parent child reaping. The
+deterministic synthetic core sweep covered 2,000, 20,000, 100,000, and
+250,000 tracks. Last-item search p50/p95 was 573.792/576.500 µs,
+5,685.709/5,832.500 µs, 28,165.667/29,352.792 µs, and
+69,792.292/70,173.625 µs; full-catalog sorting p50/p95 was 4.284/4.337 ms,
+39.132/39.729 ms, 233.342/241.475 ms, and 659.021/664.637 ms.
+Search-index payload was 134,000 / 1,340,000 / 6,700,000 / 16,750,000 bytes.
+The separate 101-query 20k sample reported 5,531.833 µs p50 / 5,636.666 µs
+p95; model construction was 179.304 ms p50 / 185.310 ms p95. Catalog sort
+keys are precomputed per track to avoid repeated Unicode case-folding during
+comparisons. Darwin `getrusage` reported 225,263,616 bytes peak RSS for the
+complete test process, including the 250k synthetic catalog and scrambled
+sort fixture. These are core microbenchmarks; they do not include SwiftUI or
+the full application process.
+The current app/catalog protocol remains capped at 20,000 tracks, so the 100k
+and 250k results measure core search and sorting only, not end-to-end library
+support.
+
+In a fresh app process, a generated three-file WAV-signature-only catalog was
+explicitly loaded. The UI showed all three tracks and remained stopped. The
+library sort menu exposed Title, Artist, and Album; the operator selected
+Artist and Command-clicked two rows, with the accessible action updating to
+`ENQUEUE SELECTED · 2`. Bulk enqueue produced two queue rows without enabling
+Pause or Stop. Selecting a queue row enabled reorder controls; Move Up changed
+the visible order while playback remained stopped. The operator then selected
+a different library track and invoked Play Next. It appeared immediately
+after the current queue entry, leaving the existing cursor unchanged. The
+Player view reported Ready and explicitly stated that queue selection does not
+start playback. This is synthetic UI and state-model acceptance, not audible
+output or real-media decoding. That interaction predates the current four-
+window composition and does not exercise its scene layout. Playlist multi-add
+is implemented in the UI and CLI; the CLI's atomic add-many bound and
+traversal rejection passed focused regressions. The current playlist-entry
+multi-select, reorder, and remove controls have CLI regression coverage but
+were not manually exercised in the locked UI session. Queue and playlist bulk
+operations reject over-limit batches atomically.
+
+The UI session ended at the OS lock screen before a final close/relaunch check;
+the generated signature fixtures were removed from temporary storage. Sort
+preference persistence across restart, compact/expanded layout acceptance,
+VoiceOver pilots, end-to-end 100k/250k catalogs, and live real-FLAC Play Next
+acceptance were **not run**. The UI now debounces and performs catalog
+parse/filter/sort work off the main actor, but the scanner and protocol remain
+bounded to 20,000 tracks. No source audio or private media was used.
+
+Focused Rust regressions passed: the library `enqueue_next` preservation/no-
+autoplay case passed 1/1, and CLI queue bulk atomicity, Play Next placement,
+reorder/current-selection, playlist multi-add atomicity, selected-entry batch
+reorder, and batch removal passed. Invalid traversal, duplicate/over-limit
+selection, and out-of-range playlist moves/removals preserve stored state. The
+final `sh scripts/offline-gate.sh` exited 0 across 17 local crates, 32
+path-only edges, zero registry/Git crates, and all workspace tests/builds,
+including 36 native AudioQueue simulations. An earlier final-pass attempt
+stopped at rustfmt (exit 1); `cargo fmt --all` corrected formatting before
+the passing gate. `python3 scripts/check_roadmap_index.py` and `git diff
+--check` exited 0. None of these
+checks closes same-file CLI route parity, physical device recovery, acoustic
+acceptance beyond the separately recorded supplied-album GUI session, or
+production release gates.
+
 ### 2026-11-01 AQ-01/AQ-02 format and AudioQueue lifecycle follow-up
 
 The native ASBD regression now checks packed signed integer LPCM layout for
@@ -291,3 +356,55 @@ was left undisturbed. AQ-05 lifecycle coverage now includes a Prime failure
 followed by teardown/reopen; the existing callback starvation, pause/resume,
 drain, stop, failed-dispose and recovery tests remain synthetic. AQ-06 full
 offline gate passes locally, while operator audibility acceptance remains open.
+
+### 2026-11-01 AUI02 native operator-window and library pass
+
+The standalone macOS source now defines independent Player, Playlist Editor,
+Media Library, and Equalizer scenes. Shared playback state is retained while
+operator windows close and reopen; the app delegate owns final process
+shutdown. Window commands can show/focus each scene or all four, and saved
+frames use distinct stable names. The initial arrangement places the Player,
+Playlist Editor, and Equalizer in a vertical left stack beside the Media
+Library. This arithmetic fits a visible display area at least 1,236 points
+wide and 648 points high; narrower or shorter displays cannot satisfy all
+four windows' current minimum sizes. Live placement and persistence remain
+unverified because the Mac UI session ended at the lock screen.
+
+The Player and Library surfaces now expose explicit Play, Play Next, enqueue,
+and Add to Playlist actions. The Playlist Editor has named playlists, queue
+visibility, selection, and batch add/remove/reorder operations. Rust CLI
+playlist and queue batch operations are bounded to 64 entries and apply
+atomically. Queue Play Next inserts after the current item without starting
+playback. Playlist reorder selection mapping has a dedicated Swift regression
+harness covering boundary and separated selections. Equalizer controls remain
+disabled because no verified DSP engine is connected; no processing is
+simulated. The app's catalog protocol and scanner are still bounded to 20,000
+tracks.
+
+The final sh scripts/build-macos-app.sh exited 0 after these UI changes. It
+compiled and ran the Swift catalog tests, the playlist-selection regression,
+snapshot/bounds checks, and shutdown/process lifecycle checks; the local app
+signature was valid on disk and satisfied its designated requirement. The
+selection harness reported
+PASS: playlist multi-selection remains stable across edge and separated moves.
+The current deterministic synthetic catalog sweep measured last-item search
+p50/p95 at 677.333/691.417 µs (2,000 tracks), 6,836.417/7,057.500 µs (20,000),
+33,375.416/34,504.583 µs (100,000), and 74,550.375/80,939.334 µs (250,000).
+Full-sort p50/p95 was 5.001/5.021 ms, 46.749/47.170 ms, 272.580/277.524 ms,
+and 676.635/718.912 ms respectively. Cached index payload was 134,000 /
+1,340,000 / 6,700,000 / 16,750,000 bytes. A 101-query 20k run measured
+6,453.375 µs p50 / 6,648.375 µs p95; model build measured 0.323/0.501 ms
+unindexed and 202.488/251.838 ms with cached indexes. Darwin getrusage
+reported 224,493,568 bytes peak RSS for the synthetic catalog test process,
+including the 250k fixtures; this is not whole-app memory use.
+
+The full sh scripts/offline-gate.sh exited 0 after the Rust queue and
+playlist changes, covering 17 local crates, 32 path-only internal edges, zero
+registry/Git crates, and 36 native AudioQueue tests. Final
+cargo fmt --all -- --check, roadmap-index, literature, and git diff --check
+validations passed. The 100k/250k timings exercise core search and sorting
+only, not end-to-end catalogs. This pass did not include a fresh four-window
+interactive session, VoiceOver/resizing acceptance, real-media playback while
+scanning, or hardware tests. It does not change the separate audible playback
+confirmation above or close the hardware/device, recovery, host-focus, or
+distribution gates.

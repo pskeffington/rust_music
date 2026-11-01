@@ -1,6 +1,25 @@
 # MAC07 — Winamp-functional desktop alignment
 
-Status: **ACTIVE TASKING; implementation partial; audio and hardware acceptance blocked** (2026-11-01). The operator-supplied Winamp reference informs interaction semantics only. Do not reproduce copyrighted imagery or skins.
+Status: **ACTIVE TASKING; supplied-album GUI audibility confirmed; CLI parity and hardware acceptance open** (2026-11-01). The operator-supplied Winamp reference informs interaction semantics only. Do not reproduce copyrighted imagery or skins.
+
+**Progress correction (2026-11-01):** the dated evidence ledger records the
+operator's real-FLAC GUI and multi-file audible confirmation. MAC07-00/01 remain
+in progress because the identical CLI/server route cannot be verified from the
+engineering shell and device recovery remains open. RM-029 is in progress:
+snapshot decoding tests, persisted title/artist/album ordering, accessible
+multi-selection, bounded bulk queueing, Play Next, and queue reorder/clear are
+implemented. The native app now defines separate Player, Playlist Editor,
+Equalizer, and Media Library windows over one shared playback model. Initial
+positions place Player, Playlist, and Equalizer down the left and Library on
+the right; native frame autosave preserves each window's placement. EQ controls
+stay disabled because no verified DSP is connected. Catalog parsing and
+debounced filtering/sorting run away from the main actor. A synthetic
+three-track UI exercise confirmed selection and queue actions without
+playback; the current four-window layout has compiled but is not yet exercised
+in a live UI session. Compact/expanded resizing, keyboard, and VoiceOver
+acceptance remain open. The catalog, scanner, and v1 playback protocol remain
+limited to 20,000 tracks. The named AUI02 reference file is absent from this
+checkout; this pass follows the operator requirements supplied in the task.
 
 ## Evidence boundary and current state
 
@@ -13,18 +32,18 @@ Status: **ACTIVE TASKING; implementation partial; audio and hardware acceptance 
 - Correction: the operator confirms other Mac apps, including browser radio, produce audible sound. The prior empty list/missing-volume results came from command-line probes and do not establish that the Mac lacks output hardware. Rust Music's output route must be inspected from its actual GUI-launched child process.
 - The operator also reported player flicker during playback. Source inspection traced it to the 500 ms snapshot poll using the interactive command path, which toggled transport busy state and blanked the visible status. Snapshot polling now shares the serialized package queue without changing visible status or transport lock, and ignores stale results around user commands. App build/signature/lifecycle checks and the offline gate passed; fresh-launch runtime flicker acceptance remains pending.
 - The live output panel showed a completed 271,104-frame queue summary while the active snapshot had reached 5,263,872 frames at 1:59. The diagnostic reader was attaching a retained prior-session stderr record to active playback snapshots. Its previous `default yes` value was stale and could not establish that session's route. A per-session diagnostic reset and terminal-only summary presentation are now implemented; fresh-run evidence is recorded in [MAC07 pass results](evidence/MAC07_PASS_RESULTS.md).
-- Exact commands and limitations are recorded in [MAC07 pass results](evidence/MAC07_PASS_RESULTS.md). Current pass states are in [mac07-pass-index.json](mac07-pass-index.json). RM-028 is in progress with its audible-output prerequisite blocked; RM-029 and RM-030 are planned and dependent.
+- Exact commands and limitations are recorded in [MAC07 pass results](evidence/MAC07_PASS_RESULTS.md). Current pass states are in [mac07-pass-index.json](mac07-pass-index.json). RM-028 remains in progress for CLI route parity and device recovery. RM-029 is in progress; RM-030 remains planned pending broader acceptance.
 
 ## Functional layout contract
 
-One resizable window in four regions:
+Four independent resizable native windows share one PlayerModel:
 
-1. **Persistent compact player:** title/artist/album, state, elapsed/duration from validated engine state, Play/Pause/Stop/Previous/Next, software volume, repeat/shuffle, and visible failure feedback.
-2. **Library navigation:** Now Playing, All Music, Artists, Albums, Folders, Playlists, Recently Added, Recently Played. Do not show Recent Played as populated without durable history.
-3. **Track browser:** search, artist, album, track number, title, length, format and optional genre; sortable/resizable columns, multi-selection, keyboard focus and incremental filtering. Missing metadata falls back to filename.
-4. **Queue/playlist editor:** distinguish the live queue from named playlists; show current/next; support enqueue/dequeue, reorder, Play Next, clear, repeat and shuffle. Collapse logically at small sizes without clipping essential text.
+1. **Main Player:** title/artist/album, state, elapsed/duration from validated engine state, Play/Pause/Stop/Previous/Next, software volume, and visible failure feedback.
+2. **Playlist Editor:** distinguish the live queue from named playlists; show current/next; support multi-track add, enqueue/dequeue, keyboard reorder, Play Next, clear, repeat, shuffle, and persistent playlist changes.
+3. **Equalizer:** independent window with ten bands. Keep every control disabled and identify DSP as unavailable until a verified processor is connected; do not simulate processing.
+4. **Media Library:** text-only track browser with search, title/artist/album sort, multi-selection, Play, Play Next, bulk enqueue, and Add to Playlist. Missing metadata falls back to filename.
 
-The visual reference does not authorize artwork, visualizers, image assets, new dependencies or floating windows. Preserve text-only UX, the 128×64 / 1,024-byte Pip-Boy frame, local-only runtime and keyboard accessibility.
+The initial arrangement stacks Player, Playlist, and Equalizer on the left and places Library on the right. Windows can move and resize independently; their frames persist across restart. Use the Window menu and WINDOWS menu to reopen/focus each scene. Custom snap docking remains unimplemented. The visual reference does not authorize artwork, visualizers, image assets, or new dependencies. Preserve text-only UX, the 128×64 / 1,024-byte Pip-Boy frame, local-only runtime, Rust Boy colors, and keyboard accessibility.
 
 ## Interaction contracts
 
