@@ -927,6 +927,13 @@ private struct RustMusicCommands: Commands {
                         || model.isStateBusy
                         || model.isTransportBusy
                 )
+            Divider()
+            Button("Sort Library by Title") { model.sortOrder = .title }
+                .keyboardShortcut("1", modifiers: [.command, .option])
+            Button("Sort Library by Artist") { model.sortOrder = .artist }
+                .keyboardShortcut("2", modifiers: [.command, .option])
+            Button("Sort Library by Album") { model.sortOrder = .album }
+                .keyboardShortcut("3", modifiers: [.command, .option])
         }
         CommandMenu("Playback") {
             Button("Play / Pause") {
@@ -2960,6 +2967,7 @@ private struct PlayerView: View {
                     .pickerStyle(.menu)
                     .frame(width: 108)
                     .accessibilityLabel("Sort library tracks")
+                    .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album.")
                     .accessibilityIdentifier("library-sort-order")
                     Text(model.isScanning
                         ? "SCANNING · \(visibleTracks.count) PRIOR RESULTS"

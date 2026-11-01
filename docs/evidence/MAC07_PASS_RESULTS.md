@@ -977,3 +977,35 @@ synthetic 250k catalog harness reported search p95 **78.259 ms**, full-sort
 p95 **824.418 ms**, and peak RSS **240,386,048 bytes**. These are catalog
 harness measurements, not compact-window or playback-under-load results.
 MAC07-03 remains in progress; compact fallback live verification is pending.
+
+### 2026-11-01 MAC07-03 library sort keyboard commands
+
+On candidate branch `codex/mac07-disabled-control-state`, source `69a7606`
+plus the working-tree SwiftUI change, the Library menu now exposes Sort Library
+by Title, Artist, and Album with Option-Command-1/2/3 shortcuts. The sort picker
+hint points to those commands. `sh scripts/build-macos-app.sh` exited **0**;
+the local bundle signature and included catalog, playlist-selection, window
+geometry, playback-snapshot, catalog-bounds, and process-lifecycle harnesses
+passed. The 250k catalog harness reported search p95 **79.580 ms**, full-sort
+p95 **816.622 ms**, and peak RSS **242,221,056 bytes**; these are catalog
+harness measurements, not full-app or playback measurements.
+
+Live CUA explicitly loaded three generated metadata-only FLAC test entries
+(118, 118, and 119 bytes, with no audio frames). Starting with ARTIST sort,
+the visible order was Mike / Alpha, Zulu / Echo, Alpha / Zulu. Option-Command-1
+changed the picker to TITLE and the rows to Alpha / Zulu, Mike / Alpha,
+Zulu / Echo. Option-Command-2 restored ARTIST ordering; Option-Command-3
+changed the picker to ALBUM and rows to Mike / Bravo, Zulu / Delta,
+Alpha / Echo. The Library menu accessibility tree exposed all three named
+commands. No playback or queue action occurred; the Player remained Ready / No
+Track at fresh launch. During the loaded-catalog interaction, playback stayed
+stopped and the output panel had no playback snapshot.
+
+After quitting, removing the generated fixture, and relaunching the rebuilt
+app, Command-F opened Media Library with sort still set to ALBUM, 0 tracks,
+and NO LIBRARY LOADED. This verifies sort-preference persistence without
+catalog restoration or startup scanning. The generated fixture was removed
+and the app was left open idle. This is a focused keyboard and preference
+check only: MAC07-03 remains in progress, the compact Player transport
+fallback still lacks live verification, and full keyboard traversal,
+VoiceOver, layout, playback, and hardware gates remain open.
