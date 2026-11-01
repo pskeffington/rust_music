@@ -3073,23 +3073,32 @@ private struct RustMusicTextFieldStyle: ViewModifier {
 
 private struct RustMusicButtonStyle: ButtonStyle {
     var prominent = false
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let foreground = isEnabled
+            ? (prominent ? RustMusicPalette.background : RustMusicPalette.phosphor)
+            : RustMusicPalette.muted
+        let background = isEnabled && prominent
+            ? RustMusicPalette.phosphor
+            : RustMusicPalette.surface
+        let outline = isEnabled && prominent
+            ? RustMusicPalette.phosphor
+            : RustMusicPalette.line
         configuration.label
             .font(.system(size: 10, weight: .bold, design: .monospaced))
             .tracking(0.35)
-            .foregroundStyle(prominent ? RustMusicPalette.background : RustMusicPalette.phosphor)
+            .foregroundStyle(foreground)
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
             .background(
-                prominent ? RustMusicPalette.phosphor : RustMusicPalette.surface,
+                background,
                 in: RoundedRectangle(cornerRadius: 4)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(prominent ? RustMusicPalette.phosphor : RustMusicPalette.line, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 4).stroke(outline, lineWidth: 1)
             }
-            .opacity(configuration.isPressed ? 0.78 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.78 : 1) : 0.62)
     }
 }
 
