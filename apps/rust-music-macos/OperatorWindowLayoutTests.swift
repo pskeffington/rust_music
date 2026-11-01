@@ -3,6 +3,17 @@ import AppKit
 @main
 private enum OperatorWindowLayoutTests {
     static func main() {
+        let probeWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            styleMask: [.titled, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        OperatorWindowLayout.applyMinimumSize(for: OperatorWindowLayout.library, to: probeWindow)
+        precondition(probeWindow.minSize == NSSize(width: 520, height: 360))
+        OperatorWindowLayout.applyMinimumSize(for: "unknown", to: probeWindow)
+        precondition(probeWindow.minSize == NSSize(width: 520, height: 360))
+
         let frames = OperatorWindowLayout.initialFrames(
             in: NSRect(x: 0, y: 0, width: 1440, height: 900)
         )

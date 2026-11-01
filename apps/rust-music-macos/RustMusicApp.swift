@@ -1102,9 +1102,7 @@ private final class WindowFrameObserver: NSView {
         configured = true
         // Launch code restores visibility; named frame autosave below is separate.
         window.isRestorable = false
-        if let minimumSize = OperatorWindowLayout.minimumFrames[name] {
-            window.minSize = minimumSize
-        }
+        OperatorWindowLayout.applyMinimumSize(for: name, to: window)
         let restored = window.setFrameUsingName(name)
         _ = window.setFrameAutosaveName(name)
         let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
