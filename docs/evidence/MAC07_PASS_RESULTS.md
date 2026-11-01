@@ -588,3 +588,24 @@ Selected Playlist produced one visible playlist entry. The test queue and
 playlist were cleared, the temporary fixture was removed, and playback was
 never started. This verifies UI-to-state routing only, not audible playback,
 keyboard navigation, VoiceOver usability, or multi-window layout acceptance.
+
+### 2026-11-01 library keyboard shortcuts and search focus
+
+The rebuilt app's Command-O shortcut opened the explicit folder picker; the
+picker was canceled without loading a library. With a temporary one-track
+catalog loaded for UI inspection, Command-F from Player opened Media Library
+and focused its search field. Typing a no-match query changed the visible
+catalog count from one to zero. One Tab from the selected track list also
+moved focus to Search. No playback was started, and the temporary fixture was
+removed. These observations verify the folder-picker shortcut and one search
+focus path only; they do not establish complete keyboard order or VoiceOver
+usability.
+
+`sh scripts/build-macos-app.sh` exited **0** for this candidate. The signed
+bundle verified; geometry, protocol, catalog, and process lifecycle checks
+passed. Synthetic search/sort passed at 2k, 20k, 100k and 250k entries. Search
+p95 was 0.695/7.466/34.126/105.984 ms; full-sort p95 was
+4.912/50.369/325.324/1,183.812 ms; catalog-harness peak RSS was
+220,889,088 bytes. These synthetic harness results are not end-to-end UI
+latency. Keyboard order across the operator windows, VoiceOver, compact-size
+interaction, and live multi-display behavior remain open.

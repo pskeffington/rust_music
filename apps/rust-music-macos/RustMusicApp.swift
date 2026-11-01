@@ -843,6 +843,13 @@ private struct RustMusicCommands: Commands {
             Button("Arrange Operator Windows") { arrangeWindows() }
             Toggle("Magnetic Window Docking", isOn: $windowDockingEnabled)
         }
+        CommandMenu("Library") {
+            Button("Find in Library") {
+                openWindow(id: "library")
+                model.requestLibrarySearchFocus()
+            }
+            .keyboardShortcut("f", modifiers: [.command])
+        }
         CommandMenu("Playback") {
             Button("Play / Pause") {
                 if model.isPlaying || model.isPaused { model.togglePause() } else { model.play() }
@@ -1219,6 +1226,7 @@ final class PlayerModel: ObservableObject {
         }
     }
     @Published var selectedTrackIDs: Set<Int> = []
+    @Published private(set) var librarySearchFocusGeneration: UInt64 = 0
     @Published var searchText = "" {
         didSet { refreshVisibleTracks() }
     }
@@ -1352,6 +1360,10 @@ final class PlayerModel: ObservableObject {
             outputDeviceStatus = "Output changed. Press Play to route through the selected device."
         }
         recreatePackageClientForOutputChange()
+    }
+
+    func requestLibrarySearchFocus() {
+        librarySearchFocusGeneration &+= 1
     }
 
     private func recreatePackageClientForOutputChange() {
@@ -2458,6 +2470,8 @@ final class PlayerModel: ObservableObject {
 private struct PlayerView: View {
     @ObservedObject private var model: PlayerModel
     private let kind: PlayerWindowKind
+    @FocusState private var librarySearchIsFocused: Bool
+    @State private var handledLibrarySearchFocusGeneration: UInt64 = 0
 
     init(model: PlayerModel, kind: PlayerWindowKind) {
         self.model = model
@@ -2497,6 +2511,17 @@ private struct PlayerView: View {
         .preferredColorScheme(.dark)
         .tint(RustMusicPalette.phosphor)
         .onChange(of: model.searchText) { _ in model.boundSearchText() }
+        .onAppear { focusLibrarySearchIfRequested() }
+        .onChange(of: model.librarySearchFocusGeneration) { _ in focusLibrarySearchIfRequested() }
+    }
+
+    private func focusLibrarySearchIfRequested() {
+        guard kind == .library,
+              model.librarySearchFocusGeneration > handledLibrarySearchFocusGeneration else { return }
+        handledLibrarySearchFocusGeneration = model.librarySearchFocusGeneration
+        DispatchQueue.main.async {
+            librarySearchIsFocused = true
+        }
     }
 
     private var header: some View {
@@ -2695,6 +2720,7 @@ private struct PlayerView: View {
                 HStack(spacing: 8) {
                     TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
                         .modifier(RustMusicTextFieldStyle())
+                        .focused($librarySearchIsFocused)
                         .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
                         .accessibilityLabel("Search library by title, artist, album, or path")
                     Picker("SORT", selection: $model.sortOrder) {
