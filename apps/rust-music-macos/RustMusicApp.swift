@@ -797,6 +797,10 @@ struct RustMusicApp: App {
         .windowResizability(.automatic)
         Window("Rust Music — Media Library", id: "library") {
             playerWindow(.library)
+                .frame(
+                    minWidth: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width,
+                    minHeight: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height
+                )
         }
         .defaultSize(width: 1000, height: 700)
         .windowResizability(.automatic)

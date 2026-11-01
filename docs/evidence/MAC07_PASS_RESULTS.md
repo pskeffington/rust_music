@@ -735,3 +735,18 @@ The scan-in-progress, scanner-start failure, folder-scan failure, and canceled
 scan notices are source/build verified only. No live scan, failure, or cancel
 state was exercised. The prior live check covered only the first-run
 `NO LIBRARY LOADED` state. This does not establish scan-state UI acceptance.
+
+### 2026-11-01 Library minimum-size enforcement
+
+On candidate branch `codex/mac07-disabled-control-state`, source commit
+`3cef914` plus the uncommitted `RustMusicApp.swift` change, the Media Library
+window now applies the same 520×360-point minimum used by the saved-frame
+fitting logic. `git diff --check` passed and
+`sh scripts/build-macos-app.sh` exited **0**, including app signature
+validation, window geometry, catalog, protocol, and process lifecycle checks.
+The fresh app launch showed the Media Library at its large default size and
+its no-library empty state. A live corner-resize attempt could not be
+completed because the UI automation target did not resolve the window at the
+drag coordinate. Therefore native enforcement of the live resize minimum is
+source/build verified but not visually measured. The candidate remains on
+PR #9; this is not merged-mainline evidence.
