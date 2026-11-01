@@ -1761,14 +1761,14 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    func addTrackToSelectedPlaylist(_ trackID: Int) {
+    func addTrackToPlaylist(_ trackID: Int, named playlistName: String) {
         guard let libraryRoot,
-              let selectedPlaylist,
+              playlists.contains(where: { $0.name == playlistName }),
               !isStateBusy,
               !isTransportBusy,
               let track = tracks.first(where: { $0.id == trackID }) else { return }
         runStateCommand(
-            ["playlist", libraryRoot.path, "add", selectedPlaylist, track.relativePath]
+            ["playlist", libraryRoot.path, "add", playlistName, track.relativePath]
         ) { [weak self] result in
             self?.applyPlaylistResult(result)
         }
@@ -3075,11 +3075,16 @@ private struct PlayerView: View {
                                     Button("Play Next") { model.enqueueTrack(track.id, next: true) }
                                         .disabled(model.isStateBusy || model.isTransportBusy)
                                     Divider()
-                                    Button("Add to Selected Playlist") {
-                                        model.addTrackToSelectedPlaylist(track.id)
+                                    Menu("Add to Playlist") {
+                                        ForEach(model.playlists) { playlist in
+                                            Button(playlist.name) {
+                                                model.addTrackToPlaylist(track.id, named: playlist.name)
+                                            }
+                                            .disabled(model.isStateBusy || model.isTransportBusy)
+                                        }
                                     }
                                     .disabled(
-                                        model.selectedPlaylist == nil
+                                        model.playlists.isEmpty
                                             || model.isStateBusy
                                             || model.isTransportBusy
                                     )
