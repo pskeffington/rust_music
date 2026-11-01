@@ -94,6 +94,15 @@ enum CatalogSearch {
         return track.searchableBytes.range(of: queryBytes) != nil
     }
 
+    static func isActionableSelectedTrack(
+        _ track: CatalogTrack?,
+        selectedTrackIDs: Set<Int>,
+        matching searchText: String
+    ) -> Bool {
+        guard let track, selectedTrackIDs.contains(track.id) else { return false }
+        return matches(track, matching: searchText)
+    }
+
     private static func queryBytes(for searchText: String) -> Data? {
         let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return nil }
