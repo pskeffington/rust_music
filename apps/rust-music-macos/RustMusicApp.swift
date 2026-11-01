@@ -865,6 +865,13 @@ private struct RustMusicCommands: Commands {
     }
 
     private func showAllWindows() {
+        openWindow(id: "equalizer")
+        openWindow(id: "library")
+        openWindow(id: "playlist")
+        openWindow(id: "player")
+    }
+
+    private func openMissingWindows() {
         if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.equalizer) {
             openWindow(id: "equalizer")
         }
@@ -880,7 +887,7 @@ private struct RustMusicCommands: Commands {
     }
 
     private func arrangeWindows() {
-        showAllWindows()
+        openMissingWindows()
         OperatorWindowDocking.shared.requestArrangement()
     }
 }
@@ -939,6 +946,13 @@ private struct WindowSwitcher: View {
     }
 
     private func showAllWindows() {
+        openWindow(id: "equalizer")
+        openWindow(id: "library")
+        openWindow(id: "playlist")
+        openWindow(id: "player")
+    }
+
+    private func openMissingWindows() {
         if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.equalizer) {
             openWindow(id: "equalizer")
         }
@@ -954,7 +968,7 @@ private struct WindowSwitcher: View {
     }
 
     private func arrangeWindows() {
-        showAllWindows()
+        openMissingWindows()
         OperatorWindowDocking.shared.requestArrangement()
     }
 }
