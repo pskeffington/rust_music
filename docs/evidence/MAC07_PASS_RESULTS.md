@@ -1312,3 +1312,17 @@ indicator at 0.105 and submitted frames increasing. Stop returned the UI to
 `Not started; duration unknown` and zero progress. The app remained idle and
 the prior 100% volume setting was restored. This is a focused UI-state check
 with zero-volume output and does not verify audible pause/resume behavior.
+
+### 2026-11-01 MAC07-03 compact Library scroll and search check
+
+On the rebuilt app, the Media Library was tiled with macOS `Window > Move &
+Resize > Top Left` at **736×462 screenshot pixels**. The six-track catalog
+showed its first four rows and part of the next row. Scrolling the Library
+list to the bottom exposed the remaining rows, including the final two; the
+accessibility tree retained the six-track count. A title query narrowed the
+catalog to one matching row and the count changed to one; clearing the query
+restored the six-track view. No row was played and no queue action occurred.
+Screenshot pixels are not AppKit points. This verifies scrolling and search
+at this one tiled size only; compact minimum-frame behavior, larger catalogs,
+keyboard selection during filtering, VoiceOver, and overall MAC07-03
+acceptance remain open.
