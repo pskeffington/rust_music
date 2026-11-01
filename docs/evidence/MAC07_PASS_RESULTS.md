@@ -466,3 +466,15 @@ AIFF/AIFF-C parity passed **7/7**. The script then stopped because
 `/private/corpus` does not exist. No user music was opened or copied. The
 private six-track FLAC parity gate remains required before merge; all captured
 transcripts remain outside Git.
+
+At app source commit `91607a5`, `sh scripts/build-macos-app.sh` exited **0**.
+Catalog, playlist, compact/tiled window geometry, snapshot bounds, strict local
+signature, shutdown coordination, and child-process lifecycle checks passed.
+The synthetic catalog harness measured search p50/p95 of 587.542/607.417 µs
+(2k), 5,943.417/6,038.541 µs (20k), 31,099.583/31,780.833 µs (100k), and
+75,323.916/78,595.791 µs (250k). Full-sort p50 ranged from 4.342 ms (2k) to
+742.303 ms (250k); cached-index payload ranged from 134,000 to 16,750,000
+bytes. Peak RSS for the synthetic catalog test process was 240,435,200 bytes.
+These are core harness measurements, not end-to-end filesystem scans or
+whole-app footprint. Roadmap-index, literature and `git diff --check`
+validators also passed.
