@@ -147,6 +147,12 @@ private final class PackageProcessClient {
         guard process.isRunning else {
             throw childStreamFailure("Rust Music playback process has exited.")
         }
+        if case .play = body {
+            // A persistent package process may play multiple tracks. Scope the
+            // retained native diagnostic to this session before it can emit a
+            // new AudioQueue record, so Stop/EOF cannot reuse prior-track data.
+            stderrCapture.resetDiagnosticCapture()
+        }
         let timeoutSeconds: TimeInterval
         if case .scanLibrary = body { timeoutSeconds = 30 } else { timeoutSeconds = 5 }
         let watchdog = DispatchWorkItem { [process] in
@@ -206,9 +212,15 @@ private final class PackageProcessClient {
             let snapshot = try PackagePlaybackSnapshot.decode(from: &reader)
             let isStopRequest: Bool
             if case .stop = body { isStopRequest = true } else { isStopRequest = false }
-            let diagnostic = isStopRequest || snapshot.state == 4
-                ? stderrCapture.statusAfterTeardown(timeout: 0.2)
-                : stderrCapture.diagnosticSummary?.statusText
+            // The stderr reader retains the most recent completed AudioQueue
+            // record for Stop/EOF diagnostics. Never attach that old teardown
+            // record to an active snapshot from a later playback session.
+            let diagnostic: String?
+            if isStopRequest || [3, 4, 5].contains(snapshot.state) {
+                diagnostic = stderrCapture.statusAfterTeardown(timeout: 0.2)
+            } else {
+                diagnostic = nil
+            }
             reply = .view(snapshot, diagnostic: diagnostic)
         case 3:
             _ = try reader.byte() // error code
@@ -279,6 +291,12 @@ private final class BoundedChildStderrCapture {
         return AudioQueueDiagnosticRecord.parse(bytes)
     }
 
+    func resetDiagnosticCapture() {
+        lock.lock()
+        retained.removeAll(keepingCapacity: true)
+        lock.unlock()
+    }
+
     func startReading(from handle: FileHandle) {
         readerGroup.enter()
         let descriptor = handle.fileDescriptor
@@ -339,6 +357,8 @@ private struct AudioQueueDiagnosticRecord {
     let created: UInt64
     let createStatus: StatusCode
     let routeStatus: StatusCode
+    let routeDeviceListStatus: StatusCode
+    let routeDefaultListed: String
     let allocated: UInt64
     let capacityBytes: UInt64
     let allocationStatus: StatusCode
@@ -349,6 +369,8 @@ private struct AudioQueueDiagnosticRecord {
     let deviceStatus: StatusCode
     let deviceAssociated: String
     let deviceMatchesDefault: String
+    let deviceListStatus: StatusCode
+    let deviceListed: String
     let callbacks: UInt64
     let teardown: UInt64
     let stopStatus: StatusCode
@@ -363,9 +385,11 @@ private struct AudioQueueDiagnosticRecord {
 
     private static let prefix = "RUST_MUSIC_AUDIO_DIAG "
     private static let expectedKeys: Set<String> = [
-        "rate", "bits", "channels", "created", "create_status", "route_status", "allocated",
+        "rate", "bits", "channels", "created", "create_status", "route_status",
+        "route_device_list_status", "route_default_listed", "allocated",
         "capacity_bytes", "allocation_status", "enqueued", "frames", "starts",
-        "start_status", "device_status", "device_associated", "device_default", "callbacks", "teardown", "stop_status", "drained",
+        "start_status", "device_status", "device_associated", "device_default",
+        "device_list_status", "device_listed", "callbacks", "teardown", "stop_status", "drained",
         "immediate_stop_status", "dispose_status"
     ]
 
@@ -399,6 +423,9 @@ private struct AudioQueueDiagnosticRecord {
                   let teardown = values["teardown"].flatMap(UInt64.init),
                   let createStatus = optionalStatus(values["create_status"]),
                   let routeStatus = optionalStatus(values["route_status"]),
+                  let routeDeviceListStatus = optionalStatus(values["route_device_list_status"]),
+                  let routeDefaultListed = values["route_default_listed"],
+                  ["0", "1", "none"].contains(routeDefaultListed),
                   let allocationStatus = optionalStatus(values["allocation_status"]),
                   let startStatus = optionalStatus(values["start_status"]),
                   let deviceStatus = optionalStatus(values["device_status"]),
@@ -406,6 +433,9 @@ private struct AudioQueueDiagnosticRecord {
                   ["0", "1", "none"].contains(deviceAssociated),
                   let deviceMatchesDefault = values["device_default"],
                   ["0", "1", "none"].contains(deviceMatchesDefault),
+                  let deviceListStatus = optionalStatus(values["device_list_status"]),
+                  let deviceListed = values["device_listed"],
+                  ["0", "1", "none"].contains(deviceListed),
                   let stopStatus = optionalStatus(values["stop_status"]),
                   let immediateStopStatus = optionalStatus(values["immediate_stop_status"]),
                   let disposeStatus = optionalStatus(values["dispose_status"]),
@@ -415,10 +445,13 @@ private struct AudioQueueDiagnosticRecord {
             return AudioQueueDiagnosticRecord(
                 rate: rate, bits: bits, channels: channels, created: created,
                 createStatus: createStatus, routeStatus: routeStatus,
+                routeDeviceListStatus: routeDeviceListStatus,
+                routeDefaultListed: routeDefaultListed,
                 allocated: allocated, capacityBytes: capacityBytes,
                 allocationStatus: allocationStatus, enqueued: enqueued, frames: frames,
                 starts: starts, startStatus: startStatus, deviceStatus: deviceStatus,
                 deviceAssociated: deviceAssociated, deviceMatchesDefault: deviceMatchesDefault,
+                deviceListStatus: deviceListStatus, deviceListed: deviceListed,
                 callbacks: callbacks,
                 teardown: teardown, stopStatus: stopStatus, drained: drained,
                 immediateStopStatus: immediateStopStatus, disposeStatus: disposeStatus
@@ -438,7 +471,15 @@ private struct AudioQueueDiagnosticRecord {
         let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
         let deviceText = deviceAssociated == "1" ? "yes" : (deviceAssociated == "0" ? "no" : "unknown")
         let defaultText = deviceMatchesDefault == "1" ? "yes" : (deviceMatchesDefault == "0" ? "no" : "unknown")
-        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) alloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) route-list \(statusValue(routeDeviceListStatus))/\(listedText(routeDefaultListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText)\ncurrent-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+    }
+
+    private func listedText(_ value: String) -> String {
+        switch value {
+        case "0": "no"
+        case "1": "yes"
+        default: "unknown"
+        }
     }
 
     private func statusValue(_ value: StatusCode) -> String {
@@ -1697,7 +1738,7 @@ struct PlayerView: View {
                      ?? model.playbackSnapshot?.outputSummary
                      ?? "NO OUTPUT SNAPSHOT · AUDIO NOT CONFIRMED")
                     .font(.system(size: 9, weight: .regular, design: .monospaced))
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .foregroundStyle(RustMusicPalette.muted)
                     .accessibilityIdentifier("playback-output-diagnostics")
                 Spacer(minLength: 0)

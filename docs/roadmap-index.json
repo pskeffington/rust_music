@@ -840,7 +840,7 @@
       "priority": "P0",
       "depends_on": [],
       "acceptance": "Same real FLAC file plays audibly via macOS GUI and native CLI, failing regression turns green, truthful output diagnostics captured.",
-      "blocker": "The operator still reports silence. Current CoreAudio and system_profiler probes show no default or enumerated output device, and the CLI route setup fails before PCM submission; a usable output route and audible acceptance are unavailable. A SwiftUI repair removes 500 ms snapshot-poll status/transport flicker, but fresh-launch verification remains pending. CountingSink coverage is decode/frame-delivery evidence, not device or audible acceptance."
+      "blocker": "The operator reports Rust Music silent while other Mac apps/browser radio are audible. The rebuilt GUI's post-stop AudioQueue record reports route status 0, default listed=yes, CurrentDevice listed=yes/default=yes, 205312 frames, successful drain and dispose, so its UID resolved in the CoreAudio device list during playback. Operator audibility confirmation for that run is pending; complete same-file GUI/CLI audible acceptance. Per-session telemetry reset and snapshot-poll flicker repairs are built; fresh-launch flicker acceptance remains pending. CountingSink coverage and queue telemetry are not proof of audible output."
     },
     {
       "gate": "G15",

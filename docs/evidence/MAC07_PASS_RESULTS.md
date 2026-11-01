@@ -46,3 +46,61 @@ The direct CLI route-binding error and CoreAudio's absence of a default/enumerat
 ## Remaining acceptance sequence
 
 Restore a CoreAudio-visible output device, rerun the direct CLI and GUI, and confirm both bind to the selected default and produce audible sound. Investigate why idle CoreAudio enumeration returns no devices while the GUI can bind during playback. Then validate progress/state, layout, transport, playlists, and A/B behavior. Capture sanitized commands, source SHA, and operator audibility confirmation. Run release checks at the accepted candidate; retain hardware/device and distribution blockers until separately observed.
+
+
+### 2026-11-01 operator correction and signal check
+
+The operator clarified that other Mac applications, including browser radio,
+produce audible sound. Therefore the empty device list and missing volume
+values observed from the command-line probes above do **not** establish that
+the user's Mac lacks an output device; those probe results are specific to that
+execution context and conflict with the operator's audible system output. The
+operator still reports Rust Music itself produces no sound.
+
+Local decodes of two supplied FLACs to temporary WAVs exited 0. The currently
+displayed GUI track decoded as 44.1 kHz, 16-bit stereo, 9,572,352 frames,
+peak absolute sample 32,768 and RMS 9,511.5; another supplied track measured
+12,985,344 frames, peak 32,768 and RMS 8,592.8. The temporary WAVs were
+removed. This confirms the source PCM is non-silent, but it does not prove the
+package process submitted those same samples to a valid output route.
+
+Next evidence must be collected from the actual GUI-launched AudioQueue: verify
+that its `CurrentDevice` UID resolves to one of the current
+`kAudioHardwarePropertyDevices` entries, in the same child-process/session
+that writes PCM. Record only membership and default match, never device UID.
+Until that identity and audible output are established, MAC07-01 remains
+unverified.
+
+
+The current GUI accessibility snapshot also showed an active track at 1:59 with
+5,263,872 submitted frames, while its output panel displayed an already
+completed queue summary for only 271,104 frames (`teardown=1`, drain complete).
+That mismatch confirms the panel was carrying a stale prior-session record;
+its earlier `default yes` value cannot be used as current route evidence. A
+Swift fix is underway to clear/scope child diagnostics per playback and keep
+completed summaries off active snapshots.
+
+
+### 2026-11-01 rebuilt GUI route inspection
+
+After rebuilding and relaunching the app, the operator-supplied album folder
+was explicitly loaded and track playback was explicitly started. The GUI's
+current post-stop summary reported: AudioQueue create/route status 0; default
+device list status 0 and listed=yes; queue CurrentDevice query status 0,
+associated=yes, default=yes, and current device list status 0/listed=yes;
+three allocated buffers (49,152 bytes total); 802 buffers / 205,312 frames
+enqueued; 802 callbacks; successful stop, drain and dispose. The playback
+session was stopped after collecting this record. It establishes that the
+GUI-launched queue's device UID resolved to a device in CoreAudio's current
+device list and matched the selected default at observation time. It does not
+prove that sound reached the speakers. Operator listening confirmation for
+this exact rebuilt session is pending; MAC07-01 remains unverified.
+
+Native routing tests passed 29/29, including unlisted/default-list failures,
+current queue UID membership and per-open diagnostics reset. The complete
+`sh scripts/offline-gate.sh` exited 0; the macOS app build/signature script,
+warnings-denied native Clippy, formatting, roadmap-index checker,
+literature checker and `git diff --check` also exited 0. Independent source
+review found no high-confidence native-routing blocker and noted scalar
+CoreAudio property result-size checks as optional hardening. No DAC,
+device-switch recovery, direct CLI A/B, or acoustic acceptance was performed.
