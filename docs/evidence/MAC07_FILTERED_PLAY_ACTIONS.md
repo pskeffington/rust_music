@@ -20,6 +20,16 @@ No track was played and no queue action was invoked during this check.
 
 The rebuilt app was explicitly loaded with a generated three-entry metadata-only FLAC fixture containing no audio frames. The first row remained selected while search was narrowed to a different row. The Media Library showed one result and the outside-search notice; Play Selected and Play Next were disabled, while Enqueue Selected remained enabled. The Main Player's Play button and Playback menu's Play / Pause command were also disabled. No transport, queue action, or playback was started. The temporary fixture was removed after the check, and the app was relaunched to Player / Ready / No Track.
 
+## Compact library and keyboard follow-up
+
+The rebuilt app was loaded with 40 generated metadata-only FLAC entries, with no audio frames. macOS Window > Move & Resize > Top Left produced a compact 736×462-pixel screenshot. Search, sort, count, the track list, and bulk action buttons remained present; this screenshot size is not a verified AppKit point size or the declared 520×360-point minimum. Tab moved focus from the window to Search and then into the track list. Shift+Down selected two adjacent tracks and updated the enqueue count to two. Scrolling the list to scrollbar value 1.0 reached the last entry. No playback or queue operation occurred. The temporary fixture was deleted and the app was relaunched to its idle Player state.
+
+## Compact library, keyboard, and scrolling check
+
+On 2026-11-01, the rebuilt app loaded 40 generated metadata-only FLAC entries with no audio frames. Native Window > Move & Resize > Top Left yielded a 736×462-pixel screenshot. The search field, sort control, track count, library list, and Play Selected / Enqueue Selected / Play Next actions remained visible. This is compact-window evidence; screenshot pixels are not AppKit points and do not prove the declared 520×360-point minimum.
+
+With default macOS keyboard navigation, Tab moved focus from the window to Search, then to the track list. Shift+Down selected two adjacent rows and the enqueue count changed to two. Scrolling the library to the bottom set the list scrollbar to 1.0 and reached the final entry. No playback or queue operation occurred. The temporary fixture was deleted and the app was relaunched to Player / Ready / No Track.
+
 ## Remaining MAC-07 checks
 
-Minimum-frame behavior, populated-list accessibility, VoiceOver speech and rotor navigation, drag docking, multiple-display and saved-frame restart behavior, scan cancellation/failure states, output-route parity, device recovery, and playback under library load remain open.
+The declared 520×360-point minimum-frame behavior, VoiceOver speech and rotor navigation, drag docking, multiple-display and saved-frame restart behavior, scan cancellation/failure states, output-route parity, device recovery, and playback under library load remain open.
