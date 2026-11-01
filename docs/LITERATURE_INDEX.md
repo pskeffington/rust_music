@@ -38,3 +38,12 @@ Updated: 2026-10-29. See [matrix](LITERATURE_MATRIX.md), [JSON index](literature
 
 - **LIT-017** [Rust Radio standalone embedding](https://github.com/pskeffington/rust_radio/blob/main/docs/EMBEDDING.md) - Reuse module shape: independent lib, explicit Play, host-owned storage and output focus. Gate G5.
 
+
+## Winamp / macOS usability research (2026-10-31)
+
+- **LIT-022** [Winamp desktop player UI and playlists](https://support.winamp.com/winamp-desktop-player-for-windows) — Keep transport, playlist editing, library and search immediately reachable; adopt keyboard selection and direct playlist actions. Gate G5.
+- **LIT-023** [Nielsen Norman Group ten usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) — Prioritize visible status, consistent controls, recognition over recall and user control. Gate G5.
+- **LIT-024** [Apple macOS design guidelines](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/) — Use resizable navigation, native keyboard conventions, discoverable toolbar/menu actions. Gate G5.
+- **LIT-025** [Apple progress indicator guidelines](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) — Do not invent track progress; show bounded frame-derived elapsed/total and honest unknown status. Gate G5.
+- **LIT-026** [Apple keyboard guidelines](https://developer.apple.com/design/human-interface-guidelines/keyboards/) — Preserve macOS standard shortcuts, Full Keyboard Access and explicit focus states. Gate G5.
+- **LIT-027** [Apple accessibility design guidelines](https://developer.apple.com/design/human-interface-guidelines/accessibility) — Ensure labeled status, VoiceOver navigation, scalable text and low cognitive burden. Gate G5.

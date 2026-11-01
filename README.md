@@ -76,6 +76,10 @@ unverified.
 - **Local build audit**: dedicated `rust-music-audit` crate checks manifests, Cargo.lock, Rust FFI and forbidden network/third-party code.
 - **Research**: 19 indexed references plus machine-readable engineering rules.
 
+## Active playback repair and A/B qualification
+
+The operator-observed macOS silent-playback symptom and missing song progress are tracked in [MAC-05](docs/MAC05_SILENT_PLAYBACK_PROGRESS.md) and the [MAC-06 diagnosis, major UI repair and A/B test plan](docs/MAC06_DIAGNOSIS_UI_AB_PLAN.md). These are **open engineering tasks**, not verified fixes. MAC-06 distinguishes CLI versus GUI, APFS versus SMB, WAV versus FLAC, output routes, and actual frame progress; the protocol already exposes progress counters which the SwiftUI UI currently discards. Do not mark playback audible solely because the UI says Playing.
+
 ## Get started
 
 To build the standalone macOS app bundle (requires the local macOS toolchain):
