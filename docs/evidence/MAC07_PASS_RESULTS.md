@@ -463,9 +463,12 @@ PRIVATE_FLAC_DIRECTORY=/private/corpus sh scripts/premerge-check.sh` exited
 **3**. Roadmap/literature validators and 8 roadmap unit tests passed, the
 captured offline Rust gate exited **0**, WAVE parity passed **6/6**, and
 AIFF/AIFF-C parity passed **7/7**. The script then stopped because
-`/private/corpus` does not exist. No user music was opened or copied. The
-private six-track FLAC parity gate remains required before merge; all captured
-transcripts remain outside Git.
+`/private/corpus` does not exist. No user music was decoded, played or copied.
+Afterward, the operator authorized a local SHA-256 match check of the 25
+listed FLACs; **0/6** manifest digests matched, so no FLAC parity run occurred
+and no audio or track identifiers were copied into Git. The private six-track
+FLAC parity gate remains required before merge; captured gate transcripts are
+outside Git.
 
 At app source commit `91607a5`, `sh scripts/build-macos-app.sh` exited **0**.
 Catalog, playlist, compact/tiled window geometry, snapshot bounds, strict local
