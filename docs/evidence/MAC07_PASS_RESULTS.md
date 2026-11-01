@@ -843,3 +843,37 @@ playlist: confirm all three actions are discoverable, reorder/remove selected
 rows, check boundary and busy states, and verify VoiceOver announces the
 updated selection. Test keyboard-only operation and focus traversal
 separately; custom VoiceOver actions do not establish keyboard operation.
+
+### 2026-11-01 playlist batch argument UI regression
+
+A live CUA run on candidate source `58afb7b` used a temporary three-track
+metadata-only FLAC catalog. Multi-selection in the Library worked, but
+`ADD SELECTED` failed and Player reported `too many or oversized state
+arguments`. Inspection found the CLI entry point accepted only two trailing
+state arguments, while `playlist add-many` supports a playlist name plus up
+to 64 track paths and `move-many` supports a name, direction, and 64 indexes.
+The parser now collects at most 66 arguments, retaining the 4096-byte per
+argument bound. No playback started during this run.
+
+After rebuilding the app with the fix, retrying `ADD SELECTED` created the
+three requested playlist entries. Moving the selected second and third
+entries up preserved their order and selection; removing the selection left
+the two unselected entries. The temporary playlist and library were deleted,
+the app was quit, and both the synthetic catalog and its root-scoped playlist
+state file were removed. The rebuilt app was reopened and showed Player /
+Ready / No Track, no output snapshot, and disabled transport controls. No
+playback was started. VoiceOver was observed off, temporarily enabled for the
+accessibility check, then restored off; CUA did not expose or invoke the named
+custom actions, so live VoiceOver action acceptance remains unverified.
+
+`cargo fmt --all -- --check` exited **0**. `cargo test --locked --offline -p
+rust-music-cli` exited **0** with 17/17 unit tests and 1/1 subprocess integration test passing. The unit tests include the state-argument bound regression; the
+subprocess test creates a named playlist and adds three paths through separate
+CLI invocations. `sh scripts/build-macos-app.sh` exited **0**
+on the formatted candidate source plus the uncommitted parser fix; the macOS
+13 app compiled, signature validation passed, and the catalog, playlist,
+window-geometry, playback-snapshot, bounded-catalog, and process-lifecycle
+harnesses passed. The synthetic 250k catalog run measured 108.448 ms search
+p95, 1,138.401 ms full-sort p95, and 240,467,968 bytes catalog-harness peak
+RSS. These are synthetic catalog-harness figures, not UI scan or
+playback-under-load measurements.
