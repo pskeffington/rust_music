@@ -830,7 +830,16 @@ validated the signed bundle, and passed catalog search at 2k/20k/100k/250k,
 playlist-selection, operator-window geometry, playback snapshot, bounded
 catalog, and process lifecycle harnesses. The 250k synthetic profile reported
 search p95 72.169 ms, full-sort p95 708.649 ms, and process peak RSS
-240,418,816 bytes. The CUA session currently shows the Player window Ready /
-No Track. VoiceOver execution of the new actions, selected-entry persistence,
-and complete keyboard traversal have not been exercised. This candidate is
-not merged-mainline evidence.
+240,418,816 bytes for the catalog harness. The CUA session currently shows
+the Player window Ready / No Track. VoiceOver execution of the new actions,
+selected-entry persistence, and complete keyboard traversal have not been
+exercised. This candidate is not merged-mainline evidence.
+
+An independent read-only gate review of source `7648cea` found no blocking
+source issue: the actions use the existing selection-validating playlist
+operations (bounded to 64 entries) and include busy-state guards. The review
+did not invoke VoiceOver. Next acceptance requires a populated temporary
+playlist: confirm all three actions are discoverable, reorder/remove selected
+rows, check boundary and busy states, and verify VoiceOver announces the
+updated selection. Test keyboard-only operation and focus traversal
+separately; custom VoiceOver actions do not establish keyboard operation.
