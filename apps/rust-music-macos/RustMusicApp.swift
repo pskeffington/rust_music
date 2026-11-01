@@ -109,6 +109,7 @@ private final class PackageProcessClient {
     private let process: Process
     private let input: FileHandle
     private let output: FileHandle
+    private let stderrCapture: BoundedChildStderrCapture
     private var requestID: UInt64 = 1
 
     init(executable: URL, root: URL) throws {
@@ -117,19 +118,25 @@ private final class PackageProcessClient {
         process.arguments = ["serve", "--desktop"]
         let inputPipe = Pipe()
         let outputPipe = Pipe()
+        let stderrPipe = Pipe()
         process.standardInput = inputPipe
         process.standardOutput = outputPipe
-        process.standardError = FileHandle.nullDevice
+        process.standardError = stderrPipe
+        var childEnvironment = process.environment ?? ProcessInfo.processInfo.environment
+        childEnvironment["RUST_MUSIC_AUDIO_DIAGNOSTICS"] = "1"
+        process.environment = childEnvironment
         try process.run()
         self.process = process
         input = inputPipe.fileHandleForWriting
         output = outputPipe.fileHandleForReading
+        stderrCapture = BoundedChildStderrCapture()
+        stderrCapture.startReading(from: stderrPipe.fileHandleForReading)
         do {
             guard case .hello(let version) = try request(.hello), version == 1 else {
                 throw RustMusicFailure(message: "Rust Music package protocol negotiation failed.")
             }
-            if case .failure(let message) = try request(.activate) { throw RustMusicFailure(message: message) }
-            if case .failure(let message) = try request(.scanLibrary(root.path)) { throw RustMusicFailure(message: message) }
+            if case .failure(let message, _) = try request(.activate) { throw RustMusicFailure(message: message) }
+            if case .failure(let message, _) = try request(.scanLibrary(root.path)) { throw RustMusicFailure(message: message) }
         } catch {
             shutdown(force: true)
             throw error
@@ -137,7 +144,9 @@ private final class PackageProcessClient {
     }
 
     func request(_ body: PackageRequest) throws -> PackageResponse {
-        guard process.isRunning else { throw RustMusicFailure(message: "Rust Music playback process has exited.") }
+        guard process.isRunning else {
+            throw childStreamFailure("Rust Music playback process has exited.")
+        }
         let timeoutSeconds: TimeInterval
         if case .scanLibrary = body { timeoutSeconds = 30 } else { timeoutSeconds = 5 }
         let watchdog = DispatchWorkItem { [process] in
@@ -155,15 +164,33 @@ private final class PackageProcessClient {
         var frame = Data([0x52, 0x42, 0x50, 0x4b])
         frame.appendBE(UInt32(payload.count))
         frame.append(payload)
-        try input.write(contentsOf: frame)
-        let header = try readExact(8)
+        do {
+            try input.write(contentsOf: frame)
+        } catch {
+            if !process.isRunning {
+                throw childStreamFailure("Rust Music playback process stopped while receiving a request.")
+            }
+            throw error
+        }
+        let header: Data
+        do {
+            header = try readExact(8)
+        } catch is PackageStreamClosed {
+            throw childStreamFailure("Rust Music playback process closed its package stream.")
+        }
         guard Array(header.prefix(4)) == [0x52, 0x42, 0x50, 0x4b] else {
             throw RustMusicFailure(message: "Rust Music returned an invalid package frame header.")
         }
         var lengthReader = PackageReader(bytes: Array(header.dropFirst(4)))
         let length = Int(try lengthReader.u32())
         guard (1...16_384).contains(length) else { throw RustMusicFailure(message: "Rust Music package frame length is invalid.") }
-        var reader = PackageReader(bytes: Array(try readExact(length)))
+        let replyBytes: Data
+        do {
+            replyBytes = try readExact(length)
+        } catch is PackageStreamClosed {
+            throw childStreamFailure("Rust Music playback process closed its package stream.")
+        }
+        var reader = PackageReader(bytes: Array(replyBytes))
         guard try reader.byte() == 1, try reader.byte() == 2,
               try reader.u64() == id,
               try reader.text(max: 96) == "org.rustboy.music" else {
@@ -176,10 +203,17 @@ private final class PackageProcessClient {
         case 1:
             reply = .ack
         case 2:
-            reply = .view(try PackagePlaybackSnapshot.decode(from: &reader))
+            let snapshot = try PackagePlaybackSnapshot.decode(from: &reader)
+            let isStopRequest: Bool
+            if case .stop = body { isStopRequest = true } else { isStopRequest = false }
+            let diagnostic = isStopRequest || snapshot.state == 4
+                ? stderrCapture.statusAfterTeardown(timeout: 0.2)
+                : stderrCapture.diagnosticSummary?.statusText
+            reply = .view(snapshot, diagnostic: diagnostic)
         case 3:
             _ = try reader.byte() // error code
-            reply = .failure(try reader.text(max: 256))
+            let message = try reader.text(max: 256)
+            reply = .failure(message, diagnostic: stderrCapture.statusAfterTeardown(timeout: 0.2))
         default:
             throw RustMusicFailure(message: "Rust Music returned an unknown package reply.")
         }
@@ -194,6 +228,7 @@ private final class PackageProcessClient {
         }
         try? input.close()
         ProcessTermination.drainAndReap(process, gracefulTimeout: 2, forcedTimeout: 1)
+        stderrCapture.waitForDrain(timeout: 1)
     }
 
     private func readExact(_ count: Int) throws -> Data {
@@ -201,19 +236,209 @@ private final class PackageProcessClient {
         data.reserveCapacity(count)
         while data.count < count {
             guard let chunk = try output.read(upToCount: count - data.count), !chunk.isEmpty else {
-                throw RustMusicFailure(message: "Rust Music playback process closed its package stream.")
+                throw PackageStreamClosed()
             }
             data.append(chunk)
         }
         return data
+    }
+
+    private func childStreamFailure(_ message: String) -> RustMusicFailure {
+        // Allow stderr already written by a just-exited child to reach the
+        // bounded reader. Its contents, including paths, are never surfaced.
+        if !process.isRunning { stderrCapture.waitForDrain(timeout: 0.1) }
+        let retainedBytes = stderrCapture.retainedByteCount
+        return RustMusicFailure(
+            message: "\(message) Child stderr retained \(retainedBytes) bytes (maximum 4096); content withheld."
+        )
+    }
+}
+
+private struct PackageStreamClosed: Error {}
+
+/// Continuously drains child stderr so it cannot block the RBPK server, while
+/// retaining at most 4 KiB for a byte-count-only failure diagnostic.
+private final class BoundedChildStderrCapture {
+    fileprivate static let maximumRetainedBytes = 4 * 1024
+    private let lock = NSLock()
+    private let readerGroup = DispatchGroup()
+    private let readerQueue = DispatchQueue(label: "org.rustboy.music.stderr-reader", qos: .utility)
+    private var retained = Data()
+    private var readSource: DispatchSourceRead?
+
+    var retainedByteCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return retained.count
+    }
+
+    var diagnosticSummary: AudioQueueDiagnosticRecord? {
+        lock.lock()
+        let bytes = retained
+        lock.unlock()
+        return AudioQueueDiagnosticRecord.parse(bytes)
+    }
+
+    func startReading(from handle: FileHandle) {
+        readerGroup.enter()
+        let descriptor = handle.fileDescriptor
+        let source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: readerQueue)
+        readSource = source
+        source.setEventHandler { [weak self] in
+            var bytes = [UInt8](repeating: 0, count: 1024)
+            let amount = bytes.withUnsafeMutableBytes { buffer in
+                Darwin.read(descriptor, buffer.baseAddress, buffer.count)
+            }
+            if amount > 0, let self {
+                self.append(Data(bytes.prefix(amount)))
+            } else if amount == 0 || (amount < 0 && errno != EAGAIN && errno != EINTR) {
+                source.cancel()
+            }
+        }
+        source.setCancelHandler { [self, handle] in
+            try? handle.close()
+            readerGroup.leave()
+        }
+        source.resume()
+    }
+
+    private func append(_ bytes: Data) {
+        lock.lock()
+        retained.append(bytes)
+        if retained.count > Self.maximumRetainedBytes {
+            retained.removeSubrange(0..<(retained.count - Self.maximumRetainedBytes))
+        }
+        lock.unlock()
+    }
+
+    func waitForDrain(timeout: TimeInterval) {
+        _ = readerGroup.wait(timeout: .now() + timeout)
+    }
+
+    func waitForDiagnostic(timeout: TimeInterval) {
+        let deadline = Date().addingTimeInterval(max(0, timeout))
+        while Date() < deadline {
+            if diagnosticSummary != nil { return }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+    }
+
+    func statusAfterTeardown(timeout: TimeInterval) -> String {
+        waitForDiagnostic(timeout: timeout)
+        if let summary = diagnosticSummary { return summary.statusText }
+        return "AudioQueue diagnostic record unavailable; stderr retained \(retainedByteCount) bytes."
+    }
+}
+
+/// Whitelisted numeric fields from the child's fixed diagnostics record.
+/// Raw stderr never escapes `BoundedChildStderrCapture`.
+private struct AudioQueueDiagnosticRecord {
+    let rate: UInt32
+    let bits: UInt8
+    let channels: UInt8
+    let created: UInt64
+    let createStatus: StatusCode
+    let allocated: UInt64
+    let capacityBytes: UInt64
+    let allocationStatus: StatusCode
+    let enqueued: UInt64
+    let frames: UInt64
+    let starts: UInt64
+    let startStatus: StatusCode
+    let callbacks: UInt64
+    let teardown: UInt64
+    let stopStatus: StatusCode
+    let drained: String
+    let immediateStopStatus: StatusCode
+    let disposeStatus: StatusCode
+
+    enum StatusCode {
+        case unavailable
+        case value(Int32)
+    }
+
+    private static let prefix = "RUST_MUSIC_AUDIO_DIAG "
+    private static let expectedKeys: Set<String> = [
+        "rate", "bits", "channels", "created", "create_status", "allocated",
+        "capacity_bytes", "allocation_status", "enqueued", "frames", "starts",
+        "start_status", "callbacks", "teardown", "stop_status", "drained",
+        "immediate_stop_status", "dispose_status"
+    ]
+
+    static func parse(_ bytes: Data) -> AudioQueueDiagnosticRecord? {
+        guard bytes.count <= BoundedChildStderrCapture.maximumRetainedBytes else { return nil }
+        let text = String(decoding: bytes, as: UTF8.self)
+        for line in text.split(whereSeparator: \.isNewline).reversed() {
+            guard line.hasPrefix(prefix), line.utf8.count <= 2048 else { continue }
+            let tokens = line.dropFirst(prefix.count).split(separator: " ")
+            guard tokens.count == expectedKeys.count else { continue }
+            var values: [String: String] = [:]
+            var valid = true
+            for token in tokens {
+                let pair = token.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                guard pair.count == 2 else { valid = false; break }
+                let key = String(pair[0])
+                guard expectedKeys.contains(key), values[key] == nil else { valid = false; break }
+                values[key] = String(pair[1])
+            }
+            guard valid, values.count == expectedKeys.count,
+                  let rate = values["rate"].flatMap(UInt32.init), rate > 0,
+                  let bits = values["bits"].flatMap(UInt8.init), [16, 24, 32].contains(bits),
+                  let channels = values["channels"].flatMap(UInt8.init), (1...8).contains(channels),
+                  let created = values["created"].flatMap(UInt64.init),
+                  let allocated = values["allocated"].flatMap(UInt64.init),
+                  let capacityBytes = values["capacity_bytes"].flatMap(UInt64.init),
+                  let enqueued = values["enqueued"].flatMap(UInt64.init),
+                  let frames = values["frames"].flatMap(UInt64.init),
+                  let starts = values["starts"].flatMap(UInt64.init),
+                  let callbacks = values["callbacks"].flatMap(UInt64.init),
+                  let teardown = values["teardown"].flatMap(UInt64.init),
+                  let createStatus = optionalStatus(values["create_status"]),
+                  let allocationStatus = optionalStatus(values["allocation_status"]),
+                  let startStatus = optionalStatus(values["start_status"]),
+                  let stopStatus = optionalStatus(values["stop_status"]),
+                  let immediateStopStatus = optionalStatus(values["immediate_stop_status"]),
+                  let disposeStatus = optionalStatus(values["dispose_status"]),
+                  let drained = values["drained"], ["0", "1", "none"].contains(drained) else {
+                continue
+            }
+            return AudioQueueDiagnosticRecord(
+                rate: rate, bits: bits, channels: channels, created: created,
+                createStatus: createStatus, allocated: allocated, capacityBytes: capacityBytes,
+                allocationStatus: allocationStatus, enqueued: enqueued, frames: frames,
+                starts: starts, startStatus: startStatus, callbacks: callbacks,
+                teardown: teardown, stopStatus: stopStatus, drained: drained,
+                immediateStopStatus: immediateStopStatus, disposeStatus: disposeStatus
+            )
+        }
+        return nil
+    }
+
+    private static func optionalStatus(_ value: String?) -> StatusCode? {
+        guard let value else { return nil }
+        if value == "none" { return .unavailable }
+        guard let status = Int32(value) else { return nil }
+        return .value(status)
+    }
+
+    var statusText: String {
+        let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) alloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) immediate \(statusValue(immediateStopStatus)) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+    }
+
+    private func statusValue(_ value: StatusCode) -> String {
+        switch value {
+        case .unavailable: "none"
+        case .value(let status): String(status)
+        }
     }
 }
 
 private enum PackageResponse {
     case hello(UInt16)
     case ack
-    case view(PackagePlaybackSnapshot)
-    case failure(String)
+    case view(PackagePlaybackSnapshot, diagnostic: String?)
+    case failure(String, diagnostic: String?)
 }
 
 @main
@@ -301,6 +526,7 @@ final class PlayerModel: ObservableObject {
     @Published var isPlaying = false
     @Published var isPaused = false
     @Published var playbackSnapshot: PackagePlaybackSnapshot?
+    @Published private(set) var audioQueueDiagnosticSummary: String?
     @Published var isTransportBusy = false
     @Published var volumePercent = 100
     @Published var isScanning = false
@@ -761,6 +987,7 @@ final class PlayerModel: ObservableObject {
     func play() {
         guard let selectedTrack, !isScanning, !isStateBusy, !isTransportBusy,
               let index = UInt16(exactly: selectedTrack.id) else { return }
+        audioQueueDiagnosticSummary = nil
         let volume = UInt8(volumePercent)
         runPackageCommands([.select(index), .setVolumePercent(volume), .play], label: "Starting playback…") { [weak self] response in
             self?.applyPlaybackResponse(response, fallback: "Playback started.")
@@ -770,6 +997,7 @@ final class PlayerModel: ObservableObject {
     private func restartQueuePlayback() {
         guard let selectedTrack,
               let index = UInt16(exactly: selectedTrack.id) else { return }
+        audioQueueDiagnosticSummary = nil
         let volume = UInt8(volumePercent)
         runPackageCommands([.stop, .select(index), .setVolumePercent(volume), .play], label: "Advancing queue…") { [weak self] response in
             self?.applyPlaybackResponse(response, fallback: "Queue advanced.")
@@ -855,7 +1083,8 @@ final class PlayerModel: ObservableObject {
         retryStateAfterError: Bool = true
     ) {
         switch response {
-        case .view(let snapshot):
+        case .view(let snapshot, let diagnostic):
+            if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
             if PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
                 playbackSnapshot = nil
             } else {
@@ -879,6 +1108,7 @@ final class PlayerModel: ObservableObject {
             case 5: status = "Playback failed. Check the macOS sound output and retry."
             default: status = fallback
             }
+            if let diagnostic { status += " | \(diagnostic)" }
             // A failed native output must release the UI's transport lockout
             // so the user can explicitly retry after restoring the device.
             if state == 5 {
@@ -887,11 +1117,12 @@ final class PlayerModel: ObservableObject {
                 snapshotPollScheduled = false
             }
             if isPlaying { scheduleSnapshotPoll() }
-        case .failure(let message):
+        case .failure(let message, let diagnostic):
             playbackSnapshot = nil
+            if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
             let shouldReconcileState = (isPlaying || isPaused) &&
                 !message.lowercased().hasPrefix("audio output:")
-            status = message
+            status = diagnostic.map { "\(message) | \($0)" } ?? message
             isPlaying = false
             isPaused = false
             snapshotPollScheduled = false
@@ -914,11 +1145,13 @@ final class PlayerModel: ObservableObject {
             guard self.isPlaying, !self.isTransportBusy else { return }
             self.runPackageCommands([.snapshot(0)], label: "") { [weak self] response in
                 guard let self else { return }
-                if case .view(let snapshot) = response, snapshot.state == 4 {
+                if case .view(let snapshot, let diagnostic) = response, snapshot.state == 4 {
+                    if let diagnostic { self.audioQueueDiagnosticSummary = diagnostic }
                     if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: self.selectedIndex) {
                         self.playbackSnapshot = snapshot
                     }
                     self.isPlaying = false
+                    self.status = diagnostic.map { "Playback finished. | \($0)" } ?? "Playback finished."
                     self.advanceQueueAfterEnd()
                     return
                 }
@@ -1334,7 +1567,9 @@ struct PlayerView: View {
                         .accessibilityValue("No playback snapshot")
                         .accessibilityIdentifier("playback-progress")
                 }
-                Text(model.playbackSnapshot?.outputSummary ?? "NO OUTPUT SNAPSHOT · AUDIO NOT CONFIRMED")
+                Text(model.audioQueueDiagnosticSummary.map { "\($0)" }
+                     ?? model.playbackSnapshot?.outputSummary
+                     ?? "NO OUTPUT SNAPSHOT · AUDIO NOT CONFIRMED")
                     .font(.system(size: 9, weight: .regular, design: .monospaced))
                     .lineLimit(2)
                     .foregroundStyle(RustMusicPalette.muted)

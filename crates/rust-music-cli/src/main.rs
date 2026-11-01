@@ -1908,7 +1908,9 @@ mod tests {
         all(target_os = "macos", feature = "macos-output"),
         all(target_os = "linux", feature = "alsa-output")
     ))]
-    use rust_music_ipc::{read_frame, write_frame, Envelope, Reply, Request, PROTOCOL_VERSION};
+    use rust_music_ipc::{
+        read_frame, write_frame, Envelope, Playback, Reply, Request, PROTOCOL_VERSION,
+    };
     use std::{
         fs,
         path::PathBuf,
@@ -2743,5 +2745,167 @@ mod tests {
         .is_err());
         assert!(output.is_empty());
         assert!(!sink_created.load(Ordering::Acquire));
+    }
+
+    // Explicit real-world corpus gate. Keep source audio outside the repository.
+    // Example: RUST_MUSIC_TEST_FLAC=/absolute/path/song.flac cargo test \
+    //   --locked --offline -p rust-music-cli --features macos-output \
+    //   -- --ignored package_stream_external_flac_transport
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    #[ignore = "requires RUST_MUSIC_TEST_FLAC pointing to a real local FLAC file"]
+    fn package_stream_external_flac_transport() {
+        let source = PathBuf::from(
+            std::env::var_os("RUST_MUSIC_TEST_FLAC")
+                .expect("set RUST_MUSIC_TEST_FLAC to an absolute real-world FLAC"),
+        );
+        assert!(source.is_absolute() && source.is_file(), "FLAC must exist");
+        assert_eq!(
+            source
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("flac".to_owned()),
+            "fixture must be FLAC"
+        );
+        let root = temp_root("package-external-flac");
+        let destination = root.join("real-world.flac");
+        fs::copy(&source, &destination).expect("copy local FLAC into isolated scan root");
+        let requests = [
+            Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+            Request::Activate {
+                width: 640,
+                height: 520,
+            },
+            Request::ScanLibrary {
+                root: root.to_string_lossy().into_owned(),
+            },
+            Request::Select { index: 0 },
+            Request::SetVolumePercent { percent: 100 },
+            Request::Play,
+            Request::Snapshot { page: 0 },
+            Request::Stop,
+            Request::Shutdown,
+        ];
+        let request_count = requests.len();
+
+        struct CountingSink {
+            inner: NullSink,
+            total: Arc<std::sync::atomic::AtomicU64>,
+        }
+        impl PcmSink for CountingSink {
+            fn open(&mut self, format: AudioFormat) -> Result<()> {
+                self.inner.open(format)
+            }
+            fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+                self.inner.write(block)?;
+                self.total
+                    .fetch_add(block.frames() as u64, Ordering::Relaxed);
+                Ok(())
+            }
+            fn pause(&mut self) -> Result<()> {
+                self.inner.pause()
+            }
+            fn resume(&mut self) -> Result<()> {
+                self.inner.resume()
+            }
+            fn finish(&mut self) -> Result<()> {
+                self.inner.finish()
+            }
+        }
+        struct PacedInput {
+            inner: std::io::Cursor<Vec<u8>>,
+            pause_at: u64,
+            paused: bool,
+        }
+        impl std::io::Read for PacedInput {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                if !self.paused && self.inner.position() >= self.pause_at {
+                    self.paused = true;
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                let cap = if self.paused {
+                    buf.len()
+                } else {
+                    buf.len()
+                        .min((self.pause_at - self.inner.position()) as usize)
+                };
+                self.inner.read(&mut buf[..cap])
+            }
+        }
+
+        let total_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let mut pause_at = 0u64;
+        let mut input = Vec::new();
+        for (offset, body) in requests.into_iter().enumerate() {
+            write_frame(
+                &mut input,
+                &Envelope {
+                    package_id: MUSIC_PACKAGE_ID.into(),
+                    request_id: offset as u64 + 1,
+                    body,
+                }
+                .encode()
+                .unwrap(),
+            )
+            .unwrap();
+            if offset == 5 {
+                pause_at = input.len() as u64;
+            }
+        }
+        let mut output = Vec::new();
+        let frames_in_sink = Arc::clone(&total_frames);
+        serve_stream_with_limits::<CountingSink, _, _, _>(
+            move || {
+                Ok(CountingSink {
+                    inner: NullSink::default(),
+                    total: frames_in_sink,
+                })
+            },
+            PacedInput {
+                inner: std::io::Cursor::new(input),
+                pause_at,
+                paused: false,
+            },
+            &mut output,
+            STANDALONE_SCAN_LIMITS,
+        )
+        .expect("persistent desktop FLAC server should complete");
+        let mut replies = output.as_slice();
+        for step in 0..request_count {
+            let bytes = read_frame(&mut replies)
+                .unwrap()
+                .expect("missing protocol reply");
+            let response = Envelope::<Reply>::decode(&bytes).unwrap();
+            assert_eq!(response.request_id, step as u64 + 1);
+            match (step, response.body) {
+                (0, Reply::Hello { .. }) | (8, Reply::Ack) => {}
+                (1..=7, Reply::View(view)) => {
+                    if step >= 2 {
+                        assert_eq!(view.track_count, 1, "FLAC scan lost the selected file");
+                    }
+                    if step == 5 {
+                        assert_eq!(
+                            view.playback,
+                            Playback::Playing,
+                            "real FLAC failed to enter playback"
+                        );
+                    }
+                }
+                (_, other) => panic!("step {step} failed: {other:?}"),
+            }
+        }
+        assert!(read_frame(&mut replies).unwrap().is_none());
+        assert!(
+            total_frames.load(Ordering::Relaxed) > 0,
+            "persistent server entered Playing but submitted zero decoded FLAC frames"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

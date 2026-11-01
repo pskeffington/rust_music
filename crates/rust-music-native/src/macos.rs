@@ -3,10 +3,11 @@
 use rust_music_core::{AudioFormat, MusicError, PcmBlock, PcmSink, Result};
 use std::{
     ffi::c_void,
+    ffi::OsStr,
     ptr,
     sync::{
         atomic::AtomicUsize,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc,
     },
     thread,
@@ -21,6 +22,203 @@ const MAX_DRAIN_WAIT: Duration = Duration::from_secs(5);
 const FORMAT_LPCM: u32 = u32::from_be_bytes(*b"lpcm");
 const FLAG_SIGNED: u32 = 1 << 2;
 const FLAG_PACKED: u32 = 1 << 3;
+const NO_STATUS: i64 = i64::MIN;
+
+/// Bounded, opt-in observations from the native AudioQueue boundary.
+/// Counters saturate at `u64::MAX`; status fields contain the most recent OSStatus.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AudioQueueDiagnosticsSnapshot {
+    pub enabled: bool,
+    pub sample_rate: u32,
+    pub bits_per_sample: u8,
+    pub channels: u8,
+    pub output_creation_attempts: u64,
+    pub output_creation_status: Option<i32>,
+    pub allocated_buffers: u64,
+    pub allocated_capacity_bytes: u64,
+    pub buffer_allocation_status: Option<i32>,
+    pub enqueued_buffers: u64,
+    pub enqueued_frames: u64,
+    pub start_attempts: u64,
+    pub start_status: Option<i32>,
+    pub completed_callbacks: u64,
+    pub teardown_attempts: u64,
+    pub stop_status: Option<i32>,
+    pub drain_complete: Option<bool>,
+    pub immediate_stop_status: Option<i32>,
+    pub dispose_status: Option<i32>,
+}
+
+struct AudioQueueDiagnostics {
+    enabled: AtomicBool,
+    sample_rate: AtomicU64,
+    bits_per_sample: AtomicU64,
+    channels: AtomicU64,
+    output_creation_attempts: AtomicU64,
+    output_creation_status: AtomicI64,
+    allocated_buffers: AtomicU64,
+    allocated_capacity_bytes: AtomicU64,
+    buffer_allocation_status: AtomicI64,
+    enqueued_buffers: AtomicU64,
+    enqueued_frames: AtomicU64,
+    start_attempts: AtomicU64,
+    start_status: AtomicI64,
+    completed_callbacks: AtomicU64,
+    teardown_attempts: AtomicU64,
+    stop_status: AtomicI64,
+    drain_complete: AtomicI64,
+    immediate_stop_status: AtomicI64,
+    dispose_status: AtomicI64,
+}
+
+impl Default for AudioQueueDiagnostics {
+    fn default() -> Self {
+        Self {
+            enabled: AtomicBool::new(false),
+            sample_rate: AtomicU64::new(0),
+            bits_per_sample: AtomicU64::new(0),
+            channels: AtomicU64::new(0),
+            output_creation_attempts: AtomicU64::new(0),
+            output_creation_status: AtomicI64::new(NO_STATUS),
+            allocated_buffers: AtomicU64::new(0),
+            allocated_capacity_bytes: AtomicU64::new(0),
+            buffer_allocation_status: AtomicI64::new(NO_STATUS),
+            enqueued_buffers: AtomicU64::new(0),
+            enqueued_frames: AtomicU64::new(0),
+            start_attempts: AtomicU64::new(0),
+            start_status: AtomicI64::new(NO_STATUS),
+            completed_callbacks: AtomicU64::new(0),
+            teardown_attempts: AtomicU64::new(0),
+            stop_status: AtomicI64::new(NO_STATUS),
+            drain_complete: AtomicI64::new(0),
+            immediate_stop_status: AtomicI64::new(NO_STATUS),
+            dispose_status: AtomicI64::new(NO_STATUS),
+        }
+    }
+}
+
+impl AudioQueueDiagnostics {
+    fn status(&self, field: &AtomicI64, value: i32) {
+        if self.enabled.load(Ordering::Relaxed) {
+            field.store(i64::from(value), Ordering::Relaxed);
+        }
+    }
+
+    fn add(&self, field: &AtomicU64, value: u64) {
+        if !self.enabled.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut current = field.load(Ordering::Relaxed);
+        loop {
+            let next = current.saturating_add(value);
+            match field.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed) {
+                Ok(_) => break,
+                Err(observed) => current = observed,
+            }
+        }
+    }
+
+    fn snapshot(&self) -> AudioQueueDiagnosticsSnapshot {
+        let status = |field: &AtomicI64| match field.load(Ordering::Relaxed) {
+            NO_STATUS => None,
+            value => i32::try_from(value).ok(),
+        };
+        let drain_complete = match self.drain_complete.load(Ordering::Relaxed) {
+            0 => None,
+            1 => Some(false),
+            _ => Some(true),
+        };
+        AudioQueueDiagnosticsSnapshot {
+            enabled: self.enabled.load(Ordering::Relaxed),
+            sample_rate: self.sample_rate.load(Ordering::Relaxed) as u32,
+            bits_per_sample: self.bits_per_sample.load(Ordering::Relaxed) as u8,
+            channels: self.channels.load(Ordering::Relaxed) as u8,
+            output_creation_attempts: self.output_creation_attempts.load(Ordering::Relaxed),
+            output_creation_status: status(&self.output_creation_status),
+            allocated_buffers: self.allocated_buffers.load(Ordering::Relaxed),
+            allocated_capacity_bytes: self.allocated_capacity_bytes.load(Ordering::Relaxed),
+            buffer_allocation_status: status(&self.buffer_allocation_status),
+            enqueued_buffers: self.enqueued_buffers.load(Ordering::Relaxed),
+            enqueued_frames: self.enqueued_frames.load(Ordering::Relaxed),
+            start_attempts: self.start_attempts.load(Ordering::Relaxed),
+            start_status: status(&self.start_status),
+            completed_callbacks: self.completed_callbacks.load(Ordering::Relaxed),
+            teardown_attempts: self.teardown_attempts.load(Ordering::Relaxed),
+            stop_status: status(&self.stop_status),
+            drain_complete,
+            immediate_stop_status: status(&self.immediate_stop_status),
+            dispose_status: status(&self.dispose_status),
+        }
+    }
+
+    fn set_drain_complete(&self, complete: bool) {
+        if self.enabled.load(Ordering::Relaxed) {
+            self.drain_complete
+                .store(if complete { 2 } else { 1 }, Ordering::Relaxed);
+        }
+    }
+
+    fn set_format(&self, format: AudioFormat) {
+        self.sample_rate
+            .store(u64::from(format.sample_rate), Ordering::Relaxed);
+        self.bits_per_sample
+            .store(u64::from(format.bits_per_sample), Ordering::Relaxed);
+        self.channels
+            .store(u64::from(format.channels), Ordering::Relaxed);
+    }
+
+    fn record(&self) -> String {
+        let snapshot = self.snapshot();
+        format!(
+            "RUST_MUSIC_AUDIO_DIAG rate={} bits={} channels={} created={} create_status={} allocated={} capacity_bytes={} allocation_status={} enqueued={} frames={} starts={} start_status={} callbacks={} teardown={} stop_status={} drained={} immediate_stop_status={} dispose_status={}",
+            snapshot.sample_rate,
+            snapshot.bits_per_sample,
+            snapshot.channels,
+            snapshot.output_creation_attempts,
+            format_status(snapshot.output_creation_status),
+            snapshot.allocated_buffers,
+            snapshot.allocated_capacity_bytes,
+            format_status(snapshot.buffer_allocation_status),
+            snapshot.enqueued_buffers,
+            snapshot.enqueued_frames,
+            snapshot.start_attempts,
+            format_status(snapshot.start_status),
+            snapshot.completed_callbacks,
+            snapshot.teardown_attempts,
+            format_status(snapshot.stop_status),
+            format_drain(snapshot.drain_complete),
+            format_status(snapshot.immediate_stop_status),
+            format_status(snapshot.dispose_status),
+        )
+    }
+}
+
+fn diagnostics_enabled_from_value(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|value| value == "1")
+}
+
+fn format_status(status: Option<i32>) -> String {
+    status.map_or_else(|| "none".to_owned(), |value| value.to_string())
+}
+
+fn format_drain(drained: Option<bool>) -> &'static str {
+    match drained {
+        Some(false) => "0",
+        Some(true) => "1",
+        None => "none",
+    }
+}
+
+fn record_start(
+    api: &dyn AudioQueueApi,
+    queue: AudioQueueRef,
+    diagnostics: &AudioQueueDiagnostics,
+) -> i32 {
+    diagnostics.add(&diagnostics.start_attempts, 1);
+    let status = api.start(queue);
+    diagnostics.status(&diagnostics.start_status, status);
+    status
+}
 
 #[repr(C)]
 struct AudioStreamBasicDescription {
@@ -152,6 +350,7 @@ struct CallbackContext {
     slots: [AudioQueueBufferRef; SLOTS],
     in_flight: [AtomicBool; SLOTS],
     active_callbacks: AtomicUsize,
+    diagnostics: Arc<AudioQueueDiagnostics>,
 }
 // The context is initialized before AudioQueue creation, then its slot
 // pointers remain immutable; callback-visible state uses atomics. Ownership
@@ -159,11 +358,12 @@ struct CallbackContext {
 unsafe impl Send for CallbackContext {}
 
 impl CallbackContext {
-    fn new() -> Self {
+    fn new(diagnostics: Arc<AudioQueueDiagnostics>) -> Self {
         Self {
             slots: [ptr::null_mut(); SLOTS],
             in_flight: std::array::from_fn(|_| AtomicBool::new(false)),
             active_callbacks: AtomicUsize::new(0),
+            diagnostics,
         }
     }
 }
@@ -281,6 +481,9 @@ unsafe extern "C" fn completed(
     for index in 0..SLOTS {
         if state.slots[index] == buffer {
             state.in_flight[index].store(false, Ordering::Release);
+            state
+                .diagnostics
+                .add(&state.diagnostics.completed_callbacks, 1);
             return;
         }
     }
@@ -297,12 +500,21 @@ pub struct MacAudioQueueSink {
     paused: bool,
     registered: bool,
     pending_teardown: bool,
+    diagnostics: Arc<AudioQueueDiagnostics>,
+    diagnostics_summary_emitted: bool,
     drain_timeout: Duration,
     #[cfg(test)]
     write_timeout: Duration,
 }
 impl Default for MacAudioQueueSink {
     fn default() -> Self {
+        let diagnostics = Arc::new(AudioQueueDiagnostics::default());
+        diagnostics.enabled.store(
+            diagnostics_enabled_from_value(
+                std::env::var_os("RUST_MUSIC_AUDIO_DIAGNOSTICS").as_deref(),
+            ),
+            Ordering::Relaxed,
+        );
         Self {
             api: Arc::new(SystemAudioQueue),
             queue: ptr::null_mut(),
@@ -312,12 +524,28 @@ impl Default for MacAudioQueueSink {
             paused: false,
             registered: false,
             pending_teardown: false,
+            diagnostics,
+            diagnostics_summary_emitted: false,
             drain_timeout: MAX_DRAIN_WAIT,
             #[cfg(test)]
             write_timeout: MAX_WAIT,
         }
     }
 }
+impl MacAudioQueueSink {
+    /// Enables or disables low-overhead counters for subsequent AudioQueue operations.
+    /// They default off unless `RUST_MUSIC_AUDIO_DIAGNOSTICS=1` is set at sink creation.
+    /// Call from a non-callback thread.
+    pub fn set_diagnostics_enabled(&mut self, enabled: bool) {
+        self.diagnostics.enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Returns a snapshot suitable for formatting or logging off the audio callback.
+    pub fn diagnostics_snapshot(&self) -> AudioQueueDiagnosticsSnapshot {
+        self.diagnostics.snapshot()
+    }
+}
+
 impl PcmSink for MacAudioQueueSink {
     fn open(&mut self, format: AudioFormat) -> Result<()> {
         format.validate()?;
@@ -329,6 +557,7 @@ impl PcmSink for MacAudioQueueSink {
                 "AudioQueue needs packed 8/16/24/32-bit PCM",
             ));
         }
+        self.diagnostics.set_format(format);
         reserve_queue()?;
         self.registered = true;
         let bytes_per_frame = u32::from(format.channels) * u32::from(format.bits_per_sample / 8);
@@ -348,16 +577,29 @@ impl PcmSink for MacAudioQueueSink {
             bits_per_channel: u32::from(format.bits_per_sample),
             reserved: 0,
         };
-        let mut context = Box::new(CallbackContext::new());
+        let mut context = Box::new(CallbackContext::new(Arc::clone(&self.diagnostics)));
         let mut queue = ptr::null_mut();
+        self.diagnostics
+            .add(&self.diagnostics.output_creation_attempts, 1);
         let err = self.api.new_output(
             &desc,
             completed,
             (&mut *context as *mut CallbackContext).cast(),
             &mut queue,
         );
+        self.diagnostics
+            .status(&self.diagnostics.output_creation_status, err);
         if err != 0 {
-            let disposed = queue.is_null() || self.api.dispose(queue, 1) == 0;
+            let dispose_status = if queue.is_null() {
+                None
+            } else {
+                self.diagnostics.add(&self.diagnostics.teardown_attempts, 1);
+                let status = self.api.dispose(queue, 1);
+                self.diagnostics
+                    .status(&self.diagnostics.dispose_status, status);
+                Some(status)
+            };
+            let disposed = dispose_status.is_none_or(|status| status == 0);
             if disposed {
                 release_queue(false);
                 self.registered = false;
@@ -367,6 +609,7 @@ impl PcmSink for MacAudioQueueSink {
                 self.pending_teardown = true;
                 mark_pending_teardown();
             }
+            self.emit_diagnostics_summary();
             return Err(MusicError::Output(format!(
                 "AudioQueueNewOutput OSStatus {err}"
             )));
@@ -375,8 +618,13 @@ impl PcmSink for MacAudioQueueSink {
             let err =
                 self.api
                     .allocate_buffer(queue, FRAMES_PER_SLOT as u32 * bytes_per_frame, slot);
+            self.diagnostics
+                .status(&self.diagnostics.buffer_allocation_status, err);
             if err != 0 {
+                self.diagnostics.add(&self.diagnostics.teardown_attempts, 1);
                 let dispose = self.api.dispose(queue, 1);
+                self.diagnostics
+                    .status(&self.diagnostics.dispose_status, dispose);
                 if dispose != 0 {
                     // Keep callback state alive while a partially initialized
                     // queue still exists; a later finish/drop can retry.
@@ -386,16 +634,29 @@ impl PcmSink for MacAudioQueueSink {
                     self.started = false;
                     self.pending_teardown = true;
                     mark_pending_teardown();
+                    self.emit_diagnostics_summary();
                     return Err(MusicError::Output(format!(
                         "AudioQueueAllocateBuffer OSStatus {err}; dispose={dispose}"
                     )));
                 }
                 release_queue(false);
                 self.registered = false;
+                self.emit_diagnostics_summary();
                 return Err(MusicError::Output(format!(
                     "AudioQueueAllocateBuffer OSStatus {err}"
                 )));
             }
+            self.diagnostics.add(&self.diagnostics.allocated_buffers, 1);
+            let capacity = if slot.is_null() {
+                0
+            } else {
+                // AudioQueue supplies this capacity in its output buffer header.
+                unsafe { (**slot).data_capacity }
+            };
+            self.diagnostics.add(
+                &self.diagnostics.allocated_capacity_bytes,
+                u64::from(capacity),
+            );
         }
         self.queue = queue;
         self.context = Some(context);
@@ -437,7 +698,7 @@ impl PcmSink for MacAudioQueueSink {
             self.paused = false;
             return Ok(());
         }
-        let err = self.api.start(self.queue);
+        let err = record_start(&*self.api, self.queue, &self.diagnostics);
         if err != 0 {
             return Err(MusicError::Output(format!(
                 "AudioQueueStart OSStatus {err}"
@@ -504,8 +765,12 @@ impl PcmSink for MacAudioQueueSink {
                     "AudioQueueEnqueueBuffer OSStatus {err}"
                 )));
             }
+            let frames = (samples.len() / channels) as u64;
+            self.diagnostics.add(&self.diagnostics.enqueued_buffers, 1);
+            self.diagnostics
+                .add(&self.diagnostics.enqueued_frames, frames);
             if !self.started {
-                let err = self.api.start(self.queue);
+                let err = record_start(&*self.api, self.queue, &self.diagnostics);
                 if err != 0 {
                     return Err(MusicError::Output(format!(
                         "AudioQueueStart OSStatus {err}"
@@ -522,6 +787,7 @@ impl PcmSink for MacAudioQueueSink {
         }
         let queue = self.queue;
         let had_audio = self.started && !self.paused;
+        self.diagnostics.add(&self.diagnostics.teardown_attempts, 1);
         // Apple documents stop(false) as asynchronous; dispose(false) is also
         // asynchronous. Keep callback state alive through buffer completion,
         // then use dispose(true), which synchronously ends callbacks before
@@ -529,18 +795,27 @@ impl PcmSink for MacAudioQueueSink {
         // https://developer.apple.com/documentation/audiotoolbox/audioqueuestop%28_%3A_%3A%29
         // https://developer.apple.com/documentation/audiotoolbox/audioqueuedispose%28_%3A_%3A%29
         let stop = self.api.stop(queue, if had_audio { 0 } else { 1 });
+        self.diagnostics.status(&self.diagnostics.stop_status, stop);
         let drained = stop == 0
             && (!had_audio
                 || self
                     .context
                     .as_deref()
                     .is_some_and(|context| wait_for_drain(context, self.drain_timeout)));
+        self.diagnostics.set_drain_complete(drained);
         let forced_stop = if stop != 0 || !drained {
             self.api.stop(queue, 1)
         } else {
             0
         };
+        if stop != 0 || !drained {
+            self.diagnostics
+                .status(&self.diagnostics.immediate_stop_status, forced_stop);
+        }
         let dispose = self.api.dispose(queue, 1);
+        self.diagnostics
+            .status(&self.diagnostics.dispose_status, dispose);
+        self.emit_diagnostics_summary();
 
         if dispose == 0 {
             self.queue = ptr::null_mut();
@@ -575,6 +850,15 @@ impl PcmSink for MacAudioQueueSink {
         Ok(())
     }
 }
+impl MacAudioQueueSink {
+    fn emit_diagnostics_summary(&mut self) {
+        if self.diagnostics.enabled.load(Ordering::Relaxed) && !self.diagnostics_summary_emitted {
+            eprintln!("{}", self.diagnostics.record());
+            self.diagnostics_summary_emitted = true;
+        }
+    }
+}
+
 impl Drop for MacAudioQueueSink {
     fn drop(&mut self) {
         if self.finish().is_err() && !self.queue.is_null() {
@@ -1258,5 +1542,114 @@ mod tests {
         assert!(matches!(sink.write(&invalid), Err(MusicError::Invalid(_))));
         assert!(sink.queue.is_null());
         assert!(sink.context.is_none());
+    }
+
+    #[test]
+    fn diagnostics_are_opt_in_and_report_successful_queue_lifecycle() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, _) = fake_sink();
+        let disabled = sink.diagnostics_snapshot();
+        assert!(!disabled.enabled);
+        assert_eq!(disabled.output_creation_attempts, 0);
+
+        sink.set_diagnostics_enabled(true);
+        sink.open(valid_format()).unwrap();
+        sink.write(&PcmBlock {
+            format: valid_format(),
+            samples: vec![11, -12, 13, -14],
+        })
+        .unwrap();
+        sink.finish().unwrap();
+
+        let snapshot = sink.diagnostics_snapshot();
+        assert!(snapshot.enabled);
+        assert_eq!(snapshot.output_creation_attempts, 1);
+        assert_eq!(snapshot.sample_rate, 44_100);
+        assert_eq!(snapshot.bits_per_sample, 16);
+        assert_eq!(snapshot.channels, 1);
+        assert_eq!(snapshot.output_creation_status, Some(0));
+        assert_eq!(snapshot.allocated_buffers, SLOTS as u64);
+        assert_eq!(
+            snapshot.allocated_capacity_bytes,
+            (SLOTS * FRAMES_PER_SLOT * 2) as u64
+        );
+        assert_eq!(snapshot.buffer_allocation_status, Some(0));
+        assert_eq!(snapshot.enqueued_buffers, 1);
+        assert_eq!(snapshot.enqueued_frames, 4);
+        assert_eq!(snapshot.start_attempts, 1);
+        assert_eq!(snapshot.start_status, Some(0));
+        assert_eq!(snapshot.completed_callbacks, 1);
+        assert_eq!(snapshot.teardown_attempts, 1);
+        assert_eq!(snapshot.stop_status, Some(0));
+        assert_eq!(snapshot.drain_complete, Some(true));
+        assert_eq!(snapshot.immediate_stop_status, None);
+        assert_eq!(snapshot.dispose_status, Some(0));
+        assert_eq!(
+            sink.diagnostics.record(),
+            "RUST_MUSIC_AUDIO_DIAG rate=44100 bits=16 channels=1 created=1 create_status=0 allocated=3 capacity_bytes=24576 allocation_status=0 enqueued=1 frames=4 starts=1 start_status=0 callbacks=1 teardown=1 stop_status=0 drained=1 immediate_stop_status=none dispose_status=0"
+        );
+    }
+
+    #[test]
+    fn diagnostics_environment_switch_requires_exact_one() {
+        assert!(!diagnostics_enabled_from_value(None));
+        assert!(!diagnostics_enabled_from_value(Some(OsStr::new("0"))));
+        assert!(!diagnostics_enabled_from_value(Some(OsStr::new("true"))));
+        assert!(diagnostics_enabled_from_value(Some(OsStr::new("1"))));
+    }
+
+    #[test]
+    fn diagnostics_capture_start_and_teardown_failures_without_callback_logging() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        sink.open(valid_format()).unwrap();
+        api.0.lock().unwrap().start_status = -77;
+        assert!(matches!(
+            sink.write(&one_sample()),
+            Err(MusicError::Output(_))
+        ));
+        api.0.lock().unwrap().stop_status = -50;
+        assert!(matches!(sink.finish(), Err(MusicError::Output(_))));
+
+        let snapshot = sink.diagnostics_snapshot();
+        assert_eq!(snapshot.start_attempts, 1);
+        assert_eq!(snapshot.start_status, Some(-77));
+        assert_eq!(snapshot.stop_status, Some(-50));
+        assert_eq!(snapshot.drain_complete, Some(false));
+        assert_eq!(snapshot.immediate_stop_status, Some(-50));
+        assert_eq!(snapshot.dispose_status, Some(0));
+    }
+
+    #[test]
+    fn diagnostics_capture_creation_and_allocation_osstatus_failures() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut creation_sink, creation_api) = fake_sink();
+        creation_sink.set_diagnostics_enabled(true);
+        creation_api.0.lock().unwrap().new_status = -71;
+        assert!(matches!(
+            creation_sink.open(valid_format()),
+            Err(MusicError::Output(_))
+        ));
+        let creation = creation_sink.diagnostics_snapshot();
+        assert_eq!(creation.output_creation_attempts, 1);
+        assert_eq!(creation.output_creation_status, Some(-71));
+        assert_eq!(creation.allocated_buffers, 0);
+
+        let (mut allocation_sink, allocation_api) = fake_sink();
+        allocation_sink.set_diagnostics_enabled(true);
+        allocation_api.0.lock().unwrap().fail_allocate_at = Some(1);
+        assert!(matches!(
+            allocation_sink.open(valid_format()),
+            Err(MusicError::Output(_))
+        ));
+        let allocation = allocation_sink.diagnostics_snapshot();
+        assert_eq!(allocation.output_creation_status, Some(0));
+        assert_eq!(allocation.allocated_buffers, 1);
+        assert_eq!(
+            allocation.allocated_capacity_bytes,
+            (FRAMES_PER_SLOT * 2) as u64
+        );
+        assert_eq!(allocation.buffer_allocation_status, Some(-50));
     }
 }

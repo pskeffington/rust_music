@@ -10,4 +10,4 @@ pub use alsa::AlsaSink;
 #[cfg(all(target_os = "macos", feature = "macos"))]
 mod macos;
 #[cfg(all(target_os = "macos", feature = "macos"))]
-pub use macos::MacAudioQueueSink;
+pub use macos::{AudioQueueDiagnosticsSnapshot, MacAudioQueueSink};
