@@ -1223,3 +1223,21 @@ The Library check used an empty catalog: no folder was loaded, scanned, or
 played. This verifies sort-label visibility and the observed startup focus
 only. Compact Library sizing with rows, scrolling, VoiceOver, and overall
 MAC07-03 acceptance remain open.
+
+### 2026-11-01 MAC07-03 compact Library rows after sort-width fix
+
+On the rebuilt app at `dedcb97`, an explicitly loaded generated catalog of
+three metadata-only FLAC files (136, 136, and 140 bytes; no audio frames) was
+shown in macOS `Window > Move & Resize > Top Left` at a captured **736×462
+screenshot pixels**. Alpha Fixture, Bravo Fixture, and Charlie Fixture were
+all visible together with artist, album, and FLAC details; the count read
+`3 TRACKS`. The sort picker displayed `ALBUM` and `ARTIST` without clipping in
+the compact layout. The screenshot size is not an AppKit point measurement.
+No search, scrolling, queue action, or playback was performed.
+
+The app was returned to the arranged operator layout with Player focused, then
+quit before the generated catalog was removed. A fresh launch showed Player /
+Ready / No Track with no output snapshot; no catalog was restored or scanned.
+This confirms three rows and the tested sort labels at this one compact tiled
+size only. Minimum-frame behavior, scrolling for larger catalogs, VoiceOver,
+and overall MAC07-03 acceptance remain open.
