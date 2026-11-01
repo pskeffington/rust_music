@@ -2101,6 +2101,7 @@ final class PlayerModel: ObservableObject {
             switch result {
             case .success(let tracks):
                 self.libraryScanNotice = nil
+                self.audioQueueDiagnosticSummary = nil
                 self.libraryRoot = root
                 self.tracks = tracks
                 self.selectedIndex = tracks.first?.id

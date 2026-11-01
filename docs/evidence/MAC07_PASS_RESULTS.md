@@ -1275,6 +1275,36 @@ playback, nonzero PCM, VoiceOver speech, or DAC evidence. The folder selection
 is not repeated here and no private filename or absolute path is recorded.
 MAC07-02 remains in progress.
 
+### 2026-11-01 MAC07-02 failed-playback and catalog-reset check
+
+The working-tree change clears the retained AudioQueue diagnostic only after
+a successful new catalog scan. This avoids carrying an old playback error
+into the newly loaded catalog while retaining the prior diagnostic if a scan
+fails and preserves the previous catalog.
+
+`sh scripts/build-macos-app.sh` exited **0** on this source. The local bundle
+signature verified, and the included catalog search/scaling, playlist
+selection, operator-window geometry, playback-snapshot, catalog-bounds, and
+process-lifecycle harnesses passed. The synthetic 250k-catalog harness
+reported last-item search p95 **86.379 ms**, full-sort p95 **942.150 ms**, and
+peak RSS **240,402,432 bytes**. These are catalog-harness measurements, not
+interactive UI latency or full-app memory.
+
+On the rebuilt bundle, an isolated 141-byte metadata-only FLAC fixture with no
+audio frames was explicitly loaded and Play was pressed with volume at 0%.
+The app returned `INVALID MUSIC COMMAND OR MEDIA STATE`; `Playback time`
+returned to `Not started; duration unknown`, progress returned to zero, and
+Play was enabled for retry. The error's AudioQueue diagnostic initially
+remained visible after loading the original supplied catalog. After applying
+the fix, the same error and successful catalog reload were repeated: the
+rebuilt UI showed Ready, the original six-track catalog, `Not started;
+duration unknown`, zero progress, and `NO OUTPUT SNAPSHOT · AUDIO NOT
+CONFIRMED` with no stale error summary. No audio frames were emitted by the
+fixture; this verifies error/reset UI only, not audible playback. Volume was
+restored to 100%, the app was left stopped with the supplied catalog loaded,
+and the temporary fixture was removed. No private file name or absolute path
+is recorded. MAC07-02 remains in progress.
+
 A second muted check observed `00:03 elapsed of 01:07` when Pause completed;
 the accessibility tree remained unchanged across a 1.6-second paused interval.
 After Resume, the value advanced to `00:07 elapsed of 01:07` with the progress
