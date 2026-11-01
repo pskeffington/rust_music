@@ -95,3 +95,35 @@ minimum-frame behavior, or simultaneous window visibility.
 On 2026-11-01, a rebuilt app explicitly loaded one generated metadata-only FLAC fixture with no audio frames. The Library list exposed `Enqueue Selected Tracks` and `Play Next Selected Track` as macOS accessibility secondary actions. Invoking Enqueue changed the queue from zero to one entry; invoking Play Next changed it from one to two. Clearing the temporary queue returned it to zero. Player remained stopped with no output snapshot throughout. This verifies action exposure and queue effects on that candidate; it does not verify VoiceOver speech or rotor navigation.
 
 A follow-up change makes Enqueue available only with a nonempty selection while commands are idle. Play Next additionally requires the transport target to be part of the Library selection and visible under the current search. The latest `sh scripts/build-macos-app.sh` exited 0. The final live no-selection check was interrupted when the desktop session reported that the app bundle had changed during user interaction; dynamic action removal for the latest build remains unverified. The fixture remains loaded in the stopped app at the last observation and is outside Git.
+
+
+## Dated correction and selected-row control guard
+
+On 2026-11-01, the desktop app was still running after the preceding entry;
+this was confirmed in the live app inventory and accessibility tree. It was
+Player / Ready with the generated metadata-only fixture selected, playback
+stopped, and no output snapshot. Opening Media Library showed the selected
+row and both named list actions. Command-clicking that row removed its
+selection and both named list actions, and disabled Enqueue Selected. The
+separate Play Selected and Play Next buttons remained enabled, exposing a
+selection-state mismatch. Player was returned to the front without starting
+playback or changing the queue.
+
+The candidate now uses one bounded selected-row predicate for the named
+Library actions, Play Selected, Play Next, and their Library-menu commands. It
+requires the active track to be selected in the Library and visible under the
+current search. Regression cases cover a matching selected row, no row
+selection, and a selected row hidden by search. `sh scripts/build-macos-app.sh`
+exited 0 after these changes; catalog, playlist, geometry, playback-state,
+catalog-bounds, and lifecycle harnesses passed and the app signature verified.
+At 250,000 synthetic tracks the final catalog harness reported search p95
+102.611 ms, full-sort p95 1,086.662 ms, and peak process RSS 220,856,320 bytes;
+these are harness results, not full-app memory or interactive UI latency.
+
+The user-visible button and menu disabled states from this final build have
+not been live-verified because the app that was already running still has the
+prior binary loaded. That process remains at Player / Ready with the test
+fixture, playback stopped, and no output snapshot. No restart was forced, and
+VoiceOver speech and rotor navigation remain open. This correction supersedes
+the preceding sentence that said the app was stopped; it does not change the
+historical result for the earlier build.
