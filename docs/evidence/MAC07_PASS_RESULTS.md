@@ -951,3 +951,29 @@ controller subsequently launched the exact rebuilt bundle and the live UI
 workflow completed. The candidate remains on open PR #9 and is not
 merged-mainline evidence. A read-only safety review found no actionable issue
 in the keyboard-command diff.
+
+### 2026-11-01 MAC07-03 compact Player transport layout
+
+On candidate branch `codex/mac07-disabled-control-state` at source `e3343fd`,
+with no library loaded, a live resize reached approximately 520×229 screenshot
+pixels. At that size the Player transport buttons wrapped labels such as
+`PREVIOUS` and `PAUSE`, and the volume label also wrapped. These are screenshot
+pixel dimensions, not AppKit points; the observation exposed a compact-layout
+usability defect.
+
+The working-tree SwiftUI change uses `ViewThatFits` to retain the full labels
+when they fit and select compact `PREV` / `VOL` labels with a narrower volume
+slider when they do not. Full accessibility labels and the existing Rust Boy
+colors and button styling are retained. The rebuilt app was observed at a
+wider approximately 620-pixel screenshot width, where the full labels remain
+on one line. Attempts to resize the rebuilt app back to the compact width
+failed with CUA `windowNotFoundAtPosition` errors, so the compact fallback has
+not yet been live-verified at its trigger width. No playback occurred; Player
+remained Ready / No Track.
+
+`sh scripts/build-macos-app.sh` exited **0** on the working-tree change;
+bundle signature validation and the included source harnesses passed. The
+synthetic 250k catalog harness reported search p95 **78.259 ms**, full-sort
+p95 **824.418 ms**, and peak RSS **240,386,048 bytes**. These are catalog
+harness measurements, not compact-window or playback-under-load results.
+MAC07-03 remains in progress; compact fallback live verification is pending.

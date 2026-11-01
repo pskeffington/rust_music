@@ -3184,48 +3184,68 @@ private struct PlayerView: View {
     private var transportBar: some View {
         VStack(spacing: 8) {
             Rectangle().fill(RustMusicPalette.line).frame(height: 1)
-            HStack(spacing: 7) {
-                Button("PREVIOUS") { model.previous() }
-                    .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                    .accessibilityIdentifier("transport-previous")
-                Button("PLAY") { model.play() }
-                    .buttonStyle(RustMusicButtonStyle(prominent: true))
-                    .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                    .accessibilityIdentifier("transport-play")
-                Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
-                    .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
-                    .accessibilityIdentifier("transport-pause-resume")
-                Button("STOP") { model.stop() }
-                    .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
-                    .accessibilityIdentifier("transport-stop")
-                Button("NEXT") { model.next() }
-                    .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
-                    .accessibilityIdentifier("transport-next")
-                Spacer(minLength: 14)
-                Text("VOLUME \(model.volumePercent)%")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(RustMusicPalette.muted)
-                Slider(
-                    value: Binding(
-                        get: { Double(model.volumePercent) },
-                        set: { model.volumePercent = Int($0.rounded()) }
-                    ),
-                    in: 0...100,
-                    step: 1,
-                    onEditingChanged: { editing in
-                        if !editing { model.commitVolume(model.volumePercent) }
-                    }
-                )
-                .frame(width: 120)
-                .disabled(model.libraryRoot == nil || model.isTransportBusy || model.isStateBusy)
-                .accessibilityIdentifier("transport-volume")
+            ViewThatFits(in: .horizontal) {
+                transportControls(compact: false)
+                transportControls(compact: true)
             }
-            .buttonStyle(RustMusicButtonStyle())
-            .padding(.horizontal, 16)
-            .padding(.bottom, 10)
         }
         .background(RustMusicPalette.surface)
         .accessibilityIdentifier("transport-bar")
+    }
+
+    private func transportControls(compact: Bool) -> some View {
+        HStack(spacing: 7) {
+            Button(compact ? "PREV" : "PREVIOUS") { model.previous() }
+                .fixedSize(horizontal: true, vertical: false)
+                .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .accessibilityLabel("Previous")
+                .accessibilityIdentifier("transport-previous")
+            Button("PLAY") { model.play() }
+                .fixedSize(horizontal: true, vertical: false)
+                .buttonStyle(RustMusicButtonStyle(prominent: true))
+                .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .accessibilityLabel("Play")
+                .accessibilityIdentifier("transport-play")
+            Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
+                .fixedSize(horizontal: true, vertical: false)
+                .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
+                .accessibilityLabel(model.isPaused ? "Resume" : "Pause")
+                .accessibilityIdentifier("transport-pause-resume")
+            Button("STOP") { model.stop() }
+                .fixedSize(horizontal: true, vertical: false)
+                .disabled((!model.isPlaying && !model.isPaused) || model.isTransportBusy || model.isStateBusy)
+                .accessibilityLabel("Stop")
+                .accessibilityIdentifier("transport-stop")
+            Button("NEXT") { model.next() }
+                .fixedSize(horizontal: true, vertical: false)
+                .disabled((model.tracks.isEmpty && model.queueEntries.isEmpty) || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .accessibilityLabel("Next")
+                .accessibilityIdentifier("transport-next")
+            Spacer(minLength: compact ? 4 : 14)
+            Text(compact ? "VOL \(model.volumePercent)%" : "VOLUME \(model.volumePercent)%")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(RustMusicPalette.muted)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Slider(
+                value: Binding(
+                    get: { Double(model.volumePercent) },
+                    set: { model.volumePercent = Int($0.rounded()) }
+                ),
+                in: 0...100,
+                step: 1,
+                onEditingChanged: { editing in
+                    if !editing { model.commitVolume(model.volumePercent) }
+                }
+            )
+            .frame(width: compact ? 76 : 120)
+            .disabled(model.libraryRoot == nil || model.isTransportBusy || model.isStateBusy)
+            .accessibilityLabel("Volume")
+            .accessibilityIdentifier("transport-volume")
+        }
+        .buttonStyle(RustMusicButtonStyle())
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
     }
 }
 
