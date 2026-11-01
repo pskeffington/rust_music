@@ -903,6 +903,7 @@ private struct RustMusicCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(
                     model.selectedTrack == nil
+                        || !model.selectedTrackMatchesCurrentSearch
                         || model.isPlaying
                         || model.isPaused
                         || model.isScanning
@@ -920,6 +921,7 @@ private struct RustMusicCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(
                     model.selectedTrack == nil
+                        || !model.selectedTrackMatchesCurrentSearch
                         || model.isStateBusy
                         || model.isTransportBusy
                 )
@@ -1468,6 +1470,11 @@ final class PlayerModel: ObservableObject {
         return tracks.first(where: { $0.id == selectedIndex })
     }
 
+    var selectedTrackMatchesCurrentSearch: Bool {
+        guard let selectedTrack else { return false }
+        return CatalogSearch.matches(selectedTrack, matching: searchText)
+    }
+
     var selectedTracksInCatalogOrder: [CatalogTrack] {
         tracks.filter { selectedTrackIDs.contains($0.id) }
     }
@@ -1759,7 +1766,7 @@ final class PlayerModel: ObservableObject {
     }
 
     func addSelectedTrackNext() {
-        guard let libraryRoot, let selectedTrack else { return }
+        guard let libraryRoot, let selectedTrack, selectedTrackMatchesCurrentSearch else { return }
         runStateCommand(["queue", libraryRoot.path, "play-next", selectedTrack.relativePath]) { [weak self] result in
             self?.applyQueueResult(result)
         }
@@ -2120,7 +2127,8 @@ final class PlayerModel: ObservableObject {
     }
 
     func play() {
-        guard let selectedTrack, !isScanning, !isStateBusy, !isTransportBusy,
+        guard let selectedTrack, selectedTrackMatchesCurrentSearch,
+              !isScanning, !isStateBusy, !isTransportBusy,
               let index = UInt16(exactly: selectedTrack.id) else { return }
         audioQueueDiagnosticSummary = nil
         let volume = UInt8(volumePercent)
@@ -3008,6 +3016,14 @@ private struct PlayerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                if model.selectedTrack != nil && !model.selectedTrackMatchesCurrentSearch {
+                    Text("CURRENT SELECTION IS OUTSIDE SEARCH · SELECT A RESULT OR CLEAR SEARCH TO PLAY")
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("library-selection-outside-search")
+                }
+
                 Group {
                     if let emptyState {
                         VStack(alignment: .leading, spacing: 6) {
@@ -3075,13 +3091,13 @@ private struct PlayerView: View {
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }
                         .buttonStyle(RustMusicButtonStyle(prominent: true))
-                        .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                        .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
                         model.addSelectionToQueue()
                     }
                     .disabled(model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
                     Button("PLAY NEXT") { model.addSelectedTrackNext() }
-                        .disabled(model.selectedTrack == nil || model.isStateBusy || model.isTransportBusy)
+                        .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isStateBusy || model.isTransportBusy)
                 }
             }
         } label: {

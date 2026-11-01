@@ -92,6 +92,13 @@ enum CatalogSearch {
         }
     }
 
+    static func matches(_ track: CatalogTrack, matching searchText: String) -> Bool {
+        let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        let queryBytes = Data(CatalogTextNormalizer.fold(query).utf8)
+        return track.searchableBytes.range(of: queryBytes) != nil
+    }
+
     static func boundedQuery(_ text: String) -> String {
         var bounded = ""
         var byteCount = 0
