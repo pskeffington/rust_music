@@ -127,3 +127,14 @@ fixture, playback stopped, and no output snapshot. No restart was forced, and
 VoiceOver speech and rotor navigation remain open. This correction supersedes
 the preceding sentence that said the app was stopped; it does not change the
 historical result for the earlier build.
+
+
+## Relaunch verification attempt
+
+A fresh-process check of the final selected-row button/menu state was attempted
+on 2026-11-01. CUA reported that macOS was locked and automatic unlock failed,
+then instructed the operator to unlock the Mac manually. I stopped UI
+interaction; no unlock bypass was attempted. The rebuilt app's final disabled
+states remain unverified, and the app's post-lock process/window state is
+unknown. Before the attempt, the last observed UI was Player / Ready with one
+metadata-only fixture, stopped playback, and no output snapshot.
