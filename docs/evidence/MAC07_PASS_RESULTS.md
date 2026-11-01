@@ -1164,6 +1164,24 @@ This verifies Player focus at the observed launch and settled snapshots; it
 does not establish simultaneous visibility or the focus of every opening
 frame during the secondary-window restoration sequence.
 
+### 2026-11-01 Playlist accessibility-action invocation
+
+The rebuilt app explicitly loaded three generated metadata-only FLAC files
+(152, 152, and 154 bytes; no audio frames). A temporary named playlist,
+`VoiceOver Action Check`, was created and populated with all three entries.
+The selected-entry list's AX element exposed the named secondary actions
+`Move selected entries up`, `Move selected entries down`, and `Remove selected
+playlist entries`. Invoking them through the CUA accessibility-action API
+reordered Alpha below Bravo, removed the selected Alpha entry, then moved
+Charlie above Bravo. The action names remained exposed after each update.
+
+This verifies action exposure through macOS accessibility APIs and the
+resulting playlist edits; it does **not** verify VoiceOver speech, rotor
+navigation, or spoken selection announcements. The generated playlist was
+deleted through the UI, the app was quit, the fixture directory was removed,
+and a fresh launch showed Player / Ready / No Track / no output snapshot. No
+playback occurred. MAC07-03 VoiceOver acceptance remains open.
+
 ### 2026-11-01 MAC07-03 loaded Library hint inspection
 
 To inspect the Library list's accessibility help on a loaded catalog, the
