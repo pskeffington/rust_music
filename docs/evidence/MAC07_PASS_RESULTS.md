@@ -503,3 +503,10 @@ and full-sort p95 was 4.475 ms / 41.423 ms / 304.149 ms / 848.790 ms. These
 core harness figures do not establish full-app library performance or
 footprint. Compact-screen UI interaction and true restart acceptance remain
 open.
+
+At clean current candidate `0f31548faf22714a4107d17179bb80ba9c150f87`,
+the required `scripts/premerge-check.sh` was rerun. Roadmap/literature checks,
+8 roadmap unit tests, captured offline Rust gate, WAVE 6/6 and AIFF/AIFF-C 7/7
+passed; the command exited **3** because `/private/corpus` remains absent. The
+exact-head Rust/evidence result is kept outside Git at
+`/private/tmp/rust-music-merge-evidence-0f31548/`.
