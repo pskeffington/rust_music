@@ -85,7 +85,7 @@ enum OperatorWindowLayout {
             x: visibleFrame.minX + gap,
             y: visibleFrame.minY + gap,
             width: min(max(librarySize.width, libraryWidth), availableWidth),
-            height: min(max(librarySize.height, availableHeight), availableHeight)
+            height: min(max(librarySize.height, 700), availableHeight)
         )
         return [
             player: NSRect(

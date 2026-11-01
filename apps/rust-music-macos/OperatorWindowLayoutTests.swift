@@ -27,6 +27,13 @@ private enum OperatorWindowLayoutTests {
             precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
         }
 
+        let tallCompactScreen = NSRect(x: 0, y: 0, width: 1024, height: 900)
+        let tallCompactFrames = OperatorWindowLayout.initialFrames(in: tallCompactScreen)
+        precondition(tallCompactFrames[OperatorWindowLayout.library]!.height == 700)
+        for frame in tallCompactFrames.values {
+            precondition(tallCompactScreen.contains(frame))
+        }
+
         let veryCompactScreen = NSRect(x: 0, y: 0, width: 640, height: 420)
         precondition(!OperatorWindowLayout.canTileAll(in: veryCompactScreen))
         let veryCompactFrames = OperatorWindowLayout.initialFrames(in: veryCompactScreen)
