@@ -24,6 +24,10 @@ struct CatalogSearchTests {
         let unicodeMatches = CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "öSTERGÖTLAND")
         precondition(unicodeMatches == [unicodeTrack], "search must match Unicode case-insensitively")
         precondition(CatalogSearch.matches(unicodeTrack, matching: "östergötland"))
+        precondition(
+            CatalogSearch.matches(unicodeTrack, matching: "o\u{0308}STERGÖTLAND"),
+            "filtered-play guard must use the same canonical Unicode matching as the visible list"
+        )
         precondition(CatalogSearch.matches(unicodeTrack, matching: " "))
         precondition(!CatalogSearch.matches(unicodeTrack, matching: "not-present"))
         precondition(
