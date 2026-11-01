@@ -783,6 +783,7 @@ struct RustMusicApp: App {
     var body: some Scene {
         Window("Rust Music — Player", id: "player") {
             playerWindow(.player)
+                .modifier(OperatorWindowLaunchRestoration())
         }
         .defaultSize(width: 620, height: 380)
         .windowResizability(.automatic)
@@ -821,6 +822,40 @@ struct RustMusicApp: App {
             .background(RustMusicPalette.background)
             .preferredColorScheme(.dark)
             .tint(RustMusicPalette.phosphor)
+    }
+}
+
+@MainActor
+private enum OperatorWindowLaunchState {
+    static var hasPresentedOperatorWindows = false
+}
+
+private struct OperatorWindowLaunchRestoration: ViewModifier {
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.onAppear {
+            guard !OperatorWindowLaunchState.hasPresentedOperatorWindows else { return }
+            OperatorWindowLaunchState.hasPresentedOperatorWindows = true
+
+            // Let Player appear first, then restore the remaining operator
+            // scenes at their saved frames (or their default tiled frames).
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(250)) {
+                guard OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.player) else {
+                    return
+                }
+                if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.equalizer) {
+                    openWindow(id: "equalizer")
+                }
+                if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.library) {
+                    openWindow(id: "library")
+                }
+                if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.playlist) {
+                    openWindow(id: "playlist")
+                }
+                OperatorWindowDocking.shared.requestPlayerFocus()
+            }
+        }
     }
 }
 
@@ -1040,6 +1075,8 @@ private final class OperatorWindowDocking: NSObject {
     private var windows: [String: WeakWindow] = [:]
     private var arrangementPending = false
     private var changingFrames = false
+    private var playerFocusPending = false
+    private var playerFocusDeadline = DispatchTime.distantFuture
 
     private override init() {
         super.init()
@@ -1081,6 +1118,43 @@ private final class OperatorWindowDocking: NSObject {
             self.arrangementPending = true
             self.arrangeIfReady()
         }
+    }
+
+    func requestPlayerFocus() {
+        playerFocusPending = true
+        playerFocusDeadline = .now() + .seconds(3)
+        settlePlayerFocus()
+    }
+
+    private func settlePlayerFocus() {
+        guard playerFocusPending else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self] in
+            self?.finishPlayerFocusCheck()
+        }
+    }
+
+    private func finishPlayerFocusCheck() {
+        guard playerFocusPending else { return }
+        guard .now() < playerFocusDeadline else {
+            playerFocusPending = false
+            return
+        }
+        guard let player = windows[OperatorWindowLayout.player]?.value,
+              player.isVisible,
+              !player.isMiniaturized else {
+            settlePlayerFocus()
+            return
+        }
+        let allWindowsVisible = OperatorWindowLayout.windowOrder.allSatisfy { name in
+            guard let window = windows[name]?.value else { return false }
+            return window.isVisible && !window.isMiniaturized
+        }
+        if allWindowsVisible {
+            playerFocusPending = false
+            player.makeKeyAndOrderFront(nil)
+            return
+        }
+        settlePlayerFocus()
     }
 
     private func arrangeIfReady() {
