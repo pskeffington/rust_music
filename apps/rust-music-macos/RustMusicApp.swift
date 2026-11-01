@@ -493,6 +493,17 @@ private struct AudioQueueDiagnosticRecord {
     let allocationStatus: StatusCode
     let enqueued: UInt64
     let frames: UInt64
+    let pcmBlocks: UInt64
+    let firstEnqueueMicros: String
+    let firstCallbackObservedMicros: String
+    let writeTimeouts: UInt64
+    let enqueueStatus: StatusCode
+    let startFailures: UInt64
+    let callbackGapSamples: UInt64
+    let callbackGapMaxMicros: UInt64
+    let queueDepthSamples: UInt64
+    let queueEmptyWrites: UInt64
+    let queueDepthMax: UInt64
     let nonzeroSamples: UInt64
     let peakSample: UInt64
     let starts: UInt64
@@ -534,7 +545,7 @@ private struct AudioQueueDiagnosticRecord {
     private static let expectedKeys: Set<String> = [
         "rate", "bits", "channels", "created", "create_status", "route_status",
         "route_device_list_status", "route_default_listed", "route_target_listed", "allocated",
-        "capacity_bytes", "allocation_status", "enqueued", "frames", "nonzero_samples", "peak_sample", "starts",
+        "capacity_bytes", "allocation_status", "pcm_blocks", "first_enqueue_us", "first_callback_observed_us", "write_timeouts", "enqueue_status", "start_failures", "callback_gap_samples", "callback_gap_max_us", "queue_depth_samples", "queue_empty_writes", "queue_depth_max", "enqueued", "frames", "nonzero_samples", "peak_sample", "starts",
         "start_status", "device_status", "device_associated", "device_default", "device_target",
         "device_list_status", "device_listed", "output_meter_enable_status", "output_meter_query_status",
         "output_meter_db_status", "output_meter_peak_millionths", "output_meter_peak_millidb",
@@ -576,6 +587,17 @@ private struct AudioQueueDiagnosticRecord {
                   let capacityBytes = values["capacity_bytes"].flatMap(UInt64.init),
                   let enqueued = values["enqueued"].flatMap(UInt64.init),
                   let frames = values["frames"].flatMap(UInt64.init),
+                  let pcmBlocks = values["pcm_blocks"].flatMap(UInt64.init),
+                  let firstEnqueueMicros = optionalUnsigned64(values["first_enqueue_us"]),
+                  let firstCallbackObservedMicros = optionalUnsigned64(values["first_callback_observed_us"]),
+                  let writeTimeouts = values["write_timeouts"].flatMap(UInt64.init),
+                  let enqueueStatus = optionalStatus(values["enqueue_status"]),
+                  let startFailures = values["start_failures"].flatMap(UInt64.init),
+                  let callbackGapSamples = values["callback_gap_samples"].flatMap(UInt64.init),
+                  let callbackGapMaxMicros = values["callback_gap_max_us"].flatMap(UInt64.init),
+                  let queueDepthSamples = values["queue_depth_samples"].flatMap(UInt64.init),
+                  let queueEmptyWrites = values["queue_empty_writes"].flatMap(UInt64.init),
+                  let queueDepthMax = values["queue_depth_max"].flatMap(UInt64.init),
                   let nonzeroSamples = values["nonzero_samples"].flatMap(UInt64.init),
                   let peakSample = values["peak_sample"].flatMap(UInt64.init),
                   let starts = values["starts"].flatMap(UInt64.init),
@@ -655,6 +677,15 @@ private struct AudioQueueDiagnosticRecord {
                 routeTargetListed: routeTargetListed,
                 allocated: allocated, capacityBytes: capacityBytes,
                 allocationStatus: allocationStatus, enqueued: enqueued, frames: frames,
+                pcmBlocks: pcmBlocks, firstEnqueueMicros: firstEnqueueMicros,
+                firstCallbackObservedMicros: firstCallbackObservedMicros,
+                writeTimeouts: writeTimeouts,
+                enqueueStatus: enqueueStatus, startFailures: startFailures,
+                callbackGapSamples: callbackGapSamples,
+                callbackGapMaxMicros: callbackGapMaxMicros,
+                queueDepthSamples: queueDepthSamples,
+                queueEmptyWrites: queueEmptyWrites,
+                queueDepthMax: queueDepthMax,
                 nonzeroSamples: nonzeroSamples, peakSample: peakSample,
                 starts: starts, startStatus: startStatus, deviceStatus: deviceStatus,
                 deviceAssociated: deviceAssociated,
@@ -705,13 +736,20 @@ private struct AudioQueueDiagnosticRecord {
         return value
     }
 
+    private static func optionalUnsigned64(_ value: String?) -> String? {
+        guard let value else { return nil }
+        if value == "none" { return value }
+        guard UInt64(value) != nil else { return nil }
+        return value
+    }
+
     var statusText: String {
         let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
         let deviceText = deviceAssociated == "1" ? "yes" : (deviceAssociated == "0" ? "no" : "unknown")
         let defaultText = deviceMatchesDefault == "1" ? "yes" : (deviceMatchesDefault == "0" ? "no" : "unknown")
         let targetText = deviceMatchesTarget == "1" ? "yes" : (deviceMatchesTarget == "0" ? "no" : "unknown")
         let runningText = queueIsRunning == "1" ? "yes" : (queueIsRunning == "0" ? "no" : "unknown")
-        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) list \(statusValue(routeDeviceListStatus)) default/target \(listedText(routeDefaultListed))/\(listedText(routeTargetListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) target \(targetText)\nPCM nonzero \(nonzeroSamples) peak \(peakSample) meter enable/query/db \(statusValue(outputMeterEnableStatus))/\(statusValue(outputMeterStatus))/\(statusValue(outputMeterDBStatus)) max \(outputMeterPeakMillionths)/1e6 \(outputMeterPeakMillidb)mdB over \(outputMeterObservations) samples; running \(statusValue(queueRunningStatus))/\(runningText)\n\(queueFormatText)\ncurrent-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) list \(statusValue(routeDeviceListStatus)) default/target \(listedText(routeDefaultListed))/\(listedText(routeTargetListed))\nalloc \(allocated)/\(capacityBytes)B PCM blocks \(pcmBlocks), first enqueue \(firstEnqueueMicros)µs, callback observed \(firstCallbackObservedMicros)µs, observed callback gaps \(callbackGapSamples), max \(callbackGapMaxMicros)µs; queue depth samples \(queueDepthSamples), empty writes \(queueEmptyWrites), max depth \(queueDepthMax); write timeouts \(writeTimeouts), enqueue status \(statusValue(enqueueStatus)), start failures \(startFailures); enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) target \(targetText)\nPCM nonzero \(nonzeroSamples) peak \(peakSample) meter enable/query/db \(statusValue(outputMeterEnableStatus))/\(statusValue(outputMeterStatus))/\(statusValue(outputMeterDBStatus)) max \(outputMeterPeakMillionths)/1e6 \(outputMeterPeakMillidb)mdB over \(outputMeterObservations) samples; running \(statusValue(queueRunningStatus))/\(runningText)\n\(queueFormatText)\ncurrent-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
     }
 
     private func listedText(_ value: String) -> String {

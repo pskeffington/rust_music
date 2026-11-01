@@ -36,7 +36,7 @@ use std::{
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, RecvTimeoutError, SyncSender},
+        mpsc::{self, SyncSender, TryRecvError},
         Arc,
     },
     thread,
@@ -1322,11 +1322,6 @@ where
     S: PcmSink,
     F: FnOnce() -> Result<S>,
 {
-    // FLAC frames in common lossless files can contain only 256 PCM frames
-    // (~5.8 ms at 44.1 kHz). Polling once per 10 ms starves the native queue
-    // before its next block arrives. Native sinks provide their own bounded
-    // backpressure, so keep the worker responsive enough to refill them.
-    const PLAYBACK_POLL_INTERVAL: Duration = Duration::from_millis(1);
     let focus = ProcessFocus {
         grant: Arc::new(AtomicBool::new(false)),
     };
@@ -1336,13 +1331,35 @@ where
     // without extending the View layout or changing the protocol version.
     let mut playback_error: Option<Reply> = None;
     loop {
-        match requests.recv_timeout(PLAYBACK_POLL_INTERVAL) {
-            Ok(UnitRequest::Eof) | Err(RecvTimeoutError::Disconnected) => {
+        // While playing, service queued commands first and otherwise decode
+        // immediately. A timeout per Poll inserts avoidable idle time between
+        // small FLAC frames (256 frames are only ~5.8 ms at 44.1 kHz), which
+        // can drain AudioQueue's short lead. The native sink already provides
+        // bounded backpressure when its three output buffers are full. When
+        // idle, block on the channel instead of spinning.
+        let unit_request = if slot.status().playback.state == rust_music::PlaybackState::Playing {
+            match requests.try_recv() {
+                Ok(request) => request,
+                Err(TryRecvError::Disconnected) => UnitRequest::Eof,
+                Err(TryRecvError::Empty) => {
+                    if let Err(error) = slot.handle(Command::Poll, &focus) {
+                        focus.grant.store(false, Ordering::Release);
+                        playback_error = Some(error_reply(error));
+                    }
+                    continue;
+                }
+            }
+        } else {
+            requests.recv().unwrap_or(UnitRequest::Eof)
+        };
+
+        match unit_request {
+            UnitRequest::Eof => {
                 focus.grant.store(false, Ordering::Release);
                 let _ = slot.handle(Command::Stop, &focus);
                 return Ok(());
             }
-            Ok(UnitRequest::Message(request)) => {
+            UnitRequest::Message(request) => {
                 let is_shutdown = request.body == Request::Shutdown;
                 let retry_or_stop = matches!(
                     &request.body,
@@ -1366,14 +1383,6 @@ where
                     focus.grant.store(false, Ordering::Release);
                     let _ = slot.handle(Command::Stop, &focus);
                     return Ok(());
-                }
-            }
-            Err(RecvTimeoutError::Timeout) => {
-                if slot.status().playback.state == rust_music::PlaybackState::Playing {
-                    if let Err(error) = slot.handle(Command::Poll, &focus) {
-                        focus.grant.store(false, Ordering::Release);
-                        playback_error = Some(error_reply(error));
-                    }
                 }
             }
         }
@@ -2485,9 +2494,41 @@ mod tests {
     fn package_stream_runs_play_pause_resume_volume_stop_end_to_end() {
         let root = temp_root("package-transport-stream");
         let format = AudioFormat::new(44_100, 2, 16).unwrap();
-        let mut wave = header(format, 8);
-        wave.extend_from_slice(&[0; 8]);
+        let data_bytes = format.sample_rate * 5 * u32::from(format.channels) * 2;
+        let mut wave = header(format, data_bytes);
+        wave.resize(wave.len() + data_bytes as usize, 0);
         fs::write(root.join("track.wav"), wave).unwrap();
+
+        // This package-worker test uses a NullSink, so pace it like a device
+        // sink. An unpaced sink would decode this multi-second fixture to EOF
+        // before the test can deliver its transport requests.
+        struct RealtimeNullSink(NullSink);
+        impl PcmSink for RealtimeNullSink {
+            fn open(&mut self, format: AudioFormat) -> Result<()> {
+                self.0.open(format)
+            }
+
+            fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+                self.0.write(block)?;
+                let micros = (block.frames() as u128 * 1_000_000
+                    / u128::from(block.format.sample_rate))
+                .min(u128::from(u64::MAX)) as u64;
+                thread::sleep(Duration::from_micros(micros));
+                Ok(())
+            }
+
+            fn pause(&mut self) -> Result<()> {
+                self.0.pause()
+            }
+
+            fn resume(&mut self) -> Result<()> {
+                self.0.resume()
+            }
+
+            fn finish(&mut self) -> Result<()> {
+                self.0.finish()
+            }
+        }
 
         let id = rust_music_host::MUSIC_PACKAGE_ID;
         let requests = [
@@ -2516,8 +2557,8 @@ mod tests {
             write_frame(&mut input, &request.encode().unwrap()).unwrap();
         }
         let mut output = Vec::new();
-        serve_stream::<NullSink, _, _, _>(
-            || Ok(NullSink::default()),
+        serve_stream::<RealtimeNullSink, _, _, _>(
+            || Ok(RealtimeNullSink(NullSink::default())),
             std::io::Cursor::new(input),
             &mut output,
         )

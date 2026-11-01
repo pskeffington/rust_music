@@ -46,6 +46,7 @@ const MAX_AUDIO_DEVICE_IDS: usize = 256;
 const FLAG_SIGNED: u32 = 1 << 2;
 const FLAG_PACKED: u32 = 1 << 3;
 const NO_STATUS: i64 = i64::MIN;
+const NO_U64: u64 = u64::MAX;
 const MAX_DEVICE_TEXT_BYTES: usize = 512;
 const CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
 const OUTPUT_DEVICE_UID_ENV: &str = "RUST_MUSIC_OUTPUT_DEVICE_UID";
@@ -69,6 +70,17 @@ pub struct AudioQueueDiagnosticsSnapshot {
     pub buffer_allocation_status: Option<i32>,
     pub enqueued_buffers: u64,
     pub enqueued_frames: u64,
+    pub pcm_blocks_submitted: u64,
+    pub first_enqueue_elapsed_micros: Option<u64>,
+    pub first_callback_observed_micros: Option<u64>,
+    pub write_timeout_count: u64,
+    pub enqueue_status: Option<i32>,
+    pub start_failure_count: u64,
+    pub callback_observation_gap_samples: u64,
+    pub callback_observation_gap_max_micros: u64,
+    pub queue_depth_before_write_samples: u64,
+    pub queue_empty_before_write_count: u64,
+    pub queue_depth_before_write_max: u64,
     pub nonzero_samples: u64,
     pub peak_sample: u64,
     pub output_meter_enable_status: Option<i32>,
@@ -141,6 +153,17 @@ struct AudioQueueDiagnostics {
     buffer_allocation_status: AtomicI64,
     enqueued_buffers: AtomicU64,
     enqueued_frames: AtomicU64,
+    pcm_blocks_submitted: AtomicU64,
+    first_enqueue_elapsed_micros: AtomicU64,
+    first_callback_observed_micros: AtomicU64,
+    write_timeout_count: AtomicU64,
+    enqueue_status: AtomicI64,
+    start_failure_count: AtomicU64,
+    callback_observation_gap_samples: AtomicU64,
+    callback_observation_gap_max_micros: AtomicU64,
+    queue_depth_before_write_samples: AtomicU64,
+    queue_empty_before_write_count: AtomicU64,
+    queue_depth_before_write_max: AtomicU64,
     nonzero_samples: AtomicU64,
     peak_sample: AtomicU64,
     output_meter_enable_status: AtomicI64,
@@ -215,6 +238,17 @@ impl Default for AudioQueueDiagnostics {
             buffer_allocation_status: AtomicI64::new(NO_STATUS),
             enqueued_buffers: AtomicU64::new(0),
             enqueued_frames: AtomicU64::new(0),
+            pcm_blocks_submitted: AtomicU64::new(0),
+            first_enqueue_elapsed_micros: AtomicU64::new(NO_U64),
+            first_callback_observed_micros: AtomicU64::new(NO_U64),
+            write_timeout_count: AtomicU64::new(0),
+            enqueue_status: AtomicI64::new(NO_STATUS),
+            start_failure_count: AtomicU64::new(0),
+            callback_observation_gap_samples: AtomicU64::new(0),
+            callback_observation_gap_max_micros: AtomicU64::new(0),
+            queue_depth_before_write_samples: AtomicU64::new(0),
+            queue_empty_before_write_count: AtomicU64::new(0),
+            queue_depth_before_write_max: AtomicU64::new(0),
             nonzero_samples: AtomicU64::new(0),
             peak_sample: AtomicU64::new(0),
             output_meter_enable_status: AtomicI64::new(NO_STATUS),
@@ -323,6 +357,24 @@ impl AudioQueueDiagnostics {
             .store(NO_STATUS, Ordering::Relaxed);
         self.enqueued_buffers.store(0, Ordering::Relaxed);
         self.enqueued_frames.store(0, Ordering::Relaxed);
+        self.pcm_blocks_submitted.store(0, Ordering::Relaxed);
+        self.first_enqueue_elapsed_micros
+            .store(NO_U64, Ordering::Relaxed);
+        self.first_callback_observed_micros
+            .store(NO_U64, Ordering::Relaxed);
+        self.write_timeout_count.store(0, Ordering::Relaxed);
+        self.enqueue_status.store(NO_STATUS, Ordering::Relaxed);
+        self.start_failure_count.store(0, Ordering::Relaxed);
+        self.callback_observation_gap_samples
+            .store(0, Ordering::Relaxed);
+        self.callback_observation_gap_max_micros
+            .store(0, Ordering::Relaxed);
+        self.queue_depth_before_write_samples
+            .store(0, Ordering::Relaxed);
+        self.queue_empty_before_write_count
+            .store(0, Ordering::Relaxed);
+        self.queue_depth_before_write_max
+            .store(0, Ordering::Relaxed);
         self.nonzero_samples.store(0, Ordering::Relaxed);
         self.peak_sample.store(0, Ordering::Relaxed);
         self.output_meter_enable_status
@@ -429,6 +481,19 @@ impl AudioQueueDiagnostics {
         }
     }
 
+    fn set_first(&self, field: &AtomicU64, value: u64) {
+        if self.enabled.load(Ordering::Relaxed) {
+            let _ = field.compare_exchange(NO_U64, value, Ordering::Relaxed, Ordering::Relaxed);
+        }
+    }
+
+    fn set_enqueue_status(&self, status: i32) {
+        if self.enabled.load(Ordering::Relaxed) {
+            self.enqueue_status
+                .store(i64::from(status), Ordering::Relaxed);
+        }
+    }
+
     fn snapshot(&self) -> AudioQueueDiagnosticsSnapshot {
         let status = |field: &AtomicI64| match field.load(Ordering::Relaxed) {
             NO_STATUS => None,
@@ -455,6 +520,25 @@ impl AudioQueueDiagnostics {
             buffer_allocation_status: status(&self.buffer_allocation_status),
             enqueued_buffers: self.enqueued_buffers.load(Ordering::Relaxed),
             enqueued_frames: self.enqueued_frames.load(Ordering::Relaxed),
+            pcm_blocks_submitted: self.pcm_blocks_submitted.load(Ordering::Relaxed),
+            first_enqueue_elapsed_micros: optional_counter(&self.first_enqueue_elapsed_micros),
+            first_callback_observed_micros: optional_counter(&self.first_callback_observed_micros),
+            write_timeout_count: self.write_timeout_count.load(Ordering::Relaxed),
+            enqueue_status: status(&self.enqueue_status),
+            start_failure_count: self.start_failure_count.load(Ordering::Relaxed),
+            callback_observation_gap_samples: self
+                .callback_observation_gap_samples
+                .load(Ordering::Relaxed),
+            callback_observation_gap_max_micros: self
+                .callback_observation_gap_max_micros
+                .load(Ordering::Relaxed),
+            queue_depth_before_write_samples: self
+                .queue_depth_before_write_samples
+                .load(Ordering::Relaxed),
+            queue_empty_before_write_count: self
+                .queue_empty_before_write_count
+                .load(Ordering::Relaxed),
+            queue_depth_before_write_max: self.queue_depth_before_write_max.load(Ordering::Relaxed),
             nonzero_samples: self.nonzero_samples.load(Ordering::Relaxed),
             peak_sample: self.peak_sample.load(Ordering::Relaxed),
             output_meter_enable_status: status(&self.output_meter_enable_status),
@@ -672,7 +756,7 @@ impl AudioQueueDiagnostics {
     fn record(&self) -> String {
         let snapshot = self.snapshot();
         format!(
-            "RUST_MUSIC_AUDIO_DIAG rate={} bits={} channels={} created={} create_status={} route_status={} route_device_list_status={} route_default_listed={} route_target_listed={} allocated={} capacity_bytes={} allocation_status={} enqueued={} frames={} nonzero_samples={} peak_sample={} starts={} start_status={} device_status={} device_associated={} device_default={} device_target={} device_list_status={} device_listed={} output_meter_enable_status={} output_meter_query_status={} output_meter_db_status={} output_meter_peak_millionths={} output_meter_peak_millidb={} output_meter_observations={} queue_running_status={} queue_is_running={} stream_status={} stream_matches={} stream_rate={} stream_flags={} stream_bytes_frame={} stream_channels={} stream_bits={} device_rate_status={} device_rate={} device_channels_status={} device_channels={} converter_error_status={} converter_error={} queue_volume_set_status={} queue_volume_get_status={} queue_volume_millionths={} tap_status={} tap_rate={} tap_format={} tap_flags={} tap_bytes_packet={} tap_frames_packet={} tap_bytes_frame={} tap_channels={} tap_bits={} tap_callbacks={} tap_frames={} tap_nonzero_bytes={} tap_data_buffers={} enqueued_nonzero_bytes={} callbacks={} teardown={} stop_status={} drained={} immediate_stop_status={} dispose_status={}",
+            "RUST_MUSIC_AUDIO_DIAG rate={} bits={} channels={} created={} create_status={} route_status={} route_device_list_status={} route_default_listed={} route_target_listed={} allocated={} capacity_bytes={} allocation_status={} pcm_blocks={} first_enqueue_us={} first_callback_observed_us={} write_timeouts={} enqueue_status={} start_failures={} callback_gap_samples={} callback_gap_max_us={} queue_depth_samples={} queue_empty_writes={} queue_depth_max={} enqueued={} frames={} nonzero_samples={} peak_sample={} starts={} start_status={} device_status={} device_associated={} device_default={} device_target={} device_list_status={} device_listed={} output_meter_enable_status={} output_meter_query_status={} output_meter_db_status={} output_meter_peak_millionths={} output_meter_peak_millidb={} output_meter_observations={} queue_running_status={} queue_is_running={} stream_status={} stream_matches={} stream_rate={} stream_flags={} stream_bytes_frame={} stream_channels={} stream_bits={} device_rate_status={} device_rate={} device_channels_status={} device_channels={} converter_error_status={} converter_error={} queue_volume_set_status={} queue_volume_get_status={} queue_volume_millionths={} tap_status={} tap_rate={} tap_format={} tap_flags={} tap_bytes_packet={} tap_frames_packet={} tap_bytes_frame={} tap_channels={} tap_bits={} tap_callbacks={} tap_frames={} tap_nonzero_bytes={} tap_data_buffers={} enqueued_nonzero_bytes={} callbacks={} teardown={} stop_status={} drained={} immediate_stop_status={} dispose_status={}",
             snapshot.sample_rate,
             snapshot.bits_per_sample,
             snapshot.channels,
@@ -685,6 +769,17 @@ impl AudioQueueDiagnostics {
             snapshot.allocated_buffers,
             snapshot.allocated_capacity_bytes,
             format_status(snapshot.buffer_allocation_status),
+            snapshot.pcm_blocks_submitted,
+            format_optional_counter(snapshot.first_enqueue_elapsed_micros),
+            format_optional_counter(snapshot.first_callback_observed_micros),
+            snapshot.write_timeout_count,
+            format_status(snapshot.enqueue_status),
+            snapshot.start_failure_count,
+            snapshot.callback_observation_gap_samples,
+            snapshot.callback_observation_gap_max_micros,
+            snapshot.queue_depth_before_write_samples,
+            snapshot.queue_empty_before_write_count,
+            snapshot.queue_depth_before_write_max,
             snapshot.enqueued_buffers,
             snapshot.enqueued_frames,
             snapshot.nonzero_samples,
@@ -774,6 +869,17 @@ fn format_bool(value: Option<bool>) -> &'static str {
 }
 
 fn format_optional_u32(value: Option<u32>) -> String {
+    value.map_or_else(|| "none".to_owned(), |value| value.to_string())
+}
+
+fn optional_counter(value: &AtomicU64) -> Option<u64> {
+    match value.load(Ordering::Relaxed) {
+        NO_U64 => None,
+        value => Some(value),
+    }
+}
+
+fn format_optional_counter(value: Option<u64>) -> String {
     value.map_or_else(|| "none".to_owned(), |value| value.to_string())
 }
 
@@ -1045,18 +1151,48 @@ fn listed_audio_device_ids() -> std::result::Result<([u32; MAX_AUDIO_DEVICE_IDS]
         scope: AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
         element: 0,
     };
+    read_audio_device_ids(
+        |size| unsafe {
+            AudioObjectGetPropertyDataSize(
+                AUDIO_OBJECT_SYSTEM_OBJECT_ID,
+                &devices_address,
+                0,
+                ptr::null(),
+                size,
+            )
+        },
+        |devices, size| unsafe {
+            AudioObjectGetPropertyData(
+                AUDIO_OBJECT_SYSTEM_OBJECT_ID,
+                &devices_address,
+                0,
+                ptr::null(),
+                size,
+                devices.as_mut_ptr().cast(),
+            )
+        },
+    )
+}
+
+fn read_audio_device_ids(
+    mut get_data_size: impl FnMut(&mut u32) -> i32,
+    mut get_data: impl FnMut(&mut [u32], &mut u32) -> i32,
+) -> std::result::Result<([u32; MAX_AUDIO_DEVICE_IDS], usize), i32> {
     let mut devices = [0_u32; MAX_AUDIO_DEVICE_IDS];
-    let mut size = std::mem::size_of_val(&devices) as u32;
-    let status = unsafe {
-        AudioObjectGetPropertyData(
-            AUDIO_OBJECT_SYSTEM_OBJECT_ID,
-            &devices_address,
-            0,
-            ptr::null(),
-            &mut size,
-            devices.as_mut_ptr().cast(),
-        )
-    };
+    let mut size = 0_u32;
+    let status = get_data_size(&mut size);
+    if status != 0 {
+        return Err(status);
+    }
+    if size as usize > std::mem::size_of_val(&devices)
+        || (size as usize) % std::mem::size_of::<u32>() != 0
+    {
+        return Err(AUDIOQUEUE_ERR_INVALID_DEVICE);
+    }
+    if size == 0 {
+        return Ok((devices, 0));
+    }
+    let status = get_data(&mut devices, &mut size);
     if status != 0 {
         return Err(status);
     }
@@ -1197,6 +1333,10 @@ fn record_start(
     diagnostics.add(&diagnostics.start_attempts, 1);
     let start_status = api.start(queue);
     diagnostics.status(&diagnostics.start_status, start_status);
+    if diagnostics.enabled.load(Ordering::Relaxed) {
+        let (status, running) = api.is_running(queue);
+        diagnostics.set_queue_running(status, running);
+    }
     let observation = api.current_device(queue, target_uid);
     diagnostics.set_current_device_observation(observation);
     if start_status != 0 {
@@ -1248,8 +1388,42 @@ fn record_start(
     }
 }
 
+fn observe_callback_progress(
+    diagnostics: &AudioQueueDiagnostics,
+    previous: &mut Option<(u64, Instant)>,
+    session_started_at: Option<Instant>,
+) {
+    if !diagnostics.enabled.load(Ordering::Relaxed) {
+        return;
+    }
+    let completed = diagnostics.completed_callbacks.load(Ordering::Acquire);
+    if completed == 0 {
+        return;
+    }
+    let observed_at = Instant::now();
+    if let Some((previous_completed, previous_observed_at)) = *previous {
+        if completed > previous_completed {
+            diagnostics.add(&diagnostics.callback_observation_gap_samples, 1);
+            diagnostics.callback_observation_gap_max_micros.fetch_max(
+                observed_at
+                    .duration_since(previous_observed_at)
+                    .as_micros()
+                    .min(u128::from(u64::MAX)) as u64,
+                Ordering::Relaxed,
+            );
+            *previous = Some((completed, observed_at));
+        }
+    } else {
+        let elapsed = session_started_at.map_or(0, |started| {
+            observed_at.duration_since(started).as_micros() as u64
+        });
+        diagnostics.set_first(&diagnostics.first_callback_observed_micros, elapsed);
+        *previous = Some((completed, observed_at));
+    }
+}
+
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct AudioStreamBasicDescription {
     sample_rate: f64,
     format_id: u32,
@@ -2087,6 +2261,8 @@ pub struct MacAudioQueueSink {
     registered: bool,
     pending_teardown: bool,
     diagnostics: Arc<AudioQueueDiagnostics>,
+    session_started_at: Option<Instant>,
+    last_callback_observation: Option<(u64, Instant)>,
     diagnostics_summary_emitted: bool,
     drain_timeout: Duration,
     #[cfg(test)]
@@ -2119,6 +2295,8 @@ impl Default for MacAudioQueueSink {
             registered: false,
             pending_teardown: false,
             diagnostics,
+            session_started_at: None,
+            last_callback_observation: None,
             diagnostics_summary_emitted: false,
             drain_timeout: MAX_DRAIN_WAIT,
             #[cfg(test)]
@@ -2158,6 +2336,8 @@ impl PcmSink for MacAudioQueueSink {
             ));
         }
         self.diagnostics.reset_session();
+        self.session_started_at = Some(Instant::now());
+        self.last_callback_observation = None;
         self.diagnostics_summary_emitted = false;
         self.diagnostics.set_format(format);
         reserve_queue()?;
@@ -2363,13 +2543,36 @@ impl PcmSink for MacAudioQueueSink {
                 "AudioQueue not open or source format changed",
             ));
         }
+        observe_callback_progress(
+            &self.diagnostics,
+            &mut self.last_callback_observation,
+            self.session_started_at,
+        );
         let context = self
             .context
             .as_ref()
             .ok_or(MusicError::Invalid("missing AudioQueue callback"))?;
+        if self.diagnostics.enabled.load(Ordering::Relaxed) {
+            let depth = context
+                .in_flight
+                .iter()
+                .filter(|slot| slot.load(Ordering::Acquire))
+                .count() as u64;
+            self.diagnostics
+                .add(&self.diagnostics.queue_depth_before_write_samples, 1);
+            if depth == 0 {
+                self.diagnostics
+                    .add(&self.diagnostics.queue_empty_before_write_count, 1);
+            }
+            self.diagnostics
+                .queue_depth_before_write_max
+                .fetch_max(depth, Ordering::Relaxed);
+        }
         let n = usize::from(block.format.bits_per_sample / 8);
         let channels = usize::from(block.format.channels);
         if self.diagnostics.enabled.load(Ordering::Relaxed) {
+            self.diagnostics
+                .add(&self.diagnostics.pcm_blocks_submitted, 1);
             self.diagnostics.add(
                 &self.diagnostics.nonzero_samples,
                 block.samples.iter().filter(|&&sample| sample != 0).count() as u64,
@@ -2393,9 +2596,18 @@ impl PcmSink for MacAudioQueueSink {
             let index = loop {
                 if let Some(i) = (0..SLOTS).find(|&i| !context.in_flight[i].load(Ordering::Acquire))
                 {
+                    if self.diagnostics.completed_callbacks.load(Ordering::Relaxed) != 0 {
+                        let elapsed = self
+                            .session_started_at
+                            .map_or(0, |started| started.elapsed().as_micros() as u64);
+                        self.diagnostics
+                            .set_first(&self.diagnostics.first_callback_observed_micros, elapsed);
+                    }
                     break i;
                 }
                 if Instant::now() >= deadline {
+                    self.diagnostics
+                        .add(&self.diagnostics.write_timeout_count, 1);
                     return Err(MusicError::Output("AudioQueue buffer timed out".into()));
                 }
                 thread::sleep(Duration::from_millis(2));
@@ -2424,6 +2636,12 @@ impl PcmSink for MacAudioQueueSink {
             }
             context.in_flight[index].store(true, Ordering::Release);
             let err = self.api.enqueue_buffer(self.queue, buffer);
+            observe_callback_progress(
+                &self.diagnostics,
+                &mut self.last_callback_observation,
+                self.session_started_at,
+            );
+            self.diagnostics.set_enqueue_status(err);
             if err != 0 {
                 context.in_flight[index].store(false, Ordering::Release);
                 return Err(MusicError::Output(format!(
@@ -2434,9 +2652,16 @@ impl PcmSink for MacAudioQueueSink {
             self.diagnostics.add(&self.diagnostics.enqueued_buffers, 1);
             self.diagnostics
                 .add(&self.diagnostics.enqueued_frames, frames);
+            let elapsed = self
+                .session_started_at
+                .map_or(0, |started| started.elapsed().as_micros() as u64);
+            self.diagnostics
+                .set_first(&self.diagnostics.first_enqueue_elapsed_micros, elapsed);
             if !self.started {
                 let prime_status = self.api.prime(self.queue);
                 if prime_status != 0 {
+                    self.diagnostics
+                        .add(&self.diagnostics.start_failure_count, 1);
                     return Err(MusicError::Output(format!(
                         "AudioQueuePrime OSStatus {prime_status}"
                     )));
@@ -2445,6 +2670,8 @@ impl PcmSink for MacAudioQueueSink {
                 let start = record_start(&*self.api, self.queue, target_uid, &self.diagnostics);
                 self.started = start.queue_started;
                 if start.status != 0 {
+                    self.diagnostics
+                        .add(&self.diagnostics.start_failure_count, 1);
                     return Err(MusicError::Output(format!(
                         "{} OSStatus {}",
                         start.failure_stage.unwrap_or("AudioQueue start validation"),
@@ -2459,9 +2686,16 @@ impl PcmSink for MacAudioQueueSink {
         if self.queue.is_null() {
             return Ok(());
         }
+        observe_callback_progress(
+            &self.diagnostics,
+            &mut self.last_callback_observation,
+            self.session_started_at,
+        );
         let queue = self.queue;
         let had_audio = self.started && !self.paused;
         if self.diagnostics.enabled.load(Ordering::Relaxed) {
+            let (running_status, running) = self.api.is_running(queue);
+            self.diagnostics.set_queue_running(running_status, running);
             if let Some(expected) = self.format {
                 self.diagnostics.set_queue_format_observation(
                     self.api.queue_format_observation(queue, expected),
@@ -2483,6 +2717,11 @@ impl PcmSink for MacAudioQueueSink {
                     .context
                     .as_deref()
                     .is_some_and(|context| wait_for_drain(context, self.drain_timeout)));
+        observe_callback_progress(
+            &self.diagnostics,
+            &mut self.last_callback_observation,
+            self.session_started_at,
+        );
         self.diagnostics.set_drain_complete(drained);
         let forced_stop = if stop != 0 || !drained {
             self.api.stop(queue, 1)
@@ -2608,6 +2847,7 @@ mod tests {
     struct FakeState {
         new_status: i32,
         new_calls: usize,
+        new_format: Option<AudioStreamBasicDescription>,
         route_status: Option<i32>,
         route_device_list_status: Option<i32>,
         route_default_device_listed: Option<bool>,
@@ -2617,6 +2857,7 @@ mod tests {
         allocate_calls: usize,
         enqueue_status: i32,
         start_status: i32,
+        prime_status: i32,
         current_device_status: Option<i32>,
         current_device_associated: Option<bool>,
         current_device_matches_default: Option<bool>,
@@ -2636,6 +2877,7 @@ mod tests {
         stop_calls: usize,
         dispose_calls: usize,
         suppress_callbacks: bool,
+        complete_on_enqueue: bool,
         callback: Option<unsafe extern "C" fn(*mut c_void, AudioQueueRef, AudioQueueBufferRef)>,
         callback_user_data: usize,
         pending_buffers: Vec<usize>,
@@ -2652,13 +2894,14 @@ mod tests {
     impl AudioQueueApi for FakeAudioQueue {
         fn new_output(
             &self,
-            _format: *const AudioStreamBasicDescription,
+            format: *const AudioStreamBasicDescription,
             callback: unsafe extern "C" fn(*mut c_void, AudioQueueRef, AudioQueueBufferRef),
             user_data: *mut c_void,
             out_queue: *mut AudioQueueRef,
         ) -> i32 {
             let mut state = self.0.lock().unwrap();
             state.new_calls += 1;
+            state.new_format = Some(unsafe { *format });
             let status = if state.device_available == Some(false) {
                 FAKE_INVALID_DEVICE
             } else {
@@ -2746,30 +2989,42 @@ mod tests {
         }
 
         fn enqueue_buffer(&self, _queue: AudioQueueRef, buffer: AudioQueueBufferRef) -> i32 {
-            let mut state = self.0.lock().unwrap();
-            state.events.push("enqueue");
-            let status = if state.device_available == Some(false) {
-                FAKE_INVALID_DEVICE
-            } else {
-                state.enqueue_status
+            let (status, complete, callback, callback_user_data) = {
+                let mut state = self.0.lock().unwrap();
+                state.events.push("enqueue");
+                let status = if state.device_available == Some(false) {
+                    FAKE_INVALID_DEVICE
+                } else {
+                    state.enqueue_status
+                };
+                let complete = status == 0 && state.complete_on_enqueue;
+                if status == 0 {
+                    let size = unsafe { (*buffer).data_size as usize };
+                    let bytes =
+                        unsafe { std::slice::from_raw_parts((*buffer).data.cast::<u8>(), size) };
+                    state.enqueued_pcm.push(bytes.to_vec());
+                    if !complete {
+                        state.pending_buffers.push(buffer as usize);
+                    }
+                }
+                (status, complete, state.callback, state.callback_user_data)
             };
-            if status == 0 {
-                let size = unsafe { (*buffer).data_size as usize };
-                let bytes =
-                    unsafe { std::slice::from_raw_parts((*buffer).data.cast::<u8>(), size) };
-                state.enqueued_pcm.push(bytes.to_vec());
-                state.pending_buffers.push(buffer as usize);
+            if complete {
+                if let Some(callback) = callback {
+                    unsafe { callback(callback_user_data as *mut c_void, FAKE_QUEUE, buffer) };
+                }
             }
             status
         }
 
         fn prime(&self, _queue: AudioQueueRef) -> i32 {
-            0
+            self.0.lock().unwrap().prime_status
         }
 
         fn start(&self, _queue: AudioQueueRef) -> i32 {
             let mut state = self.0.lock().unwrap();
             state.events.push("start");
+            state.queue_is_running = state.start_status == 0;
             state.start_status
         }
 
@@ -2943,6 +3198,86 @@ mod tests {
         );
         assert_eq!(state.events, vec!["enqueue", "start"]);
         assert_eq!(state.pending_buffers.len(), 1);
+    }
+
+    #[test]
+    fn linear_pcm_asbd_and_packed_interleaved_bytes_match_supported_formats() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        for sample_rate in [44_100, 48_000, 96_000, 192_000] {
+            for channels in [1, 2] {
+                for (bits_per_sample, samples, expected_bytes) in [
+                    (
+                        16,
+                        vec![-32_768, 32_767, -1, 1, 0, -2],
+                        vec![
+                            0x00, 0x80, 0xff, 0x7f, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, 0xfe, 0xff,
+                        ],
+                    ),
+                    (
+                        24,
+                        vec![-8_388_608, 8_388_607, -1, 1, 0, -2],
+                        vec![
+                            0x00, 0x00, 0x80, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0xfe, 0xff, 0xff,
+                        ],
+                    ),
+                    (
+                        32,
+                        vec![i32::MIN, i32::MAX, -1, 1, 0, -2],
+                        vec![
+                            0x00, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff,
+                            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,
+                        ],
+                    ),
+                ] {
+                    let format = AudioFormat::new(sample_rate, channels, bits_per_sample).unwrap();
+                    let (mut sink, api) = fake_sink();
+                    sink.open(format).unwrap();
+                    sink.write(&PcmBlock { format, samples }).unwrap();
+
+                    let state = api.0.lock().unwrap();
+                    let asbd = state.new_format.expect("AudioQueue format supplied");
+                    let bytes_per_frame = u32::from(channels) * u32::from(bits_per_sample / 8);
+                    assert_eq!(asbd.sample_rate, f64::from(sample_rate));
+                    assert_eq!(asbd.format_id, FORMAT_LPCM);
+                    assert_eq!(asbd.format_flags, FLAG_PACKED | FLAG_SIGNED);
+                    assert_eq!(asbd.bytes_per_packet, bytes_per_frame);
+                    assert_eq!(asbd.frames_per_packet, 1);
+                    assert_eq!(asbd.bytes_per_frame, bytes_per_frame);
+                    assert_eq!(asbd.channels_per_frame, u32::from(channels));
+                    assert_eq!(asbd.bits_per_channel, u32::from(bits_per_sample));
+                    assert_eq!(asbd.reserved, 0);
+                    assert_eq!(state.enqueued_pcm, vec![expected_bytes]);
+                    assert_eq!(state.events, vec!["enqueue", "start"]);
+                    drop(state);
+                    sink.finish().unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn device_list_query_uses_coreaudio_reported_byte_count() {
+        let queried_size = std::cell::Cell::new(false);
+        let mut passed_size = 0_u32;
+        let (ids, count) = read_audio_device_ids(
+            |size| {
+                queried_size.set(true);
+                *size = 3 * std::mem::size_of::<u32>() as u32;
+                0
+            },
+            |buffer, size| {
+                assert!(queried_size.get(), "must size the CoreAudio list first");
+                passed_size = *size;
+                assert_eq!(*size as usize, 3 * std::mem::size_of::<u32>());
+                buffer[..3].copy_from_slice(&[11, 22, 33]);
+                0
+            },
+        )
+        .unwrap();
+        assert_eq!(passed_size, 3 * std::mem::size_of::<u32>() as u32);
+        assert_eq!(count, 3);
+        assert_eq!(&ids[..count], &[11, 22, 33]);
     }
 
     #[test]
@@ -3138,6 +3473,7 @@ mod tests {
         let active_before = registry_lock().active;
         let (mut sink, api) = fake_sink();
         sink.write_timeout = Duration::from_millis(20);
+        sink.set_diagnostics_enabled(true);
 
         sink.open(valid_format()).unwrap();
         for _ in 0..SLOTS {
@@ -3152,6 +3488,10 @@ mod tests {
             .iter()
             .all(|slot| slot.load(Ordering::Acquire)));
         assert_eq!(api.0.lock().unwrap().pending_buffers.len(), SLOTS);
+        assert_eq!(
+            sink.diagnostics_snapshot().pcm_blocks_submitted,
+            SLOTS as u64
+        );
 
         // The fake retains all queued buffers and suppresses completion on
         // stop. This models callback starvation only, not physical unplug.
@@ -3160,7 +3500,13 @@ mod tests {
             sink.write(&one_sample()),
             Err(MusicError::Output(message)) if message.contains("AudioQueue buffer timed out")
         ));
+        assert_eq!(sink.diagnostics_snapshot().write_timeout_count, 1);
+        assert_eq!(
+            sink.diagnostics_snapshot().pcm_blocks_submitted,
+            (SLOTS + 1) as u64
+        );
         assert_eq!(api.0.lock().unwrap().pending_buffers.len(), SLOTS);
+        assert_eq!(sink.diagnostics_snapshot().write_timeout_count, 1);
 
         // With no callbacks to drain, finish escalates to immediate stop and
         // synchronous dispose, then releases the queue registry/context.
@@ -3218,6 +3564,31 @@ mod tests {
         let state = api.0.lock().unwrap();
         assert_eq!(state.stop_modes, vec![1]);
         assert_eq!(state.dispose_modes, vec![1]);
+    }
+
+    #[test]
+    fn prime_failure_is_counted_then_teardown_allows_reopen() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        sink.open(valid_format()).unwrap();
+        api.0.lock().unwrap().prime_status = -77;
+
+        assert!(matches!(
+            sink.write(&one_sample()),
+            Err(MusicError::Output(_))
+        ));
+        let failed = sink.diagnostics_snapshot();
+        assert_eq!(failed.enqueued_frames, 1);
+        assert_eq!(failed.start_failure_count, 1);
+        assert_eq!(failed.start_attempts, 0);
+        assert!(!sink.started);
+
+        api.0.lock().unwrap().prime_status = 0;
+        sink.finish().unwrap();
+        let (mut next, _) = fake_sink();
+        next.open(valid_format()).unwrap();
+        next.finish().unwrap();
     }
 
     #[test]
@@ -3400,6 +3771,13 @@ mod tests {
             samples: vec![11, -12, 13, -14],
         })
         .unwrap();
+
+        let active_snapshot = sink.diagnostics_snapshot();
+        assert_eq!(active_snapshot.pcm_blocks_submitted, 1);
+        assert_eq!(active_snapshot.enqueued_frames, 4);
+        assert!(active_snapshot.first_enqueue_elapsed_micros.is_some());
+        assert_eq!(active_snapshot.first_callback_observed_micros, None);
+
         sink.finish().unwrap();
 
         let snapshot = sink.diagnostics_snapshot();
@@ -3421,6 +3799,13 @@ mod tests {
         assert_eq!(snapshot.buffer_allocation_status, Some(0));
         assert_eq!(snapshot.enqueued_buffers, 1);
         assert_eq!(snapshot.enqueued_frames, 4);
+        assert_eq!(snapshot.pcm_blocks_submitted, 1);
+        assert_eq!(snapshot.enqueue_status, Some(0));
+        assert_eq!(snapshot.write_timeout_count, 0);
+        assert_eq!(snapshot.queue_running_status, Some(0));
+        assert_eq!(snapshot.queue_is_running, Some(true));
+        assert!(snapshot.first_enqueue_elapsed_micros.is_some());
+        assert!(snapshot.first_callback_observed_micros.is_some());
         assert_eq!(snapshot.nonzero_samples, 4);
         assert_eq!(snapshot.peak_sample, 14);
         assert_eq!(snapshot.enqueued_nonzero_bytes, 6);
@@ -3430,8 +3815,6 @@ mod tests {
         assert_eq!(snapshot.output_meter_peak_millionths, None);
         assert_eq!(snapshot.output_meter_peak_millidb, None);
         assert_eq!(snapshot.output_meter_observations, 0);
-        assert_eq!(snapshot.queue_running_status, None);
-        assert_eq!(snapshot.queue_is_running, None);
         assert_eq!(snapshot.start_attempts, 1);
         assert_eq!(snapshot.start_status, Some(0));
         assert_eq!(snapshot.current_device_status, Some(0));
@@ -3441,15 +3824,18 @@ mod tests {
         assert_eq!(snapshot.current_device_list_status, Some(0));
         assert_eq!(snapshot.current_device_listed, Some(true));
         assert_eq!(snapshot.completed_callbacks, 1);
+        assert_eq!(snapshot.callback_observation_gap_samples, 0);
+        assert_eq!(snapshot.callback_observation_gap_max_micros, 0);
         assert_eq!(snapshot.teardown_attempts, 1);
         assert_eq!(snapshot.stop_status, Some(0));
         assert_eq!(snapshot.drain_complete, Some(true));
         assert_eq!(snapshot.immediate_stop_status, None);
         assert_eq!(snapshot.dispose_status, Some(0));
-        assert_eq!(
-            sink.diagnostics.record(),
-            "RUST_MUSIC_AUDIO_DIAG rate=44100 bits=16 channels=1 created=1 create_status=0 route_status=0 route_device_list_status=0 route_default_listed=1 route_target_listed=1 allocated=3 capacity_bytes=24576 allocation_status=0 enqueued=1 frames=4 nonzero_samples=4 peak_sample=14 starts=1 start_status=0 device_status=0 device_associated=1 device_default=1 device_target=1 device_list_status=0 device_listed=1 output_meter_enable_status=none output_meter_query_status=none output_meter_db_status=none output_meter_peak_millionths=none output_meter_peak_millidb=none output_meter_observations=0 queue_running_status=none queue_is_running=none stream_status=0 stream_matches=none stream_rate=none stream_flags=none stream_bytes_frame=none stream_channels=none stream_bits=none device_rate_status=0 device_rate=none device_channels_status=0 device_channels=none converter_error_status=0 converter_error=none queue_volume_set_status=0 queue_volume_get_status=0 queue_volume_millionths=1000000 tap_status=none tap_rate=none tap_format=none tap_flags=none tap_bytes_packet=none tap_frames_packet=none tap_bytes_frame=none tap_channels=none tap_bits=none tap_callbacks=0 tap_frames=0 tap_nonzero_bytes=0 tap_data_buffers=0 enqueued_nonzero_bytes=6 callbacks=1 teardown=1 stop_status=0 drained=1 immediate_stop_status=none dispose_status=0"
-        );
+        let record = sink.diagnostics.record();
+        assert!(record.contains("pcm_blocks=1"));
+        assert!(record.contains("first_enqueue_us="));
+        assert!(record.contains("first_callback_observed_us="));
+        assert!(record.contains("write_timeouts=0"));
     }
 
     #[test]
@@ -3466,6 +3852,11 @@ mod tests {
         .unwrap();
         sink.finish().unwrap();
         let first = sink.diagnostics_snapshot();
+        assert_eq!(first.pcm_blocks_submitted, 1);
+        assert!(first.first_enqueue_elapsed_micros.is_some());
+        assert!(first.first_callback_observed_micros.is_some());
+        assert_eq!(first.write_timeout_count, 0);
+        assert_eq!(first.enqueue_status, Some(0));
         assert_eq!(first.enqueued_frames, 4);
         assert_eq!(first.completed_callbacks, 1);
         assert_eq!(first.teardown_attempts, 1);
@@ -3492,16 +3883,56 @@ mod tests {
         sink.finish().unwrap();
         let second = sink.diagnostics_snapshot();
         assert_eq!(second.enqueued_frames, 2);
+        assert_eq!(second.pcm_blocks_submitted, 1);
+        assert!(second.first_enqueue_elapsed_micros.is_some());
+        assert!(second.first_callback_observed_micros.is_some());
         assert_eq!(second.enqueued_buffers, 1);
         assert_eq!(second.completed_callbacks, 1);
         assert_eq!(second.teardown_attempts, 1);
         let second_record = sink.diagnostics.record();
         assert!(second_record.contains("frames=2"));
+        assert!(second_record.contains("pcm_blocks=1"));
+        assert!(second_record.contains("first_enqueue_us="));
+        assert!(second_record.contains("first_callback_observed_us="));
         assert!(second_record.contains("callbacks=1"));
         assert!(second_record.contains("route_default_listed=1"));
         assert!(second_record.contains("route_target_listed=1"));
         assert!(!second_record.contains("frames=4"));
         assert!(sink.diagnostics_summary_emitted);
+    }
+
+    #[test]
+    fn producer_records_callback_observation_gaps_without_callback_timing() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, api) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        api.0.lock().unwrap().complete_on_enqueue = true;
+        sink.open(valid_format()).unwrap();
+        for _ in 0..3 {
+            sink.write(&one_sample()).unwrap();
+        }
+
+        let snapshot = sink.diagnostics_snapshot();
+        assert_eq!(snapshot.completed_callbacks, 3);
+        assert_eq!(snapshot.callback_observation_gap_samples, 2);
+        assert!(snapshot.callback_observation_gap_max_micros > 0);
+        sink.finish().unwrap();
+    }
+
+    #[test]
+    fn producer_records_queue_depth_before_each_pcm_write() {
+        let _serial = SERIAL_TESTS.lock().unwrap();
+        let (mut sink, _) = fake_sink();
+        sink.set_diagnostics_enabled(true);
+        sink.open(valid_format()).unwrap();
+        for _ in 0..3 {
+            sink.write(&one_sample()).unwrap();
+        }
+        let snapshot = sink.diagnostics_snapshot();
+        assert_eq!(snapshot.queue_depth_before_write_samples, 3);
+        assert_eq!(snapshot.queue_empty_before_write_count, 1);
+        assert_eq!(snapshot.queue_depth_before_write_max, 2);
+        sink.finish().unwrap();
     }
 
     #[test]

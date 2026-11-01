@@ -245,3 +245,49 @@ block starvation, but the session does not isolate that cause from all other
 concurrent native diagnostic changes. MAC07 hardware/device recovery, DAC
 measurement, broader corpus, host-focus, and distribution gates remain
 separate and open.
+
+### 2026-11-01 AQ-01/AQ-02 format and AudioQueue lifecycle follow-up
+
+The native ASBD regression now checks packed signed integer LPCM layout for
+mono/stereo 16/24/32-bit samples at 44.1/48/96/192 kHz, including byte-level
+little-endian signed extrema. The table passes against the requested stream
+descriptor contract. New opt-in atomic diagnostics report PCM blocks, accepted
+frames/buffers, first enqueue time, producer-observed callback release time,
+enqueue status, start failures, callback count, write timeouts, and teardown
+status. The callback itself still performs only bounded atomic updates and
+buffer-slot release; timing is measured by the producer after callback release.
+
+The test-first evidence includes an expected compile failure for the new
+diagnostic fields before they were implemented. After wiring and schema changes,
+the native macOS feature suite passed 33/33 tests. The macOS bundle build and
+signature/lifecycle script passed. The GUI parser accepts the new fixed schema,
+and the app build compiles it; the existing Swift test target does not cover the
+stderr record parser directly.
+
+AQ-03 same-file route comparison found that the direct CLI and actual desktop
+persistent server, run from the engineering shell, both decoded/opened the
+supplied FLAC but AudioQueue failed route validation with OSStatus -66680 before
+allocating buffers or submitting PCM. The standalone CLI device listing was
+empty in that process context, even when the saved output UID was supplied. The
+GUI route successfully started AudioQueue and submitted PCM with zero buffer
+timeouts; one 36-second GUI run submitted 1,613,312 frames at 44.1 kHz to the
+48 kHz device. It observed 3,655 callback-progress changes on the producer
+thread, with a maximum 29,554 µs between producer observations and no write
+timeouts. This is not a callback-to-callback hardware interval and does not
+prove underrun, but it provides a measurable refill gap consistent with the
+operator's report of clock-related, periodically oscillating jitter. A complete
+4:54 run also submitted all 12,985,344 frames with no write timeout. Neither
+run establishes audibility. The environment difference between shell-launched
+CLI/server and the GUI-launched child remains unexplained, and the operator's
+audibility result for the latest fresh GUI run is pending. Do not use route
+identity, frame counts, callbacks, or `Playing` state as acoustic acceptance.
+
+AQ-04 one-versus-three-buffer startup A/B has not been run. The producer-side
+gap measurement justifies controlled testing, but does not establish that
+startup prebuffering will address sustained jitter. New instrumentation now
+also samples in-flight queue depth before each write; a fresh GUI run with this
+field is pending because the current app session is playing another track and
+was left undisturbed. AQ-05 lifecycle coverage now includes a Prime failure
+followed by teardown/reopen; the existing callback starvation, pause/resume,
+drain, stop, failed-dispose and recovery tests remain synthetic. AQ-06 full
+offline gate passes locally, while operator audibility acceptance remains open.
