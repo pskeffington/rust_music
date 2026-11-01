@@ -2972,7 +2972,7 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions. Open a track's context menu for queue and playlist actions.")
+                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; open a track's context menu for queue and playlist actions.")
                         .accessibilityIdentifier("library-track-list")
                     }
                 }

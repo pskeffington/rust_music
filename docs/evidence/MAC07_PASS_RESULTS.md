@@ -771,3 +771,23 @@ the search, sort, and action controls. No library was loaded and no playback
 started. This is a compact live layout observation in screenshot pixels; it
 does not establish AppKit point dimensions or minimum-size enforcement. The
 direct corner resize still could not be targeted by UI automation.
+
+### 2026-11-01 populated Library keyboard focus correction
+
+On candidate source `c595ed1` plus an uncommitted accessibility-hint change, a
+temporary one-track metadata-only FLAC catalog was explicitly loaded. The
+selected track appeared in the Library list. Pressing Tab from that row moved
+keyboard focus to the Library Search field. No playback was started; the
+temporary fixture was removed after quitting the app. This observation covers
+one focus transition only and does not establish the complete Library or
+cross-window keyboard order, or VoiceOver usability.
+
+The track-list accessibility hint was corrected to describe the observed Tab
+destination and directs queue/playlist actions to the row context menu. A
+fresh `sh scripts/build-macos-app.sh` exited **0** after the change, including
+strict app signature verification and the catalog, playlist, geometry,
+protocol, and process lifecycle harnesses. The 250k synthetic catalog run
+reported last-item search p95 72.746 ms, full-sort p95 703.141 ms, and peak
+RSS 240,451,584 bytes; these do not measure GUI scan or playback-under-load
+performance. The candidate remains on PR #9 and is not merged-mainline
+evidence.
