@@ -865,10 +865,11 @@ private struct RustMusicCommands: Commands {
     }
 
     private func showAllWindows() {
-        openWindow(id: "player")
-        openWindow(id: "playlist")
-        openWindow(id: "library")
         openWindow(id: "equalizer")
+        openWindow(id: "library")
+        openWindow(id: "playlist")
+        // Present the primary transport last so it owns focus when the menu closes.
+        openWindow(id: "player")
     }
 
     private func arrangeWindows() {
@@ -931,28 +932,16 @@ private struct WindowSwitcher: View {
     }
 
     private func showAllWindows() {
-        openWindow(id: "player")
-        openWindow(id: "playlist")
-        openWindow(id: "library")
         openWindow(id: "equalizer")
+        openWindow(id: "library")
+        openWindow(id: "playlist")
+        // Present the primary transport last so it owns focus when the menu closes.
+        openWindow(id: "player")
     }
 
     private func arrangeWindows() {
         showAllWindows()
         OperatorWindowDocking.shared.requestArrangement()
-        // A view-owned Menu can restore the previously key window after the
-        // docking coordinator applies its frames. Reopen Player after the
-        // menu has dismissed and the other scenes have finished presenting.
-        Task { @MainActor in
-            do {
-                try await Task.sleep(nanoseconds: 750_000_000)
-            } catch {
-                return
-            }
-            // Do not steal focus if the user switched apps or selected another window.
-            guard NSApp.isActive, NSApp.keyWindow?.title == "Rust Music — Equalizer" else { return }
-            openWindow(id: "player")
-        }
     }
 }
 
