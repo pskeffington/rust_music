@@ -1004,6 +1004,12 @@ private final class OperatorWindowDocking: NSObject {
             name: NSWindow.didMoveNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidResize(_:)),
+            name: NSWindow.didResizeNotification,
+            object: nil
+        )
     }
 
     func register(_ window: NSWindow, name: String) {
@@ -1039,6 +1045,14 @@ private final class OperatorWindowDocking: NSObject {
     }
 
     @objc private func windowDidMove(_ notification: Notification) {
+        snapWindow(from: notification)
+    }
+
+    @objc private func windowDidResize(_ notification: Notification) {
+        snapWindow(from: notification)
+    }
+
+    private func snapWindow(from notification: Notification) {
         guard !changingFrames,
               UserDefaults.standard.bool(forKey: "RustMusic.windowDockingEnabled"),
               let moved = notification.object as? NSWindow,

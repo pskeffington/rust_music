@@ -433,3 +433,20 @@ Manual dragging close to a peer edge, two-display behavior, small-screen
 overflow, VoiceOver, and persistence across an actual application restart
 remain unverified. MAC07-03 therefore remains in progress; the geometry test
 does not replace live snap and layout acceptance.
+
+### 2026-11-01 compact operator-window layout correction
+
+The follow-up layout change keeps the existing 1,440×900-point arrangement
+unchanged while constraining the four initial frames to the visible bounds on
+900×600 and 640×420-point displays. At 640×420, the left operator column is at
+least 200 points wide and the library at least 300 points wide. Resizing now
+uses the same magnetic snap calculation as moving. The focused AppKit geometry
+test passed after the change, and the preceding full app build compiled the
+resize notification wiring and passed signing and child lifecycle checks.
+
+A temporary QA copy of the newly built bundle validated its signature, but
+LaunchServices refused to launch it with `kLSNoExecutableErr` even though the
+declared executable was present. The installed older Rust Music instance was
+left untouched. Therefore no live resize, compact-screen, or restart-persistence
+acceptance is claimed; those interactions still require a successful live UI
+session.

@@ -13,12 +13,14 @@ enum OperatorWindowLayout {
         libraryWidth: CGFloat = 1000,
         gap: CGFloat = 12
     ) -> [String: NSRect] {
-        let leftWidth = min(620, max(520, visibleFrame.width - 680 - gap * 3))
-        let slotHeight = max(200, (visibleFrame.height - gap * 4) / 3)
-        let leftX = visibleFrame.minX + gap
-        let topY = visibleFrame.maxY - slotHeight - gap
-        let libraryX = leftX + leftWidth + gap
+        let usableHeight = max(1, visibleFrame.height - gap * 2)
+        let leftWidth = min(620, max(200, visibleFrame.width - gap * 3 - 680))
+        let libraryX = visibleFrame.minX + gap + leftWidth + gap
         let availableLibraryWidth = max(1, visibleFrame.maxX - libraryX - gap)
+        let libraryFrameWidth = min(max(1, libraryWidth), availableLibraryWidth)
+        let slotHeight = max(1, (usableHeight - gap * 2) / 3)
+        let leftX = visibleFrame.minX + gap
+        let topY = visibleFrame.maxY - gap - slotHeight
 
         return [
             player: NSRect(x: leftX, y: topY, width: leftWidth, height: slotHeight),
@@ -37,8 +39,8 @@ enum OperatorWindowLayout {
             library: NSRect(
                 x: libraryX,
                 y: visibleFrame.minY + gap,
-                width: min(max(libraryWidth, 680), availableLibraryWidth),
-                height: max(1, visibleFrame.height - gap * 2)
+                width: libraryFrameWidth,
+                height: usableHeight
             )
         ]
     }
