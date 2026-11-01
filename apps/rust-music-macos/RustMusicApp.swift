@@ -1030,7 +1030,15 @@ private final class OperatorWindowDocking: NSObject {
 
     func requestArrangement() {
         arrangementPending = true
-        arrangeIfReady()
+        // `openWindow` returns before SwiftUI has finished presenting every
+        // scene. A first pass may run from `register` while a later scene is
+        // still becoming key, undoing the Player-front ordering. Keep that
+        // pass for initial placement, then settle once presentation completes.
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200)) { [weak self] in
+            guard let self else { return }
+            self.arrangementPending = true
+            self.arrangeIfReady()
+        }
     }
 
     private func arrangeIfReady() {

@@ -549,6 +549,23 @@ checks passed. Private transcripts and audio remain outside Git. This does
 not certify physical output hardware, VoiceOver, multi-display interaction,
 or release readiness.
 
+### 2026-11-01 deferred operator-window arrangement
+
+A live arrangement check found that opening all four windows could raise a
+later scene after the initial layout pass, leaving the Equalizer frontmost
+instead of Player. The arrangement request now schedules a final settling pass
+after SwiftUI's window presentation. On the rebuilt app, Window > Arrange
+Operator Windows left Player focused after 800 ms; the Window menu listed all
+four operator scenes. This verifies the Player-front result in that live
+session, not multi-display positioning, drag-snap, or compact-size usability.
+
+`sh scripts/build-macos-app.sh` exited **0** with a valid signed bundle;
+geometry, protocol, catalog, and process harness checks passed. Synthetic
+catalog search/sort passed at 2k, 20k, 100k and 250k entries. Search p95 was
+1.071/9.222/51.390/120.151 ms; full-sort p95 was
+6.471/58.375/347.719/935.947 ms; harness peak RSS was 224,493,568 bytes.
+These harness measurements do not represent end-to-end UI latency.
+
 ### 2026-11-01 library track context actions
 
 Added a row context menu in the native Media Library for Enqueue Track, Play
