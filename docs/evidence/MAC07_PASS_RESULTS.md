@@ -639,3 +639,24 @@ pass does not resolve whether macOS scene restoration explains the operator's
 startup observation, nor independently establish the complete desktop
 composition after arranging. MAC07-03 remains in progress; this evidence does
 not make the change merge-ready or establish release readiness.
+
+### 2026-11-01 operator-window startup restoration continuation
+
+At source commit `f6f5e11`, startup restoration was added following the
+disabled-control-state pass above. After Player appears, a delayed check at
+250 ms opens missing operator scenes only if Player remains visible. The
+restoration path waits for all four registered scenes to become visible,
+checking every 100 ms for up to 3 seconds before it raises Player. It does not
+request a new global arrangement, so saved named window frames remain in
+effect. Closing or hiding Player before the delayed check suppresses peer
+opening; a timeout does not focus Player. Reviewers passed the source-level
+behavior, but did not independently verify it at runtime.
+
+`sh scripts/build-macos-app.sh` exited **0** on this exact code. In the live
+rebuilt bundle, the immediate accessibility tree and screenshot showed
+Player / Ready / No Track; after 900 ms Player was still the active window.
+No library was loaded and playback did not start. This smoke does not establish
+all four windows simultaneously visible, the 250 ms/100 ms/3 second timing,
+saved-frame round-trip, or closing/hiding Player during the delayed check.
+These require dedicated live acceptance. MAC07-03 remains in progress; this
+evidence does not establish release readiness.
