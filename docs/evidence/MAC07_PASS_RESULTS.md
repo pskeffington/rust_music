@@ -487,3 +487,19 @@ bytes. Peak RSS for the synthetic catalog test process was 240,435,200 bytes.
 These are core harness measurements, not end-to-end filesystem scans or
 whole-app footprint. Roadmap-index, literature and `git diff --check`
 validators also passed.
+
+### 2026-11-01 restored-window fitting and app-build refresh
+
+At app source commit `3f359f2`, the restored-frame path now fits saved window
+size and position to the current display bounds when the declared minimum
+size permits it. The regression starts with a saved 1,000×800-point library
+frame outside a 640×420-point display, then verifies an on-screen result at or
+above the library's 520×360-point minimum. `sh scripts/build-macos-app.sh`
+exited **0**, including this geometry suite, the 2k/20k/100k/250k synthetic
+catalog profiles, strict local signing, and process-lifecycle checks. The
+latest synthetic test process reported 240,467,968 bytes peak RSS; search p95
+was 626.583 µs / 6,344.875 µs / 31,607.666 µs / 74,538.625 µs respectively,
+and full-sort p95 was 4.475 ms / 41.423 ms / 304.149 ms / 848.790 ms. These
+core harness figures do not establish full-app library performance or
+footprint. Compact-screen UI interaction and true restart acceptance remain
+open.
