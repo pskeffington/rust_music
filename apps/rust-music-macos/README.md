@@ -1,5 +1,18 @@
 # Rust Music for macOS
 
+## Current debugging status — 2026-11-01
+
+**Audio stream under active debugging; GUI playback is not yet release-verified.** The operator reports actual FLAC audible through direct `rust-music-cli play`, but silent/unreliable through the SwiftUI player backed by `rust-music-cli serve --desktop`. The process/protocol, decoder-to-PCM, AudioQueue buffer submission, and output callbacks are being investigated. A UI `Playing` indication alone does not prove audible output.
+
+The MAC07 development branch contains bounded stderr diagnostics, `scripts/mac07_flac_ab.sh` for same-file CLI/GUI comparison, and opt-in real-FLAC server tests with frame-count checks. These are diagnostic implementations, **not evidence of a repaired audio stream**. Run on macOS with a real FLAC file:
+
+```sh
+sh scripts/mac07_flac_ab.sh "/absolute/path/to/track.flac"
+```
+
+Record CLI audible yes/no, GUI audible yes/no, selected output device, protocol state, and AudioQueue errors. Do not mark the macOS player production-ready until native device listening and relevant automated gates pass. See [PR #3](https://github.com/pskeffington/rust_music/pull/3).
+
+
 This is Rust Music's first standalone native desktop interface. The SwiftUI
 window is a thin local UI shell; `rust-music-cli` performs file inspection,
 decoding, and AudioQueue output. This keeps the decoder and PCM output adapter
