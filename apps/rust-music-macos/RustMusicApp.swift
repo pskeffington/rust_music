@@ -968,8 +968,17 @@ private final class WindowFrameObserver: NSView {
         configured = true
         let restored = window.setFrameUsingName(name)
         _ = window.setFrameAutosaveName(name)
-        if !restored {
-            let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+        let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+        if restored, let minimumSize = OperatorWindowLayout.minimumFrames[name] {
+            let fitted = OperatorWindowLayout.fittedFrame(
+                window.frame,
+                minimumSize: minimumSize,
+                in: visible
+            )
+            if fitted != window.frame {
+                window.setFrame(fitted, display: true)
+            }
+        } else {
             let initial = OperatorWindowLayout.initialFrames(
                 in: visible,
                 libraryWidth: window.frame.width

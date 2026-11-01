@@ -73,6 +73,28 @@ enum OperatorWindowLayout {
         ]
     }
 
+    static func fittedFrame(
+        _ frame: NSRect,
+        minimumSize: NSSize,
+        in visibleFrame: NSRect,
+        margin: CGFloat = 12
+    ) -> NSRect {
+        let availableWidth = max(1, visibleFrame.width - margin * 2)
+        let availableHeight = max(1, visibleFrame.height - margin * 2)
+        let width = min(max(frame.width, minimumSize.width), max(minimumSize.width, availableWidth))
+        let height = min(max(frame.height, minimumSize.height), max(minimumSize.height, availableHeight))
+        let minimumX = visibleFrame.minX + margin
+        let maximumX = max(minimumX, visibleFrame.maxX - margin - width)
+        let minimumY = visibleFrame.minY + margin
+        let maximumY = max(minimumY, visibleFrame.maxY - margin - height)
+        return NSRect(
+            x: min(max(frame.minX, minimumX), maximumX),
+            y: min(max(frame.minY, minimumY), maximumY),
+            width: width,
+            height: height
+        )
+    }
+
     private static func cascadedFrames(
         in visibleFrame: NSRect,
         libraryWidth: CGFloat,

@@ -45,6 +45,16 @@ private enum OperatorWindowLayoutTests {
             precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
         }
 
+        let staleSavedLibraryFrame = NSRect(x: 900, y: -300, width: 1000, height: 800)
+        let restoredLibraryFrame = OperatorWindowLayout.fittedFrame(
+            staleSavedLibraryFrame,
+            minimumSize: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!,
+            in: veryCompactScreen
+        )
+        precondition(veryCompactScreen.contains(restoredLibraryFrame))
+        precondition(restoredLibraryFrame.width >= OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width)
+        precondition(restoredLibraryFrame.height >= OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height)
+
         let rightPeer = NSRect(x: 0, y: 100, width: 100, height: 100)
         let nearlyDockedRight = NSRect(x: 111, y: 100, width: 100, height: 100)
         let snappedRight = OperatorWindowLayout.snappedFrame(nearlyDockedRight, to: [rightPeer])
