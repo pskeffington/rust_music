@@ -1140,6 +1140,30 @@ Ready / No Track, an empty queue and playlist list, and no output snapshot.
 This records a delayed startup-focus transition without inferring which
 windows were simultaneously visible. No playback or unrequested scan occurred.
 
+### 2026-11-01 MAC07-03 Player-first startup focus
+
+An earlier rebuilt-app launch produced an initial Playlist Editor AX window and
+then Player after 2.5 seconds. The launch restoration now explicitly opens the
+existing Player scene after requesting the other operator scenes, retaining the
+existing Player-focus settling check. This keeps Player as the final requested
+scene without changing frame geometry or styling.
+
+`sh scripts/build-macos-app.sh` exited **0** on the updated SwiftUI source.
+Strict local signature validation passed, as did the app's catalog, playlist,
+window geometry, playback-snapshot, catalog-bound, and process-lifecycle
+harnesses. The 250k synthetic catalog run reported search p95 **73.805 ms**,
+full-sort p95 **712.662 ms**, and catalog-harness peak RSS **240,484,352 bytes**.
+These are machine-load-sensitive harness measurements, not interactive UI or
+playback-under-load results.
+
+After confirming the app process had exited, two fresh CUA launches initially
+showed Player / Ready / No Track / no output snapshot. After 2.5 seconds each,
+the accessibility tree still identified Player as the active window. The app
+was left open idle in Player. No library was loaded and no playback occurred.
+This verifies Player focus at the observed launch and settled snapshots; it
+does not establish simultaneous visibility or the focus of every opening
+frame during the secondary-window restoration sequence.
+
 ### 2026-11-01 MAC07-03 loaded Library hint inspection
 
 To inspect the Library list's accessibility help on a loaded catalog, the

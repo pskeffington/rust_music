@@ -853,6 +853,10 @@ private struct OperatorWindowLaunchRestoration: ViewModifier {
                 if !OperatorWindowDocking.shared.isVisible(OperatorWindowLayout.playlist) {
                     openWindow(id: "playlist")
                 }
+                // `openWindow` can make each restored scene key in turn.
+                // Re-open the existing Player scene last so launch follows
+                // the same focus rule as Arrange Operator Windows.
+                openWindow(id: "player")
                 OperatorWindowDocking.shared.requestPlayerFocus()
             }
         }
