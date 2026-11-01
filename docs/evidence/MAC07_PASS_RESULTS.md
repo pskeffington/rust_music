@@ -1091,13 +1091,15 @@ acceptance result.
 
 The rebuilt app's Sort control now exposes an accessibility hint explaining
 the macOS setting required to Tab through every control. The Library list
-hint was updated in source and included in the successful app build, but its
-updated runtime hint was not inspected against a loaded catalog. After the
-build, the app was relaunched and showed Player / Ready / No Track; Media
-Library showed `0 TRACKS · NO LIBRARY LOADED` with search and track actions
-disabled. The generated metadata-only fixture was removed. No playback or
-scan occurred during this rebuild check. Compact Library sizing, VoiceOver,
-and overall MAC07-03 acceptance remain open.
+hint was updated experimentally, but a loaded-catalog AX inspection with the
+list focused exposed only its label and rows, with no Help attribute. A native
+`.help` tag experiment also did not expose Help in that tree, so the list hint
+was restored to its prior text rather than claiming the new guidance is
+announced. A three-track generated metadata-only fixture (141, 141, and 143
+bytes; no audio frames) was loaded for this check and then removed after
+quitting. Playback remained stopped with no output snapshot. The Sort hint is
+visible in AX; runtime exposure of the list hint remains unverified. Compact
+Library sizing, VoiceOver, and overall MAC07-03 acceptance remain open.
 
 ### 2026-11-01 MAC07-03 Library rows and restart state
 
@@ -1118,3 +1120,25 @@ after the same delay. This timing variation is recorded without inferring
 which other windows were visible. The app was left idle in Player. These
 observations do not establish compact Library acceptance, complete keyboard
 traversal, VoiceOver, or overall MAC07-03 completion.
+
+### 2026-11-01 MAC07-03 loaded Library hint inspection
+
+To inspect the Library list's accessibility help on a loaded catalog, the
+rebuilt app explicitly loaded three generated metadata-only FLAC fixtures
+(141, 141, and 143 bytes, no audio frames). The focused list's accessibility
+tree exposed its label and rows but no `Help` value. A temporary native `.help`
+tag did not change that observation, so the ineffective experimental list
+guidance was removed and its prior hint text restored. The Sort control does
+expose its updated `Help` value explaining how to enable full Tab traversal.
+The app was quit before the generated fixture was removed, then relaunched to
+Player / Ready / No Track with no output snapshot. No playback occurred.
+
+After restoring the list hint text, `sh scripts/build-macos-app.sh` exited
+**0** on the final source state. Strict bundle signature validation and the
+included catalog, playlist-selection, window-geometry, playback-snapshot,
+catalog-bound, and process-lifecycle harnesses passed. The 250k synthetic
+catalog run measured search p95 **117.599 ms**, full-sort p95 **1,051.471 ms**,
+and catalog-harness peak RSS **225,263,616 bytes**. These harness measurements
+are machine-load-sensitive synthetic catalog results, not full-app memory,
+interactive scan latency, or playback-under-load evidence. The app was left
+open idle in Player. MAC07-03 remains in progress.
