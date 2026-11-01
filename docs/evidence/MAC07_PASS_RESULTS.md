@@ -510,3 +510,20 @@ the required `scripts/premerge-check.sh` was rerun. Roadmap/literature checks,
 passed; the command exited **3** because `/private/corpus` remains absent. The
 exact-head Rust/evidence result is kept outside Git at
 `/private/tmp/rust-music-merge-evidence-0f31548/`.
+
+### 2026-11-01 exact corpus supplied; pre-merge gate passed
+
+Correction to the earlier blocked result: the operator subsequently supplied
+the exact six private files represented by the manifest. At clean PR head
+`9ddbb1bee6de380def4103a42bed761cfbd5e185`,
+`RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-merge-evidence-9ddbb1b
+PRIVATE_FLAC_DIRECTORY=<operator-supplied corpus directory> sh
+scripts/premerge-check.sh` exited **0**. Roadmap/literature checks, eight
+roadmap unit tests, the captured offline Rust gate, WAVE 6/6, AIFF/AIFF-C 7/7,
+and native FLAC manifest metadata/hash/PCM parity for L1, L2, L3, G4, G5 and
+G6 passed. The captured private log and evidence summary remain under
+`/private/tmp/rust-music-merge-evidence-9ddbb1b/`; no audio, filenames or
+absolute corpus path were added to Git. The script's NOT CERTIFIED notice
+still applies to Rust_Boy Radio/TV focus, physical panel/DAC, and release
+acceptance. UI accessibility, multi-display interaction, CLI route parity,
+and device recovery remain separate open acceptance items.
