@@ -216,7 +216,7 @@ private final class PackageProcessClient {
     }
 
     func request(_ body: PackageRequest) throws -> PackageResponse {
-        guard process.isRunning else { throw RustMusicFailure(message: "Rust Music playback process has exited.") }
+        guard process.isRunning else { throw RustMusicFailure(message: "Rust Music playback process has exited (stderr retained: \(stderrTail.capturedByteCount) bytes).") }
         let timeoutSeconds: TimeInterval
         if case .scanLibrary = body { timeoutSeconds = 30 } else { timeoutSeconds = 5 }
         let watchdog = DispatchWorkItem { [process] in
@@ -302,7 +302,7 @@ private final class PackageProcessClient {
         data.reserveCapacity(count)
         while data.count < count {
             guard let chunk = try output.read(upToCount: count - data.count), !chunk.isEmpty else {
-                throw RustMusicFailure(message: "Rust Music playback process closed its package stream.")
+                throw RustMusicFailure(message: "Rust Music playback process closed its package stream (stderr retained: \(stderrTail.capturedByteCount) bytes).")
             }
             data.append(chunk)
         }
