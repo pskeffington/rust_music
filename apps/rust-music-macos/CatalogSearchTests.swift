@@ -31,6 +31,30 @@ struct CatalogSearchTests {
         precondition(CatalogSearch.matches(unicodeTrack, matching: " "))
         precondition(!CatalogSearch.matches(unicodeTrack, matching: "not-present"))
         precondition(
+            CatalogSearch.isActionableSelectedTrack(
+                unicodeTrack,
+                selectedTrackIDs: [unicodeTrack.id],
+                matching: "östergötland"
+            ),
+            "selected-track actions require a selected row that remains visible in search"
+        )
+        precondition(
+            !CatalogSearch.isActionableSelectedTrack(
+                unicodeTrack,
+                selectedTrackIDs: [],
+                matching: ""
+            ),
+            "deselecting the row must disable actions labelled for the selected track"
+        )
+        precondition(
+            !CatalogSearch.isActionableSelectedTrack(
+                unicodeTrack,
+                selectedTrackIDs: [unicodeTrack.id],
+                matching: "not-present"
+            ),
+            "a selected row hidden by search must not remain actionable"
+        )
+        precondition(
             CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "o\u{0308}STERGÖTLAND") == [unicodeTrack]
         )
         precondition(CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "jÓNSI") == [unicodeTrack])
