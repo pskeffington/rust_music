@@ -791,3 +791,46 @@ reported last-item search p95 72.746 ms, full-sort p95 703.141 ms, and peak
 RSS 240,451,584 bytes; these do not measure GUI scan or playback-under-load
 performance. The candidate remains on PR #9 and is not merged-mainline
 evidence.
+
+### 2026-11-01 Playlist keyboard hint correction and launch focus
+
+On candidate source `4246f03` plus uncommitted SwiftUI changes, a temporary
+one-track metadata-only catalog and one-entry playlist were used for a
+keyboard smoke. Tab from the selected Playlist Editor entry focused the Queue
+list, not the Move Up/Down or Remove buttons. The playlist-entry hint was
+changed to name the actions that operate on the selection without promising a
+Tab path. The temporary catalog and playlist state were removed by quitting
+the app and deleting the temporary root. No playback was started.
+
+The same UI pass reproduced startup focus delay: a fresh launch initially
+showed Playlist Editor, then Player about 1.8 seconds later. A one-shot
+Player-focus attempt did not change that result and has been removed. Startup
+focus therefore remains unresolved. At source `4246f03` plus the then-current
+uncommitted UI changes, `sh scripts/build-macos-app.sh` exited **0**, including
+strict bundle signature validation and catalog, playlist, geometry, protocol,
+and lifecycle harnesses. The 250k synthetic catalog harness reported search
+p95 73.439 ms, full-sort p95 705.136 ms, and peak RSS 240,369,664 bytes; these
+are not GUI scan or playback-under-load measurements. The candidate remains
+on PR #9, not merged-mainline evidence.
+
+### 2026-11-01 Playlist VoiceOver actions
+
+The Playlist Editor's selected-entry list now exposes named accessibility
+actions to move the selected entries up or down and remove them. These invoke
+the existing bounded playlist operations and refuse to run while state or
+transport work is busy. The visible Move Up, Move Down, and Remove buttons
+remain available. The accessibility hint now explains that VoiceOver can
+invoke these actions. Apple documents named SwiftUI accessibility actions as
+invocable by assistive technologies including VoiceOver
+([API reference](https://developer.apple.com/documentation/swiftui/view/accessibilityaction%28named%3A_%3A%29)).
+
+`sh scripts/build-macos-app.sh` exited **0** at candidate source `4246f03`
+plus uncommitted changes. It compiled the macOS 13-targeted SwiftUI app,
+validated the signed bundle, and passed catalog search at 2k/20k/100k/250k,
+playlist-selection, operator-window geometry, playback snapshot, bounded
+catalog, and process lifecycle harnesses. The 250k synthetic profile reported
+search p95 72.169 ms, full-sort p95 708.649 ms, and process peak RSS
+240,418,816 bytes. The CUA session currently shows the Player window Ready /
+No Track. VoiceOver execution of the new actions, selected-entry persistence,
+and complete keyboard traversal have not been exercised. This candidate is
+not merged-mainline evidence.

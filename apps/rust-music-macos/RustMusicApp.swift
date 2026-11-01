@@ -3052,7 +3052,25 @@ private struct PlayerView: View {
                     .frame(height: 140)
                     .disabled(model.isTransportBusy || model.isStateBusy)
                     .accessibilityLabel("Tracks in selected playlist")
-                    .accessibilityHint("Select one or more tracks, then Tab to reorder or remove actions.")
+                    .accessibilityHint("Select playlist entries. VoiceOver actions can move or remove the selection.")
+                    .accessibilityAction(named: Text("Move selected entries up")) {
+                        guard !model.selectedPlaylistEntryIDs.isEmpty,
+                              !model.isTransportBusy,
+                              !model.isStateBusy else { return }
+                        model.moveSelectedPlaylistEntries(by: -1)
+                    }
+                    .accessibilityAction(named: Text("Move selected entries down")) {
+                        guard !model.selectedPlaylistEntryIDs.isEmpty,
+                              !model.isTransportBusy,
+                              !model.isStateBusy else { return }
+                        model.moveSelectedPlaylistEntries(by: 1)
+                    }
+                    .accessibilityAction(named: Text("Remove selected playlist entries")) {
+                        guard !model.selectedPlaylistEntryIDs.isEmpty,
+                              !model.isTransportBusy,
+                              !model.isStateBusy else { return }
+                        model.removeSelectedPlaylistEntries()
+                    }
                     .accessibilityIdentifier("playlist-entry-list")
 
                     HStack(spacing: 6) {
