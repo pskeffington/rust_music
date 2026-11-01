@@ -884,6 +884,31 @@ private struct RustMusicCommands: Commands {
                 model.requestLibrarySearchFocus()
             }
             .keyboardShortcut("f", modifiers: [.command])
+            Divider()
+            Button("Play Selected Track") { model.play() }
+                .keyboardShortcut(.return, modifiers: [.command])
+                .disabled(
+                    model.selectedTrack == nil
+                        || model.isPlaying
+                        || model.isPaused
+                        || model.isScanning
+                        || model.isStateBusy
+                        || model.isTransportBusy
+                )
+            Button("Enqueue Selected Tracks") { model.addSelectionToQueue() }
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+                .disabled(
+                    model.selectedTrackIDs.isEmpty
+                        || model.isStateBusy
+                        || model.isTransportBusy
+                )
+            Button("Play Next Selected Track") { model.addSelectedTrackNext() }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
+                .disabled(
+                    model.selectedTrack == nil
+                        || model.isStateBusy
+                        || model.isTransportBusy
+                )
         }
         CommandMenu("Playback") {
             Button("Play / Pause") {
@@ -2972,7 +2997,7 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; open a track's context menu for queue and playlist actions.")
+                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play Selected, Enqueue Selected, and Play Next actions, or open a track's context menu for row actions.")
                         .accessibilityIdentifier("library-track-list")
                     }
                 }

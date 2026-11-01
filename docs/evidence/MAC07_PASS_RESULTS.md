@@ -877,3 +877,44 @@ harnesses passed. The synthetic 250k catalog run measured 108.448 ms search
 p95, 1,138.401 ms full-sort p95, and 240,467,968 bytes catalog-harness peak
 RSS. These are synthetic catalog-harness figures, not UI scan or
 playback-under-load measurements.
+
+### 2026-11-01 Library keyboard selection and batch actions
+
+On candidate branch `codex/mac07-disabled-control-state`, source `9780bf4`
+plus uncommitted SwiftUI changes, a rebuilt app was exercised with three
+generated metadata-only FLAC signatures (no audio frames). The folder was
+explicitly loaded. Command-F opened the Library and focused Search after the
+catalog was available; typing `gamma` returned one track. Tab moved between
+Search and the track list, and Shift-Down extended the selection to all three
+rows. In the observed macOS focus mode, repeated Tab cycled Search and the
+list, skipping the visible sort and batch-action controls. This motivated
+adding Library menu commands for Play Selected, Enqueue Selected, and Play
+Next, with Command-Return, Command-Shift-Return, and Command-Option-Return
+shortcuts. The track-list accessibility hint now points users to those menu
+actions.
+
+In the rebuilt app, the first Command-Shift-Return probe ran while the Library
+menu remained open and added an earlier `01 Alpha Probe` row. After dismissing
+the menu, selecting all three rows, and invoking the shortcut, the Playlist
+Editor showed four queue rows total: the earlier `01 Alpha Probe` plus the
+three requested selected tracks. The queue was cleared to 0 before the
+separate Play Next test. Command-Option-Return then inserted the selected
+`03 Gamma Probe` track as the only queue row. The Play Selected shortcut was
+listed but not invoked. No playback was started. The app was quit before
+removing the generated catalog and its exact root-scoped queue state file;
+both were verified absent. On a subsequent launch, the first accessibility
+snapshot showed Playlist Editor; after about 2.5 seconds Player was frontmost
+with Ready / No Track, no output snapshot, and disabled transport controls.
+The startup focus delay remains open. This does not establish VoiceOver
+operation, complete Tab traversal, or playback acceptance.
+
+`sh scripts/build-macos-app.sh` exited **0** on source `9780bf4` plus the
+uncommitted menu commands and accessibility-hint change. Strict local bundle
+signature validation passed; the catalog-search, playlist-selection,
+operator-window geometry, playback-snapshot, catalog-bounds, and process
+lifecycle harnesses passed. The synthetic 250k catalog harness reported
+search p95 **74.091 ms**, full-sort p95 **708.465 ms**, and peak RSS
+**240,418,816 bytes**. These are catalog-harness measurements, not full-app
+memory, imported-library UI latency, or playback-under-load acceptance. The
+candidate remains on open PR #9 and is not merged-mainline or production
+readiness evidence.
