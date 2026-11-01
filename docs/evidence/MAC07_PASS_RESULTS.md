@@ -660,3 +660,13 @@ all four windows simultaneously visible, the 250 ms/100 ms/3 second timing,
 saved-frame round-trip, or closing/hiding Player during the delayed check.
 These require dedicated live acceptance. MAC07-03 remains in progress; this
 evidence does not establish release readiness.
+
+### 2026-11-01 startup-restoration branch offline gate follow-up
+
+At source commit `f6f5e11`, evidence commit `659b5cf`, on the clean PR branch,
+`sh scripts/offline-gate.sh` exited **0**. It reported 17 local crates, 32
+path-only edges, zero registry/Git crates, and passing workspace tests.
+`python3 scripts/check_roadmap_index.py` exited **0** (16 gates, 30 tasks),
+and `python3 scripts/check_literature.py` exited **0** (27 references, 16
+standards). This follow-up does not cover private FLAC corpus parity or GUI,
+physical hardware, and release acceptance.
