@@ -946,6 +946,15 @@ private struct RustMusicCommands: Commands {
                 if model.isPlaying || model.isPaused { model.togglePause() } else { model.play() }
             }
             .keyboardShortcut(.space, modifiers: [])
+            .disabled(
+                model.isStateBusy
+                    || model.isTransportBusy
+                    || (!model.isPlaying && !model.isPaused && (
+                        model.selectedTrack == nil
+                            || !model.selectedTrackMatchesCurrentSearch
+                            || model.isScanning
+                    ))
+            )
             Button("Stop") { model.stop() }
                 .keyboardShortcut(".", modifiers: [.command])
             Button("Previous Track") { model.previous() }
@@ -3246,7 +3255,7 @@ private struct PlayerView: View {
             Button("PLAY") { model.play() }
                 .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(RustMusicButtonStyle(prominent: true))
-                .disabled(model.selectedTrack == nil || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
                 .accessibilityLabel("Play")
                 .accessibilityIdentifier("transport-play")
             Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
