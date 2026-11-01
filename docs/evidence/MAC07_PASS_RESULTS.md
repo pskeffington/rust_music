@@ -454,3 +454,15 @@ copy validated its signature, but LaunchServices refused to launch it with
 `kLSNoExecutableErr` even though the declared executable was present. The
 installed older Rust Music instance was left untouched. Live resize, compact
 screen usability, drag-snap and restart-persistence acceptance remain open.
+
+### 2026-11-01 exact-HEAD pre-merge gate refresh
+
+At clean candidate `5563d7dcc410bd2f80c5e77f45db553429e719d6`,
+`RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-merge-evidence-5563d7d
+PRIVATE_FLAC_DIRECTORY=/private/corpus sh scripts/premerge-check.sh` exited
+**3**. Roadmap/literature validators and 8 roadmap unit tests passed, the
+captured offline Rust gate exited **0**, WAVE parity passed **6/6**, and
+AIFF/AIFF-C parity passed **7/7**. The script then stopped because
+`/private/corpus` does not exist. No user music was opened or copied. The
+private six-track FLAC parity gate remains required before merge; all captured
+transcripts remain outside Git.
