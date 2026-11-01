@@ -1241,3 +1241,20 @@ Ready / No Track with no output snapshot; no catalog was restored or scanned.
 This confirms three rows and the tested sort labels at this one compact tiled
 size only. Minimum-frame behavior, scrolling for larger catalogs, VoiceOver,
 and overall MAC07-03 acceptance remain open.
+
+### 2026-11-01 MAC07-02 playback-time accessibility value
+
+The Player's visually unchanged elapsed/duration row is now one accessible
+element labeled `Playback time`. Its value is derived from the validated
+snapshot (`<elapsed> elapsed of <duration>`), with explicit `Not started;
+duration unknown` text when no snapshot exists. `sh scripts/build-macos-app.sh`
+exited **0**; strict bundle signature validation
+passed, as did the included catalog, playlist-selection, window-geometry,
+playback-snapshot, catalog-bound, and process-lifecycle harnesses.
+
+After launching the rebuilt bundle with no library loaded, the Player AX tree
+exposed `Playback time` with value `Not started; duration unknown`; the
+visible display remained `--:--` at both ends. No folder was scanned and no
+playback occurred. This confirms the no-snapshot accessibility label/value
+through macOS accessibility APIs only. Real-playback elapsed/duration values,
+VoiceOver speech and rotor navigation, and MAC07-02 acceptance remain open.
