@@ -2967,7 +2967,7 @@ private struct PlayerView: View {
                     .pickerStyle(.menu)
                     .frame(width: 108)
                     .accessibilityLabel("Sort library tracks")
-                    .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album.")
+                    .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
                     .accessibilityIdentifier("library-sort-order")
                     Text(model.isScanning
                         ? "SCANNING · \(visibleTracks.count) PRIOR RESULTS"
@@ -3047,7 +3047,7 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Tab moves between Search and this list by default. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard. Use Library menu shortcuts for actions, or open a track's context menu for row actions.")
                         .accessibilityIdentifier("library-track-list")
                     }
                 }

@@ -1077,6 +1077,28 @@ labels only. Compact Library row retention, dropped-track behavior, complete
 keyboard traversal, VoiceOver, and overall MAC07-03 acceptance remain
 unverified; no pass status is changed.
 
+### 2026-11-01 MAC07-03 keyboard navigation guidance
+
+With macOS `Use keyboard navigation to move focus between controls` enabled
+temporarily, Tab traversed Show/focus operator window, Load Library, Search,
+Sort, Library list, Play Selected, Enqueue Selected, and Play Next. Shift+Down
+selected two adjacent rows and updated the Enqueue Selected count to 2; Up
+restored a single row. No action button was activated and the metadata-only
+fixture was not played. The macOS setting was restored to its original off
+state. The normal setting's Search/List path was separately observed. This is
+an operator check of keyboard traversal and multi-selection, not a VoiceOver
+acceptance result.
+
+The rebuilt app's Sort control now exposes an accessibility hint explaining
+the macOS setting required to Tab through every control. The Library list
+hint was updated in source and included in the successful app build, but its
+updated runtime hint was not inspected against a loaded catalog. After the
+build, the app was relaunched and showed Player / Ready / No Track; Media
+Library showed `0 TRACKS · NO LIBRARY LOADED` with search and track actions
+disabled. The generated metadata-only fixture was removed. No playback or
+scan occurred during this rebuild check. Compact Library sizing, VoiceOver,
+and overall MAC07-03 acceptance remain open.
+
 ### 2026-11-01 MAC07-03 Library rows and restart state
 
 An explicitly loaded generated metadata-only FLAC fixture contained three
