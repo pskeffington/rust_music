@@ -1,8 +1,12 @@
 #![cfg(all(target_os = "macos", feature = "macos-output"))]
 
+#[cfg(all(debug_assertions, feature = "test-support"))]
+use rust_music_ipc::ErrorCode;
 use rust_music_ipc::{
-    read_frame, write_frame, Envelope, ErrorCode, Playback, Reply, Request, PROTOCOL_VERSION,
+    read_frame, write_frame, Envelope, Playback, Reply, Request, PROTOCOL_VERSION,
 };
+#[cfg(all(debug_assertions, feature = "test-support"))]
+use std::io::{BufRead, BufReader};
 #[cfg(all(debug_assertions, feature = "test-support"))]
 use std::{
     fs::{self, File},
@@ -12,7 +16,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use std::{
-    io::{BufRead, BufReader, Read},
+    io::Read,
     process::{Child, ChildStdin, Command, Stdio},
     sync::mpsc::{self, Receiver},
     thread::{self, JoinHandle},
