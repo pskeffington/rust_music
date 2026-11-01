@@ -68,7 +68,7 @@
       "review_agent": "safety_reviewer",
       "scope": "Four native operator windows with shared playback state, searchable library, queue/playlist editor, disabled EQ shell, frame persistence and adaptive resizing",
       "acceptance": "Layout checks at two sizes and keyboard order validation",
-      "evidence_status": "four_scene_window_menu_and_player_focus_observed_magnetic_geometry_pass_live_drag_and_layout_matrix_open",
+      "evidence_status": "deferred_arrangement_player_front_live_verified_four_scenes_in_window_menu_magnetic_geometry_pass_live_drag_keyboard_order_multisize_voiceover_open",
       "evidence_document": "docs/evidence/MAC07_PASS_RESULTS.md"
     },
     {
