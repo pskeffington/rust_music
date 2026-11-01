@@ -8,16 +8,44 @@ enum OperatorWindowLayout {
 
     static let windowOrder = [player, playlist, equalizer, library]
 
+    static let minimumFrames: [String: NSSize] = [
+        player: NSSize(width: 520, height: 200),
+        playlist: NSSize(width: 520, height: 200),
+        equalizer: NSSize(width: 480, height: 200),
+        library: NSSize(width: 520, height: 360)
+    ]
+
+    static func canTileAll(in visibleFrame: NSRect, gap: CGFloat = 12) -> Bool {
+        let leftMinimum = max(
+            minimumFrames[player]!.width,
+            max(minimumFrames[playlist]!.width, minimumFrames[equalizer]!.width)
+        )
+        let leftHeight = minimumFrames[player]!.height
+            + minimumFrames[playlist]!.height
+            + minimumFrames[equalizer]!.height
+            + gap * 2
+        let tiledWidth = leftMinimum + minimumFrames[library]!.width + gap * 3
+        let tiledHeight = max(leftHeight, minimumFrames[library]!.height) + gap * 2
+        return visibleFrame.width >= tiledWidth && visibleFrame.height >= tiledHeight
+    }
+
     static func initialFrames(
         in visibleFrame: NSRect,
         libraryWidth: CGFloat = 1000,
         gap: CGFloat = 12
     ) -> [String: NSRect] {
+        guard canTileAll(in: visibleFrame, gap: gap) else {
+            return cascadedFrames(in: visibleFrame, libraryWidth: libraryWidth, gap: gap)
+        }
         let usableHeight = max(1, visibleFrame.height - gap * 2)
-        let leftWidth = min(620, max(200, visibleFrame.width - gap * 3 - 680))
+        let leftMinimum = max(
+            minimumFrames[player]!.width,
+            max(minimumFrames[playlist]!.width, minimumFrames[equalizer]!.width)
+        )
+        let leftWidth = min(620, max(leftMinimum, visibleFrame.width - gap * 3 - minimumFrames[library]!.width))
         let libraryX = visibleFrame.minX + gap + leftWidth + gap
         let availableLibraryWidth = max(1, visibleFrame.maxX - libraryX - gap)
-        let libraryFrameWidth = min(max(1, libraryWidth), availableLibraryWidth)
+        let libraryFrameWidth = min(max(minimumFrames[library]!.width, libraryWidth), availableLibraryWidth)
         let slotHeight = max(1, (usableHeight - gap * 2) / 3)
         let leftX = visibleFrame.minX + gap
         let topY = visibleFrame.maxY - gap - slotHeight
@@ -42,6 +70,43 @@ enum OperatorWindowLayout {
                 width: libraryFrameWidth,
                 height: usableHeight
             )
+        ]
+    }
+
+    private static func cascadedFrames(
+        in visibleFrame: NSRect,
+        libraryWidth: CGFloat,
+        gap: CGFloat
+    ) -> [String: NSRect] {
+        let availableWidth = max(1, visibleFrame.width - gap * 2)
+        let availableHeight = max(1, visibleFrame.height - gap * 2)
+        let librarySize = minimumFrames[library]!
+        let libraryFrame = NSRect(
+            x: visibleFrame.minX + gap,
+            y: visibleFrame.minY + gap,
+            width: min(max(librarySize.width, libraryWidth), availableWidth),
+            height: min(max(librarySize.height, availableHeight), availableHeight)
+        )
+        return [
+            player: NSRect(
+                x: visibleFrame.minX + gap,
+                y: visibleFrame.maxY - gap - minimumFrames[player]!.height,
+                width: minimumFrames[player]!.width,
+                height: minimumFrames[player]!.height
+            ),
+            playlist: NSRect(
+                x: visibleFrame.minX + gap * 2,
+                y: visibleFrame.maxY - gap * 2 - minimumFrames[playlist]!.height,
+                width: minimumFrames[playlist]!.width,
+                height: minimumFrames[playlist]!.height
+            ),
+            equalizer: NSRect(
+                x: visibleFrame.minX + gap * 3,
+                y: visibleFrame.maxY - gap * 3 - minimumFrames[equalizer]!.height,
+                width: minimumFrames[equalizer]!.width,
+                height: minimumFrames[equalizer]!.height
+            ),
+            library: libraryFrame
         ]
     }
 

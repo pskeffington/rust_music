@@ -804,7 +804,10 @@ struct RustMusicApp: App {
         .windowResizability(.automatic)
         Window("Rust Music — Equalizer", id: "equalizer") {
             EqualizerWindow()
-                .frame(minWidth: 480, minHeight: 200)
+                .frame(
+                    minWidth: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.equalizer]!.width,
+                    minHeight: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.equalizer]!.height
+                )
                 .background(WindowFramePersistence(name: OperatorWindowLayout.equalizer))
                 .background(RustMusicPalette.background)
                 .preferredColorScheme(.dark)
@@ -877,17 +880,17 @@ private enum PlayerWindowKind {
 
     var minimumWidth: CGFloat {
         switch self {
-        case .player: 520
-        case .playlist: 520
-        case .library: 680
+        case .player: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.player]!.width
+        case .playlist: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.playlist]!.width
+        case .library: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width
         }
     }
 
     var minimumHeight: CGFloat {
         switch self {
-        case .player: 200
-        case .playlist: 200
-        case .library: 420
+        case .player: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.player]!.height
+        case .playlist: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.playlist]!.height
+        case .library: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height
         }
     }
 

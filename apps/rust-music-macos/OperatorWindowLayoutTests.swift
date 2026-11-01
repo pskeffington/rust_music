@@ -12,24 +12,31 @@ private enum OperatorWindowLayoutTests {
         precondition(frames[OperatorWindowLayout.equalizer] == NSRect(x: 12, y: 12, width: 620, height: 284))
         precondition(frames[OperatorWindowLayout.library] == NSRect(x: 644, y: 12, width: 784, height: 876))
 
+        precondition(OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1076, height: 648)))
+        precondition(!OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1075, height: 648)))
+        precondition(!OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1076, height: 647)))
+
         let compactScreen = NSRect(x: 0, y: 0, width: 900, height: 600)
+        precondition(!OperatorWindowLayout.canTileAll(in: compactScreen))
         let compactFrames = OperatorWindowLayout.initialFrames(in: compactScreen)
-        for frame in compactFrames.values {
+        for name in OperatorWindowLayout.windowOrder {
+            let frame = compactFrames[name]!
             precondition(frame.width > 0 && frame.height > 0)
             precondition(compactScreen.contains(frame))
+            precondition(frame.width >= OperatorWindowLayout.minimumFrames[name]!.width)
+            precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
         }
-        precondition(compactFrames[OperatorWindowLayout.library]!.minX >= compactFrames[OperatorWindowLayout.player]!.maxX)
-        precondition(compactFrames[OperatorWindowLayout.library]!.minX >= compactFrames[OperatorWindowLayout.playlist]!.maxX)
-        precondition(compactFrames[OperatorWindowLayout.library]!.minX >= compactFrames[OperatorWindowLayout.equalizer]!.maxX)
 
         let veryCompactScreen = NSRect(x: 0, y: 0, width: 640, height: 420)
+        precondition(!OperatorWindowLayout.canTileAll(in: veryCompactScreen))
         let veryCompactFrames = OperatorWindowLayout.initialFrames(in: veryCompactScreen)
-        for frame in veryCompactFrames.values {
+        for name in OperatorWindowLayout.windowOrder {
+            let frame = veryCompactFrames[name]!
             precondition(frame.width > 0 && frame.height > 0)
             precondition(veryCompactScreen.contains(frame))
+            precondition(frame.width >= OperatorWindowLayout.minimumFrames[name]!.width)
+            precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
         }
-        precondition(veryCompactFrames[OperatorWindowLayout.player]!.width >= 200)
-        precondition(veryCompactFrames[OperatorWindowLayout.library]!.width >= 300)
 
         let rightPeer = NSRect(x: 0, y: 100, width: 100, height: 100)
         let nearlyDockedRight = NSRect(x: 111, y: 100, width: 100, height: 100)

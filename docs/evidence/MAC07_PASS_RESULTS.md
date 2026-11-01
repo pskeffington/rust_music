@@ -436,17 +436,21 @@ does not replace live snap and layout acceptance.
 
 ### 2026-11-01 compact operator-window layout correction
 
-The follow-up layout change keeps the existing 1,440×900-point arrangement
-unchanged while constraining the four initial frames to the visible bounds on
-900×600 and 640×420-point displays. At 640×420, the left operator column is at
-least 200 points wide and the library at least 300 points wide. Resizing now
-uses the same magnetic snap calculation as moving. The focused AppKit geometry
-test passed after the change, and the preceding full app build compiled the
-resize notification wiring and passed signing and child lifecycle checks.
+Correction to the preceding geometry update: its 900×600 and 640×420 frames
+were smaller than SwiftUI's declared minimum sizes, so those assertions did not
+prove the actual windows would remain on screen. The layout now centralizes
+minimum sizes (Player 520×200, Playlist 520×200, Equalizer 480×200, Library
+520×360 points). Displays at least 1,076×648 points tile the four minimum-size
+windows without overlap; smaller displays use a bounded cascade, with Player
+front and the Window menus available to reach the obscured windows. The
+1,440×900 arrangement remains unchanged. Resizing uses the same magnetic snap
+calculation as moving.
 
-A temporary QA copy of the newly built bundle validated its signature, but
-LaunchServices refused to launch it with `kLSNoExecutableErr` even though the
-declared executable was present. The installed older Rust Music instance was
-left untouched. Therefore no live resize, compact-screen, or restart-persistence
-acceptance is claimed; those interactions still require a successful live UI
-session.
+Focused AppKit tests check the tiling threshold, declared minimum sizes and
+visible-frame bounds at 900×600 and 640×420 points. These are geometry checks,
+not live interaction acceptance. A full app build previously exited 0 with
+resize-notification wiring, signing and child lifecycle checks. A temporary QA
+copy validated its signature, but LaunchServices refused to launch it with
+`kLSNoExecutableErr` even though the declared executable was present. The
+installed older Rust Music instance was left untouched. Live resize, compact
+screen usability, drag-snap and restart-persistence acceptance remain open.
