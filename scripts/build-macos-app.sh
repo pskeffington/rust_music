@@ -25,7 +25,6 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   apps/rust-music-macos/ProcessTermination.swift \
   apps/rust-music-macos/ProcessTerminationTests.swift \
   -o "$ROOT/target/macos/ProcessTerminationTests"
-"$ROOT/target/macos/ProcessTerminationTests" "$MACOS/rust-music-cli"
 SWIFT_ARCH=$(uname -m)
 case "$SWIFT_ARCH" in
   arm64|x86_64) ;;
@@ -38,6 +37,16 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   -o "$ROOT/target/macos/CatalogSearchTests"
 "$ROOT/target/macos/CatalogSearchTests"
 swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+  apps/rust-music-macos/PlaylistSelection.swift \
+  apps/rust-music-macos/PlaylistSelectionTests.swift \
+  -o "$ROOT/target/macos/PlaylistSelectionTests"
+"$ROOT/target/macos/PlaylistSelectionTests"
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" -framework AppKit \
+  apps/rust-music-macos/OperatorWindowLayout.swift \
+  apps/rust-music-macos/OperatorWindowLayoutTests.swift \
+  -o "$ROOT/target/macos/OperatorWindowLayoutTests"
+"$ROOT/target/macos/OperatorWindowLayoutTests"
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   apps/rust-music-macos/PlaybackUIState.swift \
   apps/rust-music-macos/PlaybackUIStateTests.swift \
   -o "$ROOT/target/macos/PlaybackUIStateTests"
@@ -48,7 +57,11 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   -o "$ROOT/target/macos/CatalogValidationTests"
 "$ROOT/target/macos/CatalogValidationTests"
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
-  apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/ProcessTermination.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
+  apps/rust-music-macos/OperatorWindowLayout.swift apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/PlaylistSelection.swift apps/rust-music-macos/ProcessTermination.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
+# The child-process lifecycle harness executes the bundled CLI by its actual
+# app-bundle path. Run it only after the parent bundle is signed: an unsigned
+# in-progress bundle can cause macOS to SIGKILL its nested executable.
+"$ROOT/target/macos/ProcessTerminationTests" "$MACOS/rust-music-cli"
 printf 'Built native app: %s\n' "$APP"

@@ -1,5 +1,12 @@
 # Rust Music — Codex repository instructions
 
+## ACTIVE MAC-07 — WINAMP FUNCTIONAL ALIGNMENT (2026-11-01)
+
+The evidence ledger records operator-confirmed audible real-FLAC playback and a multi-file queue transition in the rebuilt GUI on System Default. This confirms that supplied album/session only; CLI route parity from the engineering shell, playback jitter, device recovery, layout, accessibility, and release gates remain open. Continue [MAC-07 UI alignment](docs/MAC07_WINAMP_UI_ALIGNMENT.md) in numbered pass order. Treat Winamp as a reference for organization and controls, not copied assets. Host integrator is sole SwiftUI writer. Do not infer broad reliability or production readiness from the observed playback session; preserve native decoder behavior and local work.
+
+The 2026-10-31 report that the GUI was silent was the historical trigger for MAC-07; the later audible confirmation is recorded in [the dated evidence ledger](docs/evidence/MAC07_PASS_RESULTS.md).
+
+
 Rust Music is an independent, ultra-lightweight **lossless-only** audio module for Rust_Boy and standalone offline systems. Follow the repository, not assumptions about other Rust_Boy modules.
 
 ## CURRENT MAINLINE OVERRIDE — 2026-10-31

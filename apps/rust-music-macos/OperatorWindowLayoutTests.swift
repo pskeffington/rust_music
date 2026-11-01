@@ -1,0 +1,75 @@
+import AppKit
+
+@main
+private enum OperatorWindowLayoutTests {
+    static func main() {
+        let frames = OperatorWindowLayout.initialFrames(
+            in: NSRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+        precondition(frames.count == 4)
+        precondition(frames[OperatorWindowLayout.player] == NSRect(x: 12, y: 604, width: 620, height: 284))
+        precondition(frames[OperatorWindowLayout.playlist] == NSRect(x: 12, y: 308, width: 620, height: 284))
+        precondition(frames[OperatorWindowLayout.equalizer] == NSRect(x: 12, y: 12, width: 620, height: 284))
+        precondition(frames[OperatorWindowLayout.library] == NSRect(x: 644, y: 12, width: 784, height: 876))
+
+        precondition(OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1076, height: 648)))
+        precondition(!OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1075, height: 648)))
+        precondition(!OperatorWindowLayout.canTileAll(in: NSRect(x: 0, y: 0, width: 1076, height: 647)))
+
+        let compactScreen = NSRect(x: 0, y: 0, width: 900, height: 600)
+        precondition(!OperatorWindowLayout.canTileAll(in: compactScreen))
+        let compactFrames = OperatorWindowLayout.initialFrames(in: compactScreen)
+        for name in OperatorWindowLayout.windowOrder {
+            let frame = compactFrames[name]!
+            precondition(frame.width > 0 && frame.height > 0)
+            precondition(compactScreen.contains(frame))
+            precondition(frame.width >= OperatorWindowLayout.minimumFrames[name]!.width)
+            precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
+        }
+
+        let tallCompactScreen = NSRect(x: 0, y: 0, width: 1024, height: 900)
+        let tallCompactFrames = OperatorWindowLayout.initialFrames(in: tallCompactScreen)
+        precondition(tallCompactFrames[OperatorWindowLayout.library]!.height == 700)
+        for frame in tallCompactFrames.values {
+            precondition(tallCompactScreen.contains(frame))
+        }
+
+        let veryCompactScreen = NSRect(x: 0, y: 0, width: 640, height: 420)
+        precondition(!OperatorWindowLayout.canTileAll(in: veryCompactScreen))
+        let veryCompactFrames = OperatorWindowLayout.initialFrames(in: veryCompactScreen)
+        for name in OperatorWindowLayout.windowOrder {
+            let frame = veryCompactFrames[name]!
+            precondition(frame.width > 0 && frame.height > 0)
+            precondition(veryCompactScreen.contains(frame))
+            precondition(frame.width >= OperatorWindowLayout.minimumFrames[name]!.width)
+            precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
+        }
+
+        let staleSavedLibraryFrame = NSRect(x: 900, y: -300, width: 1000, height: 800)
+        let restoredLibraryFrame = OperatorWindowLayout.fittedFrame(
+            staleSavedLibraryFrame,
+            minimumSize: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!,
+            in: veryCompactScreen
+        )
+        precondition(veryCompactScreen.contains(restoredLibraryFrame))
+        precondition(restoredLibraryFrame.width >= OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width)
+        precondition(restoredLibraryFrame.height >= OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height)
+
+        let rightPeer = NSRect(x: 0, y: 100, width: 100, height: 100)
+        let nearlyDockedRight = NSRect(x: 111, y: 100, width: 100, height: 100)
+        let snappedRight = OperatorWindowLayout.snappedFrame(nearlyDockedRight, to: [rightPeer])
+        precondition(snappedRight.origin == NSPoint(x: 112, y: 100))
+
+        let lowerPeer = NSRect(x: 100, y: 0, width: 100, height: 100)
+        let nearlyDockedAbove = NSRect(x: 100, y: 111, width: 100, height: 100)
+        let snappedAbove = OperatorWindowLayout.snappedFrame(nearlyDockedAbove, to: [lowerPeer])
+        precondition(snappedAbove.origin == NSPoint(x: 100, y: 112))
+
+        let distant = NSRect(x: 200, y: 100, width: 100, height: 100)
+        precondition(OperatorWindowLayout.snappedFrame(distant, to: [rightPeer]) == distant)
+        let unrelatedPeer = NSRect(x: 0, y: 0, width: 100, height: 100)
+        precondition(OperatorWindowLayout.snappedFrame(nearlyDockedRight, to: [unrelatedPeer]) == nearlyDockedRight)
+        precondition(OperatorWindowLayout.snappedFrame(nearlyDockedRight, to: [rightPeer], tolerance: 0) == nearlyDockedRight)
+        print("PASS: operator window arrangement and magnetic docking geometry")
+    }
+}

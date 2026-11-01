@@ -36,7 +36,7 @@ use std::{
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, RecvTimeoutError, SyncSender},
+        mpsc::{self, SyncSender, TryRecvError},
         Arc,
     },
     thread,
@@ -501,6 +501,24 @@ fn state_queue_command(
             queue.enqueue(PathBuf::from(&arguments[0]))?;
             changed = true;
         }
+        "add-many" if !arguments.is_empty() && arguments.len() <= 64 => {
+            let mut candidate = queue.clone();
+            for path in arguments {
+                candidate.enqueue(PathBuf::from(path))?;
+            }
+            queue = candidate;
+            changed = true;
+        }
+        "play-next" if arguments.len() == 1 => {
+            queue.enqueue_next(PathBuf::from(&arguments[0]))?;
+            changed = true;
+        }
+        "move" if arguments.len() == 2 => {
+            let from = parse_state_index(&arguments[0])?;
+            let to = parse_state_index(&arguments[1])?;
+            queue.move_entry(from, to)?;
+            changed = true;
+        }
         "remove" if arguments.len() == 1 => {
             let index = parse_state_index(&arguments[0])?;
             queue
@@ -617,9 +635,79 @@ fn state_playlist_command(
             store.push_entry(&arguments[0], PathBuf::from(&arguments[1]))?;
             true
         }
+        "add-many" if (2..=65).contains(&arguments.len()) => {
+            let mut candidate = store.clone();
+            for path in &arguments[1..] {
+                candidate.push_entry(&arguments[0], PathBuf::from(path))?;
+            }
+            store = candidate;
+            true
+        }
         "remove" if arguments.len() == 2 => {
             let index = parse_state_index(&arguments[1])?;
             store.remove_entry(&arguments[0], index)?;
+            true
+        }
+        "remove-many" if (2..=65).contains(&arguments.len()) => {
+            let mut indices = arguments[1..]
+                .iter()
+                .map(|value| parse_state_index(value))
+                .collect::<Result<Vec<_>>>()?;
+            indices.sort_unstable();
+            if indices.windows(2).any(|pair| pair[0] == pair[1]) {
+                return Err(MusicError::Invalid("playlist entry indexes must be unique"));
+            }
+            let mut candidate = store.clone();
+            for index in indices.into_iter().rev() {
+                candidate.remove_entry(&arguments[0], index)?;
+            }
+            store = candidate;
+            true
+        }
+        "move" if arguments.len() == 3 => {
+            let from = parse_state_index(&arguments[1])?;
+            let to = parse_state_index(&arguments[2])?;
+            store.move_entry(&arguments[0], from, to)?;
+            true
+        }
+        "move-many" if (3..=66).contains(&arguments.len()) => {
+            let offset = arguments[1]
+                .parse::<i8>()
+                .map_err(|_| MusicError::Invalid("playlist move direction must be -1 or 1"))?;
+            if !matches!(offset, -1 | 1) {
+                return Err(MusicError::Invalid(
+                    "playlist move direction must be -1 or 1",
+                ));
+            }
+            let mut indices = arguments[2..]
+                .iter()
+                .map(|value| parse_state_index(value))
+                .collect::<Result<Vec<_>>>()?;
+            indices.sort_unstable();
+            if indices.windows(2).any(|pair| pair[0] == pair[1]) {
+                return Err(MusicError::Invalid("playlist entry indexes must be unique"));
+            }
+            if offset > 0 {
+                indices.reverse();
+            }
+            let mut candidate = store.clone();
+            for index in indices {
+                let count = candidate
+                    .get(&arguments[0])
+                    .ok_or(MusicError::Invalid("playlist does not exist"))?
+                    .len();
+                let target = if offset < 0 {
+                    index.checked_sub(1)
+                } else {
+                    index.checked_add(1).filter(|next| *next < count)
+                };
+                if let Some(target) = target {
+                    candidate.move_entry(&arguments[0], index, target)?;
+                } else if index >= count {
+                    return Err(MusicError::Invalid("playlist entry index is out of bounds"));
+                }
+            }
+            store = candidate;
             true
         }
         _ => {
@@ -1326,29 +1414,63 @@ where
         grant: Arc::new(AtomicBool::new(false)),
     };
     let mut slot = MusicSlot::new(LazySink::new(make_sink), Library::empty());
+    // Preserve the first asynchronous playback failure for the next Snapshot.
+    // RBPK v1 already has a bounded Error reply; this surfaces native details
+    // without extending the View layout or changing the protocol version.
+    let mut playback_error: Option<Reply> = None;
     loop {
-        match requests.recv_timeout(Duration::from_millis(10)) {
-            Ok(UnitRequest::Eof) | Err(RecvTimeoutError::Disconnected) => {
+        // While playing, service queued commands first and otherwise decode
+        // immediately. A timeout per Poll inserts avoidable idle time between
+        // small FLAC frames (256 frames are only ~5.8 ms at 44.1 kHz), which
+        // can drain AudioQueue's short lead. The native sink already provides
+        // bounded backpressure when its three output buffers are full. When
+        // idle, block on the channel instead of spinning.
+        let unit_request = if slot.status().playback.state == rust_music::PlaybackState::Playing {
+            match requests.try_recv() {
+                Ok(request) => request,
+                Err(TryRecvError::Disconnected) => UnitRequest::Eof,
+                Err(TryRecvError::Empty) => {
+                    if let Err(error) = slot.handle(Command::Poll, &focus) {
+                        focus.grant.store(false, Ordering::Release);
+                        playback_error = Some(error_reply(error));
+                    }
+                    continue;
+                }
+            }
+        } else {
+            requests.recv().unwrap_or(UnitRequest::Eof)
+        };
+
+        match unit_request {
+            UnitRequest::Eof => {
                 focus.grant.store(false, Ordering::Release);
                 let _ = slot.handle(Command::Stop, &focus);
                 return Ok(());
             }
-            Ok(UnitRequest::Message(request)) => {
+            UnitRequest::Message(request) => {
                 let is_shutdown = request.body == Request::Shutdown;
-                let reply =
-                    handle_unit_request_with_limits(&mut slot, &focus, request, scan_limits);
+                let retry_or_stop = matches!(
+                    &request.body,
+                    Request::ScanLibrary { .. }
+                        | Request::Select { .. }
+                        | Request::Play
+                        | Request::ResumePlayback
+                        | Request::Stop
+                );
+                if retry_or_stop {
+                    playback_error = None;
+                }
+                let reply = match &request.body {
+                    Request::Snapshot { .. } if playback_error.is_some() => {
+                        playback_error.clone().expect("checked playback error")
+                    }
+                    _ => handle_unit_request_with_limits(&mut slot, &focus, request, scan_limits),
+                };
                 let _ = replies.send(Ok(reply));
                 if is_shutdown {
                     focus.grant.store(false, Ordering::Release);
                     let _ = slot.handle(Command::Stop, &focus);
                     return Ok(());
-                }
-            }
-            Err(RecvTimeoutError::Timeout) => {
-                if slot.status().playback.state == rust_music::PlaybackState::Playing
-                    && slot.handle(Command::Poll, &focus).is_err()
-                {
-                    focus.grant.store(false, Ordering::Release);
                 }
             }
         }
@@ -1564,8 +1686,8 @@ fn error_reply(error: MusicError) -> Reply {
         MusicError::Io(_) => {
             process_error(ErrorCode::Decoder, "local music file could not be read")
         }
-        MusicError::Output(_) => {
-            process_error(ErrorCode::Output, "audio output could not start or stop")
+        MusicError::Output(message) => {
+            process_error(ErrorCode::Output, &format!("audio output: {message}"))
         }
     }
 }
@@ -1642,7 +1764,30 @@ fn bounded_title(value: &str) -> String {
 fn run() -> Result<()> {
     let mut args = env::args();
     let _binary = args.next();
-    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli scan DIRECTORY | catalog [--managed-parent-stdin] DIRECTORY [QUERY] | state [--managed-parent-stdin] queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
+    let action = args.next().ok_or(MusicError::Invalid("usage: rust-music-cli audio-devices | scan DIRECTORY | catalog [--managed-parent-stdin] DIRECTORY [QUERY] | state [--managed-parent-stdin] queue|playlist ROOT COMMAND [ARGS] | preview DIRECTORY OUTPUT.pbm | inspect FILE | decode FILE OUTPUT.wav | decode-range FILE START_FRAME FRAME_COUNT OUTPUT.wav | play FILE [ALSA_DEVICE] | play-managed-root DIRECTORY RELATIVE_PATH [ALSA_DEVICE] | serve [--desktop] [ALSA_DEVICE]"))?;
+    if action == "audio-devices" {
+        if args.next().is_some() {
+            return Err(MusicError::Invalid("audio-devices accepts no arguments"));
+        }
+        #[cfg(all(target_os = "macos", feature = "macos-output"))]
+        {
+            let mut output = String::new();
+            for (uid, name) in rust_music::MacAudioQueueSink::available_output_devices()? {
+                append_hex(&mut output, &uid);
+                output.push('\t');
+                append_hex(&mut output, &name);
+                output.push('\n');
+            }
+            std::io::stdout().lock().write_all(output.as_bytes())?;
+            return Ok(());
+        }
+        #[cfg(not(all(target_os = "macos", feature = "macos-output")))]
+        {
+            return Err(MusicError::Unsupported(
+                "output-device enumeration needs macos-output on macOS",
+            ));
+        }
+    }
     #[cfg(all(
         debug_assertions,
         feature = "test-support",
@@ -1888,7 +2033,9 @@ mod tests {
         all(target_os = "macos", feature = "macos-output"),
         all(target_os = "linux", feature = "alsa-output")
     ))]
-    use rust_music_ipc::{read_frame, write_frame, Envelope, Reply, Request, PROTOCOL_VERSION};
+    use rust_music_ipc::{
+        read_frame, write_frame, Envelope, Playback, Reply, Request, PROTOCOL_VERSION,
+    };
     use std::{
         fs,
         path::PathBuf,
@@ -1968,6 +2115,205 @@ mod tests {
             .map(|value| (*value).to_owned())
             .collect::<Vec<_>>();
         state_command(base, category, root, operation, &arguments)
+    }
+
+    #[test]
+    fn queue_bulk_play_next_and_reorder_are_atomic_and_selection_only() {
+        let root = temp_root("queue-bulk-root");
+        let base = temp_root("queue-bulk-base").join("app-support");
+        let added = state_call(
+            &base,
+            "queue",
+            &root,
+            "add-many",
+            &["a.flac", "b.wav", "c.aiff"],
+        )
+        .unwrap();
+        assert!(added.contains("meta\tcurrent\t-\n"));
+        assert!(state_call(
+            &base,
+            "queue",
+            &root,
+            "add-many",
+            &["valid.flac", "../escape.flac"]
+        )
+        .is_err());
+        let oversized_batch = vec!["extra.flac"; 65];
+        assert!(state_call(&base, "queue", &root, "add-many", &oversized_batch).is_err());
+        assert_eq!(
+            state_call(&base, "queue", &root, "list", &[]).unwrap(),
+            added
+        );
+
+        let priority = state_call(&base, "queue", &root, "play-next", &["priority.flac"]).unwrap();
+        assert!(priority.contains("meta\tcurrent\t-\n"));
+        assert!(priority
+            .lines()
+            .nth(3)
+            .unwrap()
+            .ends_with("7072696f726974792e666c6163"));
+        state_call(&base, "queue", &root, "select", &["2"]).unwrap();
+        let inserted =
+            state_call(&base, "queue", &root, "play-next", &["up-next.ogg.flac"]).unwrap();
+        assert!(inserted.contains("meta\tcurrent\t2\n"));
+        assert!(inserted
+            .lines()
+            .nth(6)
+            .unwrap()
+            .ends_with("75702d6e6578742e6f67672e666c6163"));
+        let moved = state_call(&base, "queue", &root, "move", &["4", "1"]).unwrap();
+        assert!(moved.contains("meta\tcurrent\t3\n"));
+        assert!(moved.lines().nth(4).unwrap().ends_with("632e61696666"));
+        assert!(moved.contains("entry\t3\t1\t622e776176\n"));
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn playlist_bulk_add_is_atomic_for_multiselection() {
+        let root = temp_root("playlist-bulk-root");
+        let base = temp_root("playlist-bulk-base").join("app-support");
+        state_call(&base, "playlist", &root, "create", &["Batch Set"]).unwrap();
+        let added = state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "one.flac", "two.wav"],
+        )
+        .unwrap();
+        assert!(added.contains("playlist\t426174636820536574\t2\n"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "valid.flac", "../escape.flac"]
+        )
+        .is_err());
+        let mut oversized_batch = vec!["Batch Set"];
+        oversized_batch.extend(vec!["extra.flac"; 65]);
+        assert!(state_call(&base, "playlist", &root, "add-many", &oversized_batch).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            added
+        );
+        state_call(
+            &base,
+            "playlist",
+            &root,
+            "add-many",
+            &["Batch Set", "three.flac", "four.flac"],
+        )
+        .unwrap();
+        let moved_up = state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "2"],
+        )
+        .unwrap();
+        assert!(moved_up
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t74776f2e776176"));
+        assert!(moved_up
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74687265652e666c6163"));
+        assert!(moved_up
+            .lines()
+            .nth(3)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        let moved_down = state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "1", "0", "1"],
+        )
+        .unwrap();
+        assert!(moved_down
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        assert!(moved_down
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74776f2e776176"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "99"]
+        )
+        .is_err());
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "move-many",
+            &["Batch Set", "-1", "1", "1"]
+        )
+        .is_err());
+        let mut oversized_move = vec!["Batch Set", "-1"];
+        oversized_move.extend(vec!["0"; 65]);
+        assert!(state_call(&base, "playlist", &root, "move-many", &oversized_move).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            moved_down
+        );
+        let removed = state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "1", "3"],
+        )
+        .unwrap();
+        assert!(removed.contains("playlist\t426174636820536574\t2\n"));
+        assert!(removed
+            .lines()
+            .nth(1)
+            .unwrap()
+            .ends_with("\t6f6e652e666c6163"));
+        assert!(removed
+            .lines()
+            .nth(2)
+            .unwrap()
+            .ends_with("\t74687265652e666c6163"));
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "0", "99"]
+        )
+        .is_err());
+        assert!(state_call(
+            &base,
+            "playlist",
+            &root,
+            "remove-many",
+            &["Batch Set", "0", "0"]
+        )
+        .is_err());
+        let mut oversized_remove = vec!["Batch Set"];
+        oversized_remove.extend(vec!["0"; 65]);
+        assert!(state_call(&base, "playlist", &root, "remove-many", &oversized_remove).is_err());
+        assert_eq!(
+            state_call(&base, "playlist", &root, "list", &[]).unwrap(),
+            removed
+        );
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
@@ -2435,9 +2781,41 @@ mod tests {
     fn package_stream_runs_play_pause_resume_volume_stop_end_to_end() {
         let root = temp_root("package-transport-stream");
         let format = AudioFormat::new(44_100, 2, 16).unwrap();
-        let mut wave = header(format, 8);
-        wave.extend_from_slice(&[0; 8]);
+        let data_bytes = format.sample_rate * 5 * u32::from(format.channels) * 2;
+        let mut wave = header(format, data_bytes);
+        wave.resize(wave.len() + data_bytes as usize, 0);
         fs::write(root.join("track.wav"), wave).unwrap();
+
+        // This package-worker test uses a NullSink, so pace it like a device
+        // sink. An unpaced sink would decode this multi-second fixture to EOF
+        // before the test can deliver its transport requests.
+        struct RealtimeNullSink(NullSink);
+        impl PcmSink for RealtimeNullSink {
+            fn open(&mut self, format: AudioFormat) -> Result<()> {
+                self.0.open(format)
+            }
+
+            fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+                self.0.write(block)?;
+                let micros = (block.frames() as u128 * 1_000_000
+                    / u128::from(block.format.sample_rate))
+                .min(u128::from(u64::MAX)) as u64;
+                thread::sleep(Duration::from_micros(micros));
+                Ok(())
+            }
+
+            fn pause(&mut self) -> Result<()> {
+                self.0.pause()
+            }
+
+            fn resume(&mut self) -> Result<()> {
+                self.0.resume()
+            }
+
+            fn finish(&mut self) -> Result<()> {
+                self.0.finish()
+            }
+        }
 
         let id = rust_music_host::MUSIC_PACKAGE_ID;
         let requests = [
@@ -2466,8 +2844,8 @@ mod tests {
             write_frame(&mut input, &request.encode().unwrap()).unwrap();
         }
         let mut output = Vec::new();
-        serve_stream::<NullSink, _, _, _>(
-            || Ok(NullSink::default()),
+        serve_stream::<RealtimeNullSink, _, _, _>(
+            || Ok(RealtimeNullSink(NullSink::default())),
             std::io::Cursor::new(input),
             &mut output,
         )
@@ -2723,5 +3101,167 @@ mod tests {
         .is_err());
         assert!(output.is_empty());
         assert!(!sink_created.load(Ordering::Acquire));
+    }
+
+    // Explicit real-world corpus gate. Keep source audio outside the repository.
+    // Example: RUST_MUSIC_TEST_FLAC=/absolute/path/song.flac cargo test \
+    //   --locked --offline -p rust-music-cli --features macos-output \
+    //   -- --ignored package_stream_external_flac_transport
+    #[cfg(any(
+        all(target_os = "macos", feature = "macos-output"),
+        all(target_os = "linux", feature = "alsa-output")
+    ))]
+    #[test]
+    #[ignore = "requires RUST_MUSIC_TEST_FLAC pointing to a real local FLAC file"]
+    fn package_stream_external_flac_transport() {
+        let source = PathBuf::from(
+            std::env::var_os("RUST_MUSIC_TEST_FLAC")
+                .expect("set RUST_MUSIC_TEST_FLAC to an absolute real-world FLAC"),
+        );
+        assert!(source.is_absolute() && source.is_file(), "FLAC must exist");
+        assert_eq!(
+            source
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("flac".to_owned()),
+            "fixture must be FLAC"
+        );
+        let root = temp_root("package-external-flac");
+        let destination = root.join("real-world.flac");
+        fs::copy(&source, &destination).expect("copy local FLAC into isolated scan root");
+        let requests = [
+            Request::Hello {
+                min_version: PROTOCOL_VERSION,
+                max_version: PROTOCOL_VERSION,
+            },
+            Request::Activate {
+                width: 640,
+                height: 520,
+            },
+            Request::ScanLibrary {
+                root: root.to_string_lossy().into_owned(),
+            },
+            Request::Select { index: 0 },
+            Request::SetVolumePercent { percent: 100 },
+            Request::Play,
+            Request::Snapshot { page: 0 },
+            Request::Stop,
+            Request::Shutdown,
+        ];
+        let request_count = requests.len();
+
+        struct CountingSink {
+            inner: NullSink,
+            total: Arc<std::sync::atomic::AtomicU64>,
+        }
+        impl PcmSink for CountingSink {
+            fn open(&mut self, format: AudioFormat) -> Result<()> {
+                self.inner.open(format)
+            }
+            fn write(&mut self, block: &rust_music::PcmBlock) -> Result<()> {
+                self.inner.write(block)?;
+                self.total
+                    .fetch_add(block.frames() as u64, Ordering::Relaxed);
+                Ok(())
+            }
+            fn pause(&mut self) -> Result<()> {
+                self.inner.pause()
+            }
+            fn resume(&mut self) -> Result<()> {
+                self.inner.resume()
+            }
+            fn finish(&mut self) -> Result<()> {
+                self.inner.finish()
+            }
+        }
+        struct PacedInput {
+            inner: std::io::Cursor<Vec<u8>>,
+            pause_at: u64,
+            paused: bool,
+        }
+        impl std::io::Read for PacedInput {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                if !self.paused && self.inner.position() >= self.pause_at {
+                    self.paused = true;
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                let cap = if self.paused {
+                    buf.len()
+                } else {
+                    buf.len()
+                        .min((self.pause_at - self.inner.position()) as usize)
+                };
+                self.inner.read(&mut buf[..cap])
+            }
+        }
+
+        let total_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let mut pause_at = 0u64;
+        let mut input = Vec::new();
+        for (offset, body) in requests.into_iter().enumerate() {
+            write_frame(
+                &mut input,
+                &Envelope {
+                    package_id: MUSIC_PACKAGE_ID.into(),
+                    request_id: offset as u64 + 1,
+                    body,
+                }
+                .encode()
+                .unwrap(),
+            )
+            .unwrap();
+            if offset == 5 {
+                pause_at = input.len() as u64;
+            }
+        }
+        let mut output = Vec::new();
+        let frames_in_sink = Arc::clone(&total_frames);
+        serve_stream_with_limits::<CountingSink, _, _, _>(
+            move || {
+                Ok(CountingSink {
+                    inner: NullSink::default(),
+                    total: frames_in_sink,
+                })
+            },
+            PacedInput {
+                inner: std::io::Cursor::new(input),
+                pause_at,
+                paused: false,
+            },
+            &mut output,
+            STANDALONE_SCAN_LIMITS,
+        )
+        .expect("persistent desktop FLAC server should complete");
+        let mut replies = output.as_slice();
+        for step in 0..request_count {
+            let bytes = read_frame(&mut replies)
+                .unwrap()
+                .expect("missing protocol reply");
+            let response = Envelope::<Reply>::decode(&bytes).unwrap();
+            assert_eq!(response.request_id, step as u64 + 1);
+            match (step, response.body) {
+                (0, Reply::Hello { .. }) | (8, Reply::Ack) => {}
+                (1..=7, Reply::View(view)) => {
+                    if step >= 2 {
+                        assert_eq!(view.track_count, 1, "FLAC scan lost the selected file");
+                    }
+                    if step == 5 {
+                        assert_eq!(
+                            view.playback,
+                            Playback::Playing,
+                            "real FLAC failed to enter playback"
+                        );
+                    }
+                }
+                (_, other) => panic!("step {step} failed: {other:?}"),
+            }
+        }
+        assert!(read_frame(&mut replies).unwrap().is_none());
+        assert!(
+            total_frames.load(Ordering::Relaxed) > 0,
+            "persistent server entered Playing but submitted zero decoded FLAC frames"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

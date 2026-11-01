@@ -1,5 +1,12 @@
 # Codex agent routing — Rust Music
 
+**Machine-readable MAC-07 pass routing:** [mac07-pass-index.json](mac07-pass-index.json), with explicit dependency, sole writer, reviewer and evidence contract. Evidence recorded in [MAC07_PASS_RESULTS.md](evidence/MAC07_PASS_RESULTS.md); do not infer a PASS from this documentation.
+
+## Active assignment: MAC-07 Winamp-functional Mac UI (2026-10-31)
+
+Read [MAC-07 UI alignment](MAC07_WINAMP_UI_ALIGNMENT.md) before tasking. **host_integrator** is the sole SwiftUI/library/queue implementation writer; **audio_backend** investigates native output without changing it unless a defect is proven; **codec_engineer** verifies FLAC preservation; **gate_verifier** independently reviews same-file CLI versus GUI reproduction and A/B outcomes; **safety_reviewer** audits local paths, focus and dependency policy; **index_curator** serially maintains documentation, roadmap and registry. MAC07-00/01 are highest priority. No recorded source implementation or passing GUI audio test is implied by this tasking.
+
+
 Codex reads [AGENTS.md](../AGENTS.md) as root project instructions. Actual **project-scoped subagent definitions** live in `.codex/agents/*.toml` and are recognized by Codex versions supporting custom agents. [Codex project config](../.codex/config.toml) allows up to **three** concurrent spawned agents and intentionally pins no model, cloud provider, server or dependencies. These are development assistants, not part of the offline player. Custom-agent instructions do not create separate sandbox permissions.
 
 The separately pinned workflow reference and mapping from its orchestrator/reviewer roles to these Rust Music specialists is documented in [AGENT_SKILLS_INTEGRATION.md](AGENT_SKILLS_INTEGRATION.md). It is guidance only; repository instructions, task dependencies and actual Codex permissions remain controlling.
@@ -60,6 +67,10 @@ Update `docs/roadmap-index.json` when introducing a gate, task, agent, path or d
 Route RM-021 through RM-027 using the canonical [roadmap index](roadmap-index.json) and [portable deployment contract](design/PORTABLE_LIBRARY_DEPLOYMENT.md). Initially retain the existing `host_integrator` as **the sole writer** for library/socket/IPC/desktop application paths; no additional agent writes those overlapping trees concurrently. `index_curator` owns roadmap/index updates serially. `gate_verifier` and `safety_reviewer` independently validate tests and security (read-only).
 
 Task order: read-only RM-021 API inventory -> RM-022 manifest and corpus fixtures -> RM-023 pack/verify/import -> RM-024 macOS deploy UI + RM-025 host consumer on explicitly non-overlapping files -> RM-026 Linux/Windows adapters -> RM-027 physical field testing. Preserve RM-020/macOS v1.0 as the highest immediate production priority; no automatic cross-platform declaration. Only add specialized platform agents after actual code ownership is split and indexed.
+
+## 2026-11-01 MAC07 desktop playback and library routing
+
+Route RM-028 through RM-030 through the [MAC07 pass contract](MAC07_WINAMP_UI_ALIGNMENT.md), [pass index](mac07-pass-index.json), and [evidence ledger](evidence/MAC07_PASS_RESULTS.md). `host_integrator` owns SwiftUI, desktop IPC and library implementation; `audio_backend` may change the native output adapter only when a sink defect is evidenced. `gate_verifier` owns independent reproduction and acceptance review, while `index_curator` serially updates the roadmap and evidence indexes. MAC07-00/01 block later passes until same-file GUI playback is audibly accepted on a usable output route; CountingSink frame delivery is not device output evidence. Preserve the zero-artwork, local-only, no-startup-scan/autoplay and existing RBPK v1 constraints.
 
 Under agent_skills orchestration, assign software-delivery-orchestrator to integration scheduling, code-implementation to one scoped writing lane, build-integration to offline build evidence, test-verification to separately observed results, security-assurance to path traversal/hash/staging reviews, independent-code-review to compatibility, and documentation-maintenance to registry synchronization. Pin and verify the actual upstream agent_skills revision; never infer it was loaded.
 

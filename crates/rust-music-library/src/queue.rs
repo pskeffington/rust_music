@@ -159,6 +159,16 @@ impl PlaybackQueue {
         Ok(())
     }
 
+    /// Insert an entry immediately after the selected item, or at the front
+    /// when the queue has no current selection. Insertion never selects or
+    /// starts playback.
+    pub fn enqueue_next(&mut self, path: PathBuf) -> Result<()> {
+        self.enqueue(path)?;
+        let from = self.entries.len() - 1;
+        let to = self.current.map_or(0, |current| (current + 1).min(from));
+        self.move_entry(from, to)
+    }
+
     /// Explicit selection primitive. Selection alone never starts playback.
     pub fn select(&mut self, index: usize) -> Result<&Path> {
         if index >= self.entries.len() {
@@ -560,6 +570,24 @@ mod tests {
         queue.remove(0).unwrap();
         assert_eq!(queue.current(), None);
         assert_eq!(queue.len(), 2);
+    }
+
+    #[test]
+    fn enqueue_next_preserves_current_selection_and_never_autoplays() {
+        let mut queue = queue();
+        queue.select(1).unwrap();
+        queue.enqueue_next("Album/priority.flac".into()).unwrap();
+        assert_eq!(queue.current(), Some(Path::new("Album/two.wav")));
+        assert_eq!(queue.current_index(), Some(1));
+        assert_eq!(queue.entries()[2], Path::new("Album/priority.flac"));
+
+        let mut empty_selection = PlaybackQueue::new();
+        empty_selection.enqueue("Album/later.flac".into()).unwrap();
+        empty_selection
+            .enqueue_next("Album/first.wav".into())
+            .unwrap();
+        assert_eq!(empty_selection.current(), None);
+        assert_eq!(empty_selection.entries()[0], Path::new("Album/first.wav"));
     }
 
     #[test]

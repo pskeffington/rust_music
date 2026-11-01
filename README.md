@@ -17,7 +17,15 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths. N
 
 **Source of truth:** the checked-out code and measured validation evidence take precedence over dated handoffs. Historical draft-PR instructions are not current merge policy. `main` and `build/native-codecs-g0` were identical at `deb6f879` on 2026-10-31.
 
-## Current status — 2026-10-31
+## Active development notice — 2026-11-01: debugging the audio stream
+
+**Current status: audio-stream debugging in progress (MAC-07).** The latest dated evidence records operator-confirmed audible real-FLAC playback and a multi-file queue transition in the rebuilt macOS GUI. Same-file CLI/server route behavior from the engineering shell, jitter, device recovery, and broader acceptance remain unresolved. Earlier reports of GUI silence are historical; see the dated evidence rather than treating them as the latest state.
+
+The engineering branch includes bounded playback-process stderr capture, a same-file CLI/GUI A/B harness (`scripts/mac07_flac_ab.sh`), and an opt-in real-FLAC persistent-server regression with PCM frame-count assertions. The audible result is confirmed for the supplied album only; the 1 ms worker polling change is a candidate explanation for earlier short-block starvation, not an isolated root-cause proof. The current focus is route parity, jitter, device recovery, and broader playback acceptance. Run the macOS listening gate before release.
+
+For implementation scope and evidence, see [MAC-07 roadmap](docs/ROADMAP.md) and [macOS player notes](apps/rust-music-macos/README.md).
+
+
 
 The merged implementation and latest local macOS app build are on [`main` at `e8e5ff8`](https://github.com/pskeffington/rust_music/commit/e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b); PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The pushed `main` commit descends from that merge commit. The native macOS bundle compiled and launched successfully; library loading and audible output have been exercised. This is an engineering checkpoint, **not a production release**.
 

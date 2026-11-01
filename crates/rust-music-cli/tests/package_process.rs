@@ -1,8 +1,12 @@
 #![cfg(all(target_os = "macos", feature = "macos-output"))]
 
+#[cfg(all(debug_assertions, feature = "test-support"))]
+use rust_music_ipc::ErrorCode;
 use rust_music_ipc::{
     read_frame, write_frame, Envelope, Playback, Reply, Request, PROTOCOL_VERSION,
 };
+#[cfg(all(debug_assertions, feature = "test-support"))]
+use std::io::{BufRead, BufReader};
 #[cfg(all(debug_assertions, feature = "test-support"))]
 use std::{
     fs::{self, File},
@@ -12,7 +16,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use std::{
-    io::{BufRead, BufReader, Read},
+    io::Read,
     process::{Child, ChildStdin, Command, Stdio},
     sync::mpsc::{self, Receiver},
     thread::{self, JoinHandle},
@@ -442,24 +446,39 @@ fn spawned_cli_output_failure_recovers_only_after_explicit_play() {
     // failed, unclaimed state without retrying or resuming output implicitly.
     let mut request_id = 5;
     let deadline = Instant::now() + REPLY_DEADLINE;
-    let failed = loop {
+    let failure = loop {
         send_request(&mut stdin, request_id, Request::Snapshot { page: 0 });
         request_id += 1;
         let snapshot = receive_reply(&replies);
-        let Reply::View(snapshot) = snapshot.body else {
-            panic!("Snapshot should return playback state");
-        };
-        if snapshot.playback == Playback::Failed {
-            break snapshot;
+        match snapshot.body {
+            Reply::Error {
+                code: ErrorCode::Output,
+                message,
+            } => break message,
+            Reply::View(snapshot) if snapshot.playback != Playback::Failed => {}
+            body => panic!("Snapshot should report the output failure: {body:?}"),
         }
         assert!(
             Instant::now() < deadline,
-            "injected device error was not observed: {snapshot:?}"
+            "injected device error was not observed before the deadline"
         );
         thread::sleep(Duration::from_millis(10));
     };
-    assert!(!failed.audio_claimed);
-    assert_eq!(failed.frames_delivered, 0);
+    assert!(
+        failure.contains("audio output: injected output-device loss on first write"),
+        "native output diagnostic was not preserved: {failure}"
+    );
+
+    // Keep the diagnostic available until an explicit recovery action.
+    send_request(&mut stdin, request_id, Request::Snapshot { page: 0 });
+    request_id += 1;
+    assert!(matches!(
+        receive_reply(&replies).body,
+        Reply::Error {
+            code: ErrorCode::Output,
+            ..
+        }
+    ));
 
     // Device recovery is explicit. A separate Play must reacquire the host
     // lease, reopen the sink, and deliver frames before Stop/Shutdown.

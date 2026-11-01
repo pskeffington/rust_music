@@ -19,6 +19,9 @@ struct CatalogTrack: Identifiable, Equatable {
     let album: String
     let relativePath: String
     let searchableBytes: Data
+    let titleSortKey: String
+    let artistSortKey: String
+    let albumSortKey: String
 
     init(
         id: Int,
@@ -34,6 +37,9 @@ struct CatalogTrack: Identifiable, Equatable {
         self.artist = artist
         self.album = album
         self.relativePath = relativePath
+        titleSortKey = CatalogTextNormalizer.fold(title)
+        artistSortKey = CatalogTextNormalizer.fold(artist)
+        albumSortKey = CatalogTextNormalizer.fold(album)
         let searchableText = [title, artist, album, relativePath]
             .map(CatalogTextNormalizer.fold)
             .joined(separator: "\u{0}")
@@ -42,12 +48,48 @@ struct CatalogTrack: Identifiable, Equatable {
 }
 
 enum CatalogSearch {
-    static func visibleTracks(in tracks: [CatalogTrack], matching searchText: String) -> [CatalogTrack] {
+    enum SortOrder: String, CaseIterable, Identifiable {
+        case title
+        case artist
+        case album
+
+        var id: String { rawValue }
+        var label: String { rawValue.uppercased() }
+
+        init?(rawValue: String) {
+            switch rawValue {
+            case "title": self = .title
+            case "artist": self = .artist
+            case "album": self = .album
+            default: return nil
+            }
+        }
+    }
+
+    static func visibleTracks(
+        in tracks: [CatalogTrack],
+        matching searchText: String,
+        sortedBy order: SortOrder = .title
+    ) -> [CatalogTrack] {
         let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return tracks }
-        let foldedQuery = CatalogTextNormalizer.fold(query)
-        let queryBytes = Data(foldedQuery.utf8)
-        return tracks.filter { $0.searchableBytes.range(of: queryBytes) != nil }
+        let filtered: [CatalogTrack]
+        if query.isEmpty {
+            filtered = tracks
+        } else {
+            let foldedQuery = CatalogTextNormalizer.fold(query)
+            let queryBytes = Data(foldedQuery.utf8)
+            filtered = tracks.filter { $0.searchableBytes.range(of: queryBytes) != nil }
+        }
+        return filtered.sorted { left, right in
+            let leftKey: String
+            let rightKey: String
+            switch order {
+            case .title: leftKey = left.titleSortKey; rightKey = right.titleSortKey
+            case .artist: leftKey = left.artistSortKey; rightKey = right.artistSortKey
+            case .album: leftKey = left.albumSortKey; rightKey = right.albumSortKey
+            }
+            return leftKey == rightKey ? left.id < right.id : leftKey < rightKey
+        }
     }
 
     static func boundedQuery(_ text: String) -> String {
