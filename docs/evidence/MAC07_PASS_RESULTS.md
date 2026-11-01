@@ -527,3 +527,24 @@ absolute corpus path were added to Git. The script's NOT CERTIFIED notice
 still applies to Rust_Boy Radio/TV focus, physical panel/DAC, and release
 acceptance. UI accessibility, multi-display interaction, CLI route parity,
 and device recovery remain separate open acceptance items.
+
+### 2026-11-01 RBPK v1 compatibility repair and exact-head gate
+
+At source commit `e662e99e50aa2ac3ee1eb8fe092bd42ae862d809`, removed the
+unnegotiated seek request from the RBPK v1 codec, CLI dispatch, and macOS
+transport. The player progress indicator is read-only; decoder-level seek
+support remains internal. `cargo fmt --all -- --check`,
+`cargo test --workspace --offline`, and `sh scripts/build-macos-app.sh` passed.
+The macOS build reported a valid signed bundle, passed operator-window and
+process-lifecycle checks, and completed 2k/20k/100k/250k synthetic catalog
+checks. Search p95 was 0.669/6.002/32.939/111.750 ms and full-sort p95 was
+5.108/44.828/269.278/750.076 ms; test-process peak RSS was 240,467,968 bytes.
+
+`RUST_MUSIC_EVIDENCE_DIR=/private/tmp/rust-music-merge-evidence-e662e99
+PRIVATE_FLAC_DIRECTORY=<operator-supplied corpus directory> sh
+scripts/premerge-check.sh` exited **0** at that exact commit. Roadmap and
+literature checks, eight roadmap tests, the captured offline gate (exit 0),
+WAVE 6/6, AIFF/AIFF-C 7/7, and all six manifest FLAC metadata/hash/native PCM
+checks passed. Private transcripts and audio remain outside Git. This does
+not certify physical output hardware, VoiceOver, multi-display interaction,
+or release readiness.
