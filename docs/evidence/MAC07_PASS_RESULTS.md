@@ -1037,3 +1037,25 @@ returned Launch Services `kLSNoExecutableErr` even though the executable was
 present and the signature valid; the CUA controller subsequently launched the
 same bundle successfully. MAC07-03 remains in progress; compact sizing,
 keyboard, VoiceOver, playback, and hardware acceptance remain open.
+
+### 2026-11-01 Rust-only offline gate recovery
+
+At initial source `0b1f6cb`, `sh scripts/offline-gate.sh` exited **1** because
+the strict dependency audit rejected the exact Cargo-built CLI process spawn in
+`crates/rust-music-cli/tests/state_cli_batch.rs`. This was a narrow audit
+allowlist mismatch. The scoped allowlist/test correction was committed as
+`246baceca04ae6aefe7eaa76c83aeafaa4c12eb5` on the remote candidate branch.
+The owner reran `sh scripts/offline-gate.sh` successfully immediately before
+that source commit with identical tracked code content: exit **0**, 17 local
+crates, 32 path-only internal edges, zero registry/Git crates, and zero
+third-party system links. Fmt, Clippy, workspace tests, release build, and the
+macOS feature check passed.
+
+An independent reviewer at the same code content ran
+`cargo test --locked --offline -p rust-music-audit` (exit **0**, 2/2 tests),
+the dependency audit command (exit **0**), and `git diff --check` (exit **0**).
+This records a passing Rust-only offline gate on the exact tracked code at
+candidate head `246baceca04ae6aefe7eaa76c83aeafaa4c12eb5`; the gate ran
+immediately before the source commit, whose tracked code is identical. It does
+not establish a macOS app build, real FLAC playback, private-corpus parity,
+DAC/hardware acceptance, or completion of any MAC07 pass.
