@@ -1535,6 +1535,31 @@ final class PlayerModel: ObservableObject {
         }
     }
 
+    func enqueueTrack(_ trackID: Int, next: Bool = false) {
+        guard let libraryRoot,
+              !isStateBusy,
+              !isTransportBusy,
+              let track = tracks.first(where: { $0.id == trackID }) else { return }
+        runStateCommand(
+            ["queue", libraryRoot.path, next ? "play-next" : "add", track.relativePath]
+        ) { [weak self] result in
+            self?.applyQueueResult(result)
+        }
+    }
+
+    func addTrackToSelectedPlaylist(_ trackID: Int) {
+        guard let libraryRoot,
+              let selectedPlaylist,
+              !isStateBusy,
+              !isTransportBusy,
+              let track = tracks.first(where: { $0.id == trackID }) else { return }
+        runStateCommand(
+            ["playlist", libraryRoot.path, "add", selectedPlaylist, track.relativePath]
+        ) { [weak self] result in
+            self?.applyPlaylistResult(result)
+        }
+    }
+
     func addSelectedTrackNext() {
         guard let libraryRoot, let selectedTrack else { return }
         runStateCommand(["queue", libraryRoot.path, "play-next", selectedTrack.relativePath]) { [weak self] result in
@@ -2697,6 +2722,21 @@ private struct PlayerView: View {
                         .padding(.vertical, 2)
                         .tag(track.id)
                         .listRowBackground(RustMusicPalette.display)
+                        .contextMenu {
+                            Button("Enqueue Track") { model.enqueueTrack(track.id) }
+                                .disabled(model.isStateBusy || model.isTransportBusy)
+                            Button("Play Next") { model.enqueueTrack(track.id, next: true) }
+                                .disabled(model.isStateBusy || model.isTransportBusy)
+                            Divider()
+                            Button("Add to Selected Playlist") {
+                                model.addTrackToSelectedPlaylist(track.id)
+                            }
+                            .disabled(
+                                model.selectedPlaylist == nil
+                                    || model.isStateBusy
+                                    || model.isTransportBusy
+                            )
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -2705,7 +2745,7 @@ private struct PlayerView: View {
                 .frame(minHeight: 170, maxHeight: 230)
                 .disabled(model.isTransportBusy || model.isStateBusy)
                 .accessibilityLabel("Library tracks")
-                .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions.")
+                .accessibilityHint("Use Command-click or Shift-click to select multiple tracks, then Tab to the actions. Open a track's context menu for queue and playlist actions.")
                 .accessibilityIdentifier("library-track-list")
 
                 HStack(spacing: 8) {

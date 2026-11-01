@@ -548,3 +548,26 @@ WAVE 6/6, AIFF/AIFF-C 7/7, and all six manifest FLAC metadata/hash/native PCM
 checks passed. Private transcripts and audio remain outside Git. This does
 not certify physical output hardware, VoiceOver, multi-display interaction,
 or release readiness.
+
+### 2026-11-01 library track context actions
+
+Added a row context menu in the native Media Library for Enqueue Track, Play
+Next, and Add to Selected Playlist. Each command uses the clicked row's track
+identity and existing bounded CLI state operation. These actions persist queue
+or playlist changes without starting playback. The library's accessibility
+hint now also advertises the track context menu.
+
+`sh scripts/build-macos-app.sh` exited **0** after the UI change. The signed
+bundle verified; operator-window geometry and process lifecycle checks passed.
+Synthetic search and sort passed at 2k, 20k, 100k and 250k entries. On the
+final app build in this pass, search p95 was 0.821/6.653/31.269/78.298 ms;
+full-sort p95 was 4.937/49.222/295.171/846.936 ms; catalog-harness peak RSS
+was 240,762,880 bytes. These are harness
+measurements, not end-to-end UI latency.
+
+A live accessibility-tree smoke used a temporary one-track library. Enqueue
+changed the visible queue count to 1; Play Next changed it to 2; Add to
+Selected Playlist produced one visible playlist entry. The test queue and
+playlist were cleared, the temporary fixture was removed, and playback was
+never started. This verifies UI-to-state routing only, not audible playback,
+keyboard navigation, VoiceOver usability, or multi-window layout acceptance.
