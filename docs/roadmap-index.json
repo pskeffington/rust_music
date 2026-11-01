@@ -860,7 +860,7 @@
         "RM-028"
       ],
       "acceptance": "Validated real frame progress, accessible persistent player, resizable library and queue regions and sortable track browser tests.",
-      "blocker": "The supplied-album GUI playback and queue transition have operator audibility confirmation in docs/evidence/MAC07_PASS_RESULTS.md. Four native operator window scenes, shared model wiring, initial left/right placement and persistent frame names are implemented and compile; the live UI layout could not be exercised while the Mac was locked. CLI route parity, physical device recovery, custom snap docking, accessibility pilots, multi-location catalogs and end-to-end performance above the 20,000-track protocol cap remain open. The requested AUI02 reference file is absent from this checkout; the operator requirements were implemented from the task text."
+      "blocker": "The supplied-album GUI playback and queue transition have operator audibility confirmation in docs/evidence/MAC07_PASS_RESULTS.md. Four native operator window scenes, shared model wiring, persistent frames, magnetic edge docking, and an Arrange Operator Windows command are implemented and build; deterministic geometry tests pass, and a temporary QA launch confirmed all four native scenes in the Window menu with Player focused after arrangement. Live drag-snap, multi-size layout, keyboard, and VoiceOver acceptance remain open. CLI route parity, physical device recovery, accessibility pilots, multi-location catalogs and end-to-end performance above the 20,000-track protocol cap remain open. The requested AUI02 reference file is absent from this checkout; the operator requirements were implemented from the task text."
     },
     {
       "gate": "G15",

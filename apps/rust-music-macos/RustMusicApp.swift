@@ -805,7 +805,7 @@ struct RustMusicApp: App {
         Window("Rust Music — Equalizer", id: "equalizer") {
             EqualizerWindow()
                 .frame(minWidth: 480, minHeight: 200)
-                .background(WindowFramePersistence(name: "RustMusic.Equalizer"))
+                .background(WindowFramePersistence(name: OperatorWindowLayout.equalizer))
                 .background(RustMusicPalette.background)
                 .preferredColorScheme(.dark)
                 .tint(RustMusicPalette.phosphor)
@@ -827,6 +827,7 @@ struct RustMusicApp: App {
 private struct RustMusicCommands: Commands {
     @ObservedObject var model: PlayerModel
     @Environment(\.openWindow) private var openWindow
+    @AppStorage("RustMusic.windowDockingEnabled") private var windowDockingEnabled = true
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
@@ -839,6 +840,8 @@ private struct RustMusicCommands: Commands {
             Button("Show Media Library") { openWindow(id: "library") }
             Button("Show Equalizer") { openWindow(id: "equalizer") }
             Button("Show All Operator Windows") { showAllWindows() }
+            Button("Arrange Operator Windows") { arrangeWindows() }
+            Toggle("Magnetic Window Docking", isOn: $windowDockingEnabled)
         }
         CommandMenu("Playback") {
             Button("Play / Pause") {
@@ -859,6 +862,11 @@ private struct RustMusicCommands: Commands {
         openWindow(id: "playlist")
         openWindow(id: "library")
         openWindow(id: "equalizer")
+    }
+
+    private func arrangeWindows() {
+        showAllWindows()
+        OperatorWindowDocking.shared.requestArrangement()
     }
 }
 
@@ -885,9 +893,9 @@ private enum PlayerWindowKind {
 
     var frameName: String {
         switch self {
-        case .player: "RustMusic.Player"
-        case .playlist: "RustMusic.Playlist"
-        case .library: "RustMusic.Library"
+        case .player: OperatorWindowLayout.player
+        case .playlist: OperatorWindowLayout.playlist
+        case .library: OperatorWindowLayout.library
         }
     }
 
@@ -895,15 +903,16 @@ private enum PlayerWindowKind {
 
 private struct WindowSwitcher: View {
     @Environment(\.openWindow) private var openWindow
+    @AppStorage("RustMusic.windowDockingEnabled") private var windowDockingEnabled = true
 
     var body: some View {
         Menu("WINDOWS") {
             Button("Show All Operator Windows") {
-                openWindow(id: "player")
-                openWindow(id: "playlist")
-                openWindow(id: "library")
-                openWindow(id: "equalizer")
+                showAllWindows()
             }
+            Button("Arrange Operator Windows") { arrangeWindows() }
+            Divider()
+            Toggle("Magnetic Docking", isOn: $windowDockingEnabled)
             Divider()
             Button("Player") { openWindow(id: "player") }
             Button("Playlist Editor") { openWindow(id: "playlist") }
@@ -912,6 +921,18 @@ private struct WindowSwitcher: View {
         }
         .buttonStyle(RustMusicButtonStyle())
         .accessibilityLabel("Show or focus an operator window")
+    }
+
+    private func showAllWindows() {
+        openWindow(id: "player")
+        openWindow(id: "playlist")
+        openWindow(id: "library")
+        openWindow(id: "equalizer")
+    }
+
+    private func arrangeWindows() {
+        showAllWindows()
+        OperatorWindowDocking.shared.requestArrangement()
     }
 }
 
@@ -945,32 +966,98 @@ private final class WindowFrameObserver: NSView {
         let restored = window.setFrameUsingName(name)
         _ = window.setFrameAutosaveName(name)
         if !restored {
-            window.setFrame(initialWindowFrame(for: name, in: window), display: true)
+            let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+            let initial = OperatorWindowLayout.initialFrames(
+                in: visible,
+                libraryWidth: window.frame.width
+            )
+            if let frame = initial[name] {
+                window.setFrame(frame, display: true)
+            }
+        }
+        OperatorWindowDocking.shared.register(window, name: name)
+    }
+}
+
+@MainActor
+private final class OperatorWindowDocking: NSObject {
+    static let shared = OperatorWindowDocking()
+
+    private final class WeakWindow {
+        weak var value: NSWindow?
+
+        init(_ value: NSWindow) {
+            self.value = value
         }
     }
 
-    private func initialWindowFrame(for name: String, in window: NSWindow) -> NSRect {
-        guard let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return window.frame }
-        let gap: CGFloat = 12
-        let leftWidth = min(620, max(520, visible.width - 680 - gap * 3))
-        let slotHeight = max(200, (visible.height - gap * 4) / 3)
-        let leftX = visible.minX + gap
-        let topY = visible.maxY - slotHeight - gap
-        switch name {
-        case "RustMusic.Player":
-            return NSRect(x: leftX, y: topY, width: leftWidth, height: slotHeight)
-        case "RustMusic.Playlist":
-            return NSRect(x: leftX, y: topY - slotHeight - gap, width: leftWidth, height: slotHeight)
-        case "RustMusic.Equalizer":
-            return NSRect(x: leftX, y: visible.minY + gap, width: leftWidth, height: slotHeight)
-        case "RustMusic.Library":
-            let x = leftX + leftWidth + gap
-            let availableWidth = max(1, visible.maxX - x - gap)
-            let width = min(max(window.frame.width, 680), availableWidth)
-            return NSRect(x: x, y: visible.minY + gap, width: width, height: visible.height - gap * 2)
-        default:
-            return window.frame
+    private var windows: [String: WeakWindow] = [:]
+    private var arrangementPending = false
+    private var changingFrames = false
+
+    private override init() {
+        super.init()
+        UserDefaults.standard.register(defaults: ["RustMusic.windowDockingEnabled": true])
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidMove(_:)),
+            name: NSWindow.didMoveNotification,
+            object: nil
+        )
+    }
+
+    func register(_ window: NSWindow, name: String) {
+        windows[name] = WeakWindow(window)
+        if arrangementPending {
+            arrangeIfReady()
         }
+    }
+
+    func requestArrangement() {
+        arrangementPending = true
+        arrangeIfReady()
+    }
+
+    private func arrangeIfReady() {
+        guard OperatorWindowLayout.windowOrder.allSatisfy({ windows[$0]?.value != nil }),
+              let screen = NSScreen.main ?? windows.values.compactMap(\.value).first?.screen,
+              let libraryWindow = windows[OperatorWindowLayout.library]?.value else {
+            return
+        }
+        arrangementPending = false
+        let frames = OperatorWindowLayout.initialFrames(
+            in: screen.visibleFrame,
+            libraryWidth: libraryWindow.frame.width
+        )
+        changingFrames = true
+        for name in OperatorWindowLayout.windowOrder {
+            guard let window = windows[name]?.value, let frame = frames[name] else { continue }
+            window.setFrame(frame, display: true, animate: true)
+        }
+        changingFrames = false
+        windows[OperatorWindowLayout.player]?.value?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func windowDidMove(_ notification: Notification) {
+        guard !changingFrames,
+              UserDefaults.standard.bool(forKey: "RustMusic.windowDockingEnabled"),
+              let moved = notification.object as? NSWindow,
+              windows.values.contains(where: { $0.value === moved }),
+              moved.isVisible,
+              !moved.isMiniaturized else {
+            return
+        }
+        let peers = windows.values.compactMap(\.value).filter {
+            $0 !== moved && $0.isVisible && !$0.isMiniaturized && $0.screen === moved.screen
+        }
+        let frame = OperatorWindowLayout.snappedFrame(
+            moved.frame,
+            to: peers.map(\.frame)
+        )
+        guard frame.origin != moved.frame.origin else { return }
+        changingFrames = true
+        moved.setFrame(frame, display: true)
+        changingFrames = false
     }
 }
 

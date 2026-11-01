@@ -408,3 +408,28 @@ interactive session, VoiceOver/resizing acceptance, real-media playback while
 scanning, or hardware tests. It does not change the separate audible playback
 confirmation above or close the hardware/device, recovery, host-focus, or
 distribution gates.
+
+### 2026-11-01 magnetic operator-window docking update
+
+The four native scenes now support magnetic edge snapping with a persisted
+user toggle, plus an Arrange Operator Windows command that opens all four
+scenes, restores the left-stack/right-library layout, and brings Player
+forward. Per-window autosave names remain in place. Pure AppKit geometry
+regressions passed for the 1,440×900-point arrangement, horizontal docking,
+vertical docking, distant windows, non-overlapping windows, and a disabled
+docking tolerance.
+
+The macOS app build exited 0 after the update. The harness reported
+PASS: operator window arrangement and magnetic docking geometry, and the
+locally signed app satisfied its designated requirement; process shutdown and
+reaping checks also passed. For a live smoke, the same built bundle was copied
+to a temporary QA bundle with a distinct identifier and locally re-signed.
+The Window menu visibly listed Player, Playlist Editor, Media Library, and
+Equalizer. Invoking Arrange Operator Windows left Player focused, with no
+library loaded and no playback started. The existing installed Rust Music
+instance was not replaced.
+
+Manual dragging close to a peer edge, two-display behavior, small-screen
+overflow, VoiceOver, and persistence across an actual application restart
+remain unverified. MAC07-03 therefore remains in progress; the geometry test
+does not replace live snap and layout acceptance.
