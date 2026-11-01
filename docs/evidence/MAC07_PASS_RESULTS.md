@@ -1059,3 +1059,40 @@ candidate head `246baceca04ae6aefe7eaa76c83aeafaa4c12eb5`; the gate ran
 immediately before the source commit, whose tracked code is identical. It does
 not establish a macOS app build, real FLAC playback, private-corpus parity,
 DAC/hardware acceptance, or completion of any MAC07 pass.
+
+### 2026-11-01 MAC07-03 compact Player transport verification
+
+On the live candidate app, Player was resized by dragging its bottom-right
+corner to a captured **539×339 screenshot pixels**. The compact transport
+displayed `PREV / PLAY / PAUS / STOP / NEXT` and `VOL 100%` on one row without
+wrapping. Its accessibility tree retained the full descriptions Previous,
+Play, Pause, Stop, Next, and Volume. After Arrange, a **620×292 screenshot
+pixel** capture showed the expanded labels `PREVIOUS / PLAY / PAUSE / STOP /
+NEXT / VOLUME 100%` on one row. Both captures retained Rust Boy styling and
+showed Ready / No Track with no output snapshot. Screenshot pixels are not
+AppKit point dimensions. No folder scan or playback occurred.
+
+This verifies the Player transport's compact-label fallback and expanded
+labels only. Compact Library row retention, dropped-track behavior, complete
+keyboard traversal, VoiceOver, and overall MAC07-03 acceptance remain
+unverified; no pass status is changed.
+
+### 2026-11-01 MAC07-03 Library rows and restart state
+
+An explicitly loaded generated metadata-only FLAC fixture contained three
+files (117, 119, and 119 bytes) with no audio frames. Media Library
+accessibility state showed 3 tagged tracks, Alpha, Bravo, and Charlie. At a
+captured **736×462 screenshot pixels**, after macOS Top Left tiling, the
+visible Library table showed all three rows. A drag attempt to shrink the
+Library failed with CUA `windowNotFoundAtPosition((-724.0, 1943.0))`; therefore
+compact Library row retention and no-dropped-row behavior remain unverified.
+Screenshot pixels are not AppKit point dimensions.
+
+After quitting, deleting the generated fixture, and relaunching, Media Library
+showed 0 tracks, `NO LIBRARY LOADED`, and disabled actions. No scan or playback
+occurred. On this relaunch, initial CUA state was Playlist Editor and after a
+2.5-second pause it was Player; an earlier fresh launch remained at Player
+after the same delay. This timing variation is recorded without inferring
+which other windows were visible. The app was left idle in Player. These
+observations do not establish compact Library acceptance, complete keyboard
+traversal, VoiceOver, or overall MAC07-03 completion.
