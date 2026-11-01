@@ -1,7 +1,7 @@
 # MAC-07 filtered playback action check
 
 Date: 2026-11-01  
-Source: `c4bdfdb` (the source file in this commit matches the locally built candidate)
+Source: `5dceb78` (the committed query-matching helper and regression test match the locally built candidate)
 
 ## Build and scope
 
@@ -51,3 +51,18 @@ This confirms the filtered-selection guard and selection retention through the
 macOS accessibility tree for this rebuilt worktree and synthetic catalog. It
 does not verify VoiceOver speech, audio output, or behavior at the declared
 minimum window frame.
+
+## Canonical Unicode query and filtered Play guard
+
+`CatalogSearch.visibleTracks` and the selected-track Play guard now share one
+bounded, whitespace-trimmed, Unicode-folded query representation. The catalog
+search harness adds a regression case with a decomposed accent in the query.
+
+The rebuilt candidate loaded two generated metadata-only FLAC entries with no
+audio frames. A canonically decomposed accent query returned the matching
+composed-accent row while the prior selection remained hidden. The outside-
+search notice appeared; Play Selected and Play Next were disabled while
+Enqueue Selected remained available. Selecting the visible result removed the
+notice and re-enabled Play actions. Playback and queue operations were not
+invoked. This is a focused live accessibility-tree check, not VoiceOver speech
+or audio-output acceptance.
