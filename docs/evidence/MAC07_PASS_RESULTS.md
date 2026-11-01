@@ -1015,16 +1015,19 @@ VoiceOver, layout, playback, and hardware gates remain open.
 On candidate `0a4c343bda129cb7034dc55f38d8de2c5ed5e26c`,
 `sh scripts/build-macos-app.sh` exited **0** and the rebuilt bundle signature
 verified. The desktop CUA launched the bundle with Player in front; it showed
-Ready / No Track and no output snapshot. The Window menu exposed Player,
-Playlist Editor, Media Library, Equalizer, individual Show actions, Show All,
-and Arrange Operator Windows. Raising Playlist Editor showed an empty queue
-and empty named-playlist list. Raising Equalizer showed all ten band sliders
-disabled with the message that no verified DSP processor is connected. Raising
-Media Library showed 0 tracks, `NO LIBRARY LOADED`, and disabled search and
-track actions. Arrange Operator Windows executed and Player was the front
-window afterward. This confirms those exercised window controls and empty
-states; it does not establish that all windows were simultaneously visible or
-that their arranged geometry was visually accepted.
+Ready / No Track and no output snapshot. After quitting and relaunching the
+unloaded app via CUA, without invoking Show All or Arrange, the active AX window
+remained Player / Ready / No Track after a 2.5-second pause. The Window menu
+exposed Player, Playlist Editor, Media Library, Equalizer, individual Show
+actions, Show All, and Arrange Operator Windows. Raising Playlist Editor
+showed an empty queue and empty named-playlist list. Raising Equalizer showed
+all ten band sliders disabled with the message that no verified DSP processor
+is connected. Raising Media Library showed 0 tracks, `NO LIBRARY LOADED`, and
+disabled search and track actions. Show All and Arrange were then explicitly
+invoked; Player remained the active AX window afterward. This confirms those
+exercised window controls and empty states; AX observations do not establish
+that all windows were simultaneously visible or that their arranged geometry
+was visually accepted.
 
 No folder was loaded, no scan was performed, and no playback occurred. Compact
 and expanded geometry and full keyboard traversal were not verified in this
