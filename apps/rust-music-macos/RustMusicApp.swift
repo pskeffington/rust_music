@@ -503,6 +503,21 @@ private struct AudioQueueDiagnosticRecord {
     let deviceMatchesTarget: String
     let deviceListStatus: StatusCode
     let deviceListed: String
+    let outputMeterEnableStatus: StatusCode
+    let outputMeterStatus: StatusCode
+    let outputMeterDBStatus: StatusCode
+    let outputMeterPeakMillionths: String
+    let outputMeterPeakMillidb: String
+    let outputMeterObservations: UInt64
+    let queueRunningStatus: StatusCode
+    let queueIsRunning: String
+    let queueFormatText: String
+    let tapCreationStatus: StatusCode
+    let tapCallbacks: UInt64
+    let tapFrames: UInt64
+    let tapNonzeroBytes: UInt64
+    let tapDataBuffers: UInt64
+    let enqueuedNonzeroBytes: UInt64
     let callbacks: UInt64
     let teardown: UInt64
     let stopStatus: StatusCode
@@ -521,7 +536,18 @@ private struct AudioQueueDiagnosticRecord {
         "route_device_list_status", "route_default_listed", "route_target_listed", "allocated",
         "capacity_bytes", "allocation_status", "enqueued", "frames", "nonzero_samples", "peak_sample", "starts",
         "start_status", "device_status", "device_associated", "device_default", "device_target",
-        "device_list_status", "device_listed", "callbacks", "teardown", "stop_status", "drained",
+        "device_list_status", "device_listed", "output_meter_enable_status", "output_meter_query_status",
+        "output_meter_db_status", "output_meter_peak_millionths", "output_meter_peak_millidb",
+        "output_meter_observations", "queue_running_status", "queue_is_running",
+        "stream_status", "stream_matches", "stream_rate", "stream_flags", "stream_bytes_frame",
+        "stream_channels", "stream_bits", "device_rate_status", "device_rate",
+        "device_channels_status", "device_channels", "converter_error_status", "converter_error",
+        "tap_status", "tap_callbacks", "tap_frames", "tap_nonzero_bytes", "tap_data_buffers",
+        "tap_rate", "tap_format", "tap_flags", "tap_bytes_packet", "tap_frames_packet",
+        "tap_bytes_frame", "tap_channels", "tap_bits",
+        "queue_volume_set_status", "queue_volume_get_status", "queue_volume_millionths",
+        "enqueued_nonzero_bytes",
+        "callbacks", "teardown", "stop_status", "drained",
         "immediate_stop_status", "dispose_status"
     ]
 
@@ -574,6 +600,47 @@ private struct AudioQueueDiagnosticRecord {
                   let deviceListStatus = optionalStatus(values["device_list_status"]),
                   let deviceListed = values["device_listed"],
                   ["0", "1", "none"].contains(deviceListed),
+                  let outputMeterEnableStatus = optionalStatus(values["output_meter_enable_status"]),
+                  let outputMeterStatus = optionalStatus(values["output_meter_query_status"]),
+                  let outputMeterDBStatus = optionalStatus(values["output_meter_db_status"]),
+                  let outputMeterPeakMillionths = values["output_meter_peak_millionths"],
+                  outputMeterPeakMillionths == "none" || UInt32(outputMeterPeakMillionths) != nil,
+                  let outputMeterPeakMillidb = values["output_meter_peak_millidb"],
+                  outputMeterPeakMillidb == "none" || Int32(outputMeterPeakMillidb) != nil,
+                  let outputMeterObservations = values["output_meter_observations"].flatMap(UInt64.init),
+                  let queueRunningStatus = optionalStatus(values["queue_running_status"]),
+                  let queueIsRunning = values["queue_is_running"],
+                  ["0", "1", "none"].contains(queueIsRunning),
+                  let streamStatus = optionalStatus(values["stream_status"]),
+                  let streamMatches = values["stream_matches"], ["0", "1", "none"].contains(streamMatches),
+                  let streamRate = optionalUnsigned(values["stream_rate"]),
+                  let streamFlags = optionalUnsigned(values["stream_flags"]),
+                  let streamBytes = optionalUnsigned(values["stream_bytes_frame"]),
+                  let streamChannels = optionalUnsigned(values["stream_channels"]),
+                  let streamBits = optionalUnsigned(values["stream_bits"]),
+                  let deviceRateStatus = optionalStatus(values["device_rate_status"]),
+                  let deviceRate = optionalUnsigned(values["device_rate"]),
+                  let deviceChannelsStatus = optionalStatus(values["device_channels_status"]),
+                  let deviceChannels = optionalUnsigned(values["device_channels"]),
+                  let converterStatus = optionalStatus(values["converter_error_status"]),
+                  let converterError = optionalUnsigned(values["converter_error"]),
+                  let tapCreationStatus = optionalStatus(values["tap_status"]),
+                  let tapCallbacks = values["tap_callbacks"].flatMap(UInt64.init),
+                  let tapFrames = values["tap_frames"].flatMap(UInt64.init),
+                  let tapNonzeroBytes = values["tap_nonzero_bytes"].flatMap(UInt64.init),
+                  let tapDataBuffers = values["tap_data_buffers"].flatMap(UInt64.init),
+                  let tapRate = optionalUnsigned(values["tap_rate"]),
+                  let tapFormat = optionalUnsigned(values["tap_format"]),
+                  let tapFlags = optionalUnsigned(values["tap_flags"]),
+                  let tapBytesPacket = optionalUnsigned(values["tap_bytes_packet"]),
+                  let tapFramesPacket = optionalUnsigned(values["tap_frames_packet"]),
+                  let tapBytesFrame = optionalUnsigned(values["tap_bytes_frame"]),
+                  let tapChannels = optionalUnsigned(values["tap_channels"]),
+                  let tapBits = optionalUnsigned(values["tap_bits"]),
+                  let queueVolumeSetStatus = optionalStatus(values["queue_volume_set_status"]),
+                  let queueVolumeGetStatus = optionalStatus(values["queue_volume_get_status"]),
+                  let queueVolume = optionalUnsigned(values["queue_volume_millionths"]),
+                  let enqueuedNonzeroBytes = values["enqueued_nonzero_bytes"].flatMap(UInt64.init),
                   let stopStatus = optionalStatus(values["stop_status"]),
                   let immediateStopStatus = optionalStatus(values["immediate_stop_status"]),
                   let disposeStatus = optionalStatus(values["dispose_status"]),
@@ -594,6 +661,21 @@ private struct AudioQueueDiagnosticRecord {
                 deviceMatchesDefault: deviceMatchesDefault,
                 deviceMatchesTarget: deviceMatchesTarget,
                 deviceListStatus: deviceListStatus, deviceListed: deviceListed,
+                outputMeterEnableStatus: outputMeterEnableStatus,
+                outputMeterStatus: outputMeterStatus,
+                outputMeterDBStatus: outputMeterDBStatus,
+                outputMeterPeakMillionths: outputMeterPeakMillionths,
+                outputMeterPeakMillidb: outputMeterPeakMillidb,
+                outputMeterObservations: outputMeterObservations,
+                queueRunningStatus: queueRunningStatus,
+                queueIsRunning: queueIsRunning,
+                queueFormatText: "stream \(Self.formatStatus(streamStatus))/\(streamMatches) \(streamRate)Hz flags \(streamFlags) bytes/frame \(streamBytes) channels \(streamChannels) bits \(streamBits); device rate \(Self.formatStatus(deviceRateStatus))/\(deviceRate)Hz channels \(Self.formatStatus(deviceChannelsStatus))/\(deviceChannels); converter \(Self.formatStatus(converterStatus))/\(converterError); queue volume set/get \(Self.formatStatus(queueVolumeSetStatus))/\(Self.formatStatus(queueVolumeGetStatus)) = \(queueVolume); pre-effects tap \(Self.formatStatus(tapCreationStatus)) \(tapRate)Hz fmt \(tapFormat) flags \(tapFlags) b/packet \(tapBytesPacket) f/packet \(tapFramesPacket) b/frame \(tapBytesFrame) ch \(tapChannels) bits \(tapBits); callbacks \(tapCallbacks), frames \(tapFrames), nonzero bytes \(tapNonzeroBytes), buffers \(tapDataBuffers); enqueued nonzero bytes \(enqueuedNonzeroBytes)",
+                tapCreationStatus: tapCreationStatus,
+                tapCallbacks: tapCallbacks,
+                tapFrames: tapFrames,
+                tapNonzeroBytes: tapNonzeroBytes,
+                tapDataBuffers: tapDataBuffers,
+                enqueuedNonzeroBytes: enqueuedNonzeroBytes,
                 callbacks: callbacks,
                 teardown: teardown, stopStatus: stopStatus, drained: drained,
                 immediateStopStatus: immediateStopStatus, disposeStatus: disposeStatus
@@ -609,12 +691,27 @@ private struct AudioQueueDiagnosticRecord {
         return .value(status)
     }
 
+    private static func formatStatus(_ value: StatusCode) -> String {
+        switch value {
+        case .unavailable: "none"
+        case .value(let status): String(status)
+        }
+    }
+
+    private static func optionalUnsigned(_ value: String?) -> String? {
+        guard let value else { return nil }
+        if value == "none" { return value }
+        guard UInt32(value) != nil else { return nil }
+        return value
+    }
+
     var statusText: String {
         let drainText = drained == "none" ? "unknown" : (drained == "1" ? "complete" : "incomplete")
         let deviceText = deviceAssociated == "1" ? "yes" : (deviceAssociated == "0" ? "no" : "unknown")
         let defaultText = deviceMatchesDefault == "1" ? "yes" : (deviceMatchesDefault == "0" ? "no" : "unknown")
         let targetText = deviceMatchesTarget == "1" ? "yes" : (deviceMatchesTarget == "0" ? "no" : "unknown")
-        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) list \(statusValue(routeDeviceListStatus)) default/target \(listedText(routeDefaultListed))/\(listedText(routeTargetListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) target \(targetText)\nPCM nonzero \(nonzeroSamples) peak \(peakSample) · current-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
+        let runningText = queueIsRunning == "1" ? "yes" : (queueIsRunning == "0" ? "no" : "unknown")
+        return "AQ \(rate)Hz/\(bits)b/\(channels)ch create \(created):\(statusValue(createStatus)) route \(statusValue(routeStatus)) list \(statusValue(routeDeviceListStatus)) default/target \(listedText(routeDefaultListed))/\(listedText(routeTargetListed))\nalloc \(allocated)/\(capacityBytes)B:\(statusValue(allocationStatus)) enq \(enqueued)/\(frames)f start \(starts):\(statusValue(startStatus)) device \(statusValue(deviceStatus))/\(deviceText) default \(defaultText) target \(targetText)\nPCM nonzero \(nonzeroSamples) peak \(peakSample) meter enable/query/db \(statusValue(outputMeterEnableStatus))/\(statusValue(outputMeterStatus))/\(statusValue(outputMeterDBStatus)) max \(outputMeterPeakMillionths)/1e6 \(outputMeterPeakMillidb)mdB over \(outputMeterObservations) samples; running \(statusValue(queueRunningStatus))/\(runningText)\n\(queueFormatText)\ncurrent-list \(statusValue(deviceListStatus))/\(listedText(deviceListed)) cb \(callbacks) teardown \(teardown) stop \(statusValue(stopStatus)) drain \(drainText) dispose \(statusValue(disposeStatus)) · audible unconfirmed"
     }
 
     private func listedText(_ value: String) -> String {

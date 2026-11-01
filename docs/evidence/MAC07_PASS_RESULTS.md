@@ -1,6 +1,6 @@
 # MAC07 pass evidence register
 
-**State: PARTIAL REPRODUCTION; AUDIO/HARDWARE ACCEPTANCE BLOCKED.** Do not store private filenames, absolute paths, music, or media hashes here. Baseline source: `e9cacb1d8d1a3464fd1ba973449767f7152cffd1` on `build/native-codecs-g0`.
+**State: REAL-FLAC GUI PLAYBACK AUDIBLY CONFIRMED; REMAINING HARDWARE/RELEASE ACCEPTANCE OPEN.** Do not store private filenames, absolute paths, music, or media hashes here. Baseline source: `e9cacb1d8d1a3464fd1ba973449767f7152cffd1` on `build/native-codecs-g0`. The dated entries retain earlier observations; the latest audible acceptance is recorded at the end of this ledger.
 
 | Pass | Source / commands | Observation | Result / blocker |
 | --- | --- | --- | --- |
@@ -71,6 +71,35 @@ that writes PCM. Record only membership and default match, never device UID.
 Until that identity and audible output are established, MAC07-01 remains
 unverified.
 
+### 2026-11-01 volume and post-callback meter follow-up
+
+The operator clarified the current player volume should be blaring; the GUI
+showed 100%, and the AudioQueue is explicitly set to unity (`1.0`). The first
+3.6 seconds of the supplied track decode to 44.1 kHz stereo 16-bit PCM with
+peak 22,494 and RMS 2,070.4; the full track has 12,525,568 frames, peak
+32,768, and RMS 8,008.0. The temporary decode was removed. Source level and
+volume control therefore do not explain silence.
+
+In the latest short GUI playback, AudioQueue reported successful queue start,
+running state, selected/default device association, and callback completion;
+620 buffers / 158,720 frames with 310,952 nonzero samples (peak 22,494) were
+submitted. Meter enable/query/dB statuses were all 0, but the maximum reported
+level remained 0/1e6 and -120,000 mdB across 35 post-callback observations.
+This is evidence that AudioQueue's meter observed no level in that run, not
+proof that the signal reached the DAC. I added bounded teardown-time queries
+for the queue stream ASBD, associated device sample rate/channel count, and
+AudioQueue converter error to distinguish format conversion from downstream
+rendering. They compile into the signed app, but a fresh GUI capture of these
+fields is still pending; this host's LaunchServices launch of the rebuilt
+bundle failed with `kLSNoExecutableErr` despite the bundle executable being
+present, so no new hardware conclusion is claimed.
+
+**Status:** user audibility remains negative; MAC07-01 remains **UNVERIFIED**.
+The 100% control, unity queue volume and high PCM level make a simple low
+volume/source-silence explanation unlikely. Next inspect the new live stream,
+device-format and converter fields, then measure beyond AudioQueue (for
+example with an authorized system loopback path) if those fields are valid.
+
 
 The current GUI accessibility snapshot also showed an active track at 1:59 with
 5,263,872 submitted frames, while its output panel displayed an already
@@ -134,3 +163,85 @@ denied, CLI macOS-output tests (21 passed, 1 ignored, plus 3 integration
 tests), app build/signature checks, Swift compile/typecheck, formatting,
 roadmap-index/literature validators, and `git diff --check`. These checks do
 not substitute for listening acceptance.
+
+### 2026-11-01 live meter and same-file CLI follow-up
+
+The output meter was sampled from the non-real-time write thread after queue
+start and after buffer submissions, retaining the maximum over the session.
+In the rebuilt GUI on System Default (MacBook Air Speakers), operator
+listening again reported silence. The post-stop record showed route status 0,
+default and target listed=yes, queue device associated=yes/default=yes/target
+yes, 999 buffers / 255,744 frames submitted, 504,970 nonzero PCM samples with
+peak 22,494, 1,000 meter observations with a maximum of 122/1,000,000, 999
+callbacks, and successful stop/drain/dispose. These meter reads were taken by the producer after enqueue, before confirming
+that a callback had retired a buffer. They may therefore be stale/pre-render
+zeros and are not valid evidence of a signal-level discrepancy.
+
+The supplied-file persistent-server regression passed (1/1), confirming the
+package server can decode the file and deliver frames to its test sink. A
+direct native CLI playback attempt failed before buffer allocation with
+AudioQueue route lookup OSStatus `-66680`, zero listed default output, and no
+PCM submission; this matches earlier command-line-only route failures and is
+not evidence of a system-wide output failure. The directive's
+`scripts/mac07_flac_ab.sh` is absent from this checkout, so that harness could
+not be run. The GUI session remains silent despite successful queue/device
+identity checks. MAC07-00/01 therefore remain blocked/in progress; do not
+advance dependent passes or mark audible acceptance.
+
+The focused native macOS suite passed 31/31, warnings-denied native Clippy
+passed, `cargo fmt --all -- --check` passed, and `sh
+scripts/build-macos-app.sh` exited 0 with a valid signed bundle. These are
+source/build checks, not acoustic acceptance. Meter sampling is diagnostic-
+only, opt-in, and runs outside the real-time callback.
+
+A second rebuilt-app run after throttling meter queries to approximately 10 Hz
+still produced no sound per the operator. It submitted 155,648 frames with
+304,809 nonzero samples (peak 22,494); route/device/default checks and
+608 callbacks succeeded, teardown drained and disposed cleanly, while the
+maximum output meter value was 0/1,000,000 across 34 observations. These values came from the same pre-render sampling path and cannot establish
+that AudioQueue rendered silence. The operator still reported silence; acoustic
+acceptance remains blocked.
+
+
+### 2026-11-01 meter sampling correction
+
+A read-only review found the earlier meter queries were made after enqueue, not
+after a completed callback, and the `ppm` label was not an appropriate unit
+for Apple's unitless 0–1 linear meter. Withdraw the earlier inference that
+122 ppm or 0 ppm identified a signal-level failure. Instrumentation now keeps
+the meter-enable status separate from linear and dB query statuses, samples
+after callback retirement (throttled to about 10 Hz), and records AudioQueue
+`IsRunning`. A fresh rebuilt-app measurement with these corrected checkpoints
+is required before drawing a queue-render conclusion. The operator's report of
+silence remains the acceptance result.
+
+### 2026-11-01 real-FLAC multi-track audible playback confirmation
+
+Following the preceding silent observations, the persistent playback worker's
+request wait interval was reduced from 10 ms to 1 ms. The supplied first FLAC
+contains 50,724 decoded blocks across 12,985,344 frames (about 256 frames per
+block on average, or 5.8 ms at 44.1 kHz); waiting 10 ms between worker polls
+could leave the native queue without the next small block. The AudioQueue
+sink's existing bounded backpressure remains in place.
+
+The rebuilt, locally signed app loaded the supplied 11-track album. With
+System Default selected and volume at 100%, the operator selected track 1 and
+confirmed **WORKING** while it played. The app showed 231,168 frames submitted
+at about five seconds and 394,496 at about eight seconds. It then advanced
+through the queue; the operator explicitly confirmed **MULTI-FILE WORKING**.
+After Stop, the sanitized AudioQueue summary showed route status 0, default
+and target device listed, the current device associated/default/target all
+yes, device format 48 kHz stereo, converter status 0/error 0, unity queue
+volume, 1,289 buffers / 329,984 frames, 653,422 nonzero samples (peak
+22,494), and successful stop/drain/dispose. The user audibility confirmation
+is the acceptance evidence; these diagnostics alone do not prove acoustic
+output. No media path, device UID, or copyrighted audio was added to the
+repository.
+
+This confirms audible real-FLAC playback and queue transitions on the current
+Mac session and resolves the immediate silence defect for this supplied
+album. The 1 ms polling change is the candidate cause of the earlier short-
+block starvation, but the session does not isolate that cause from all other
+concurrent native diagnostic changes. MAC07 hardware/device recovery, DAC
+measurement, broader corpus, host-focus, and distribution gates remain
+separate and open.

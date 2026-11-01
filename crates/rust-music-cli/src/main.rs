@@ -1322,6 +1322,11 @@ where
     S: PcmSink,
     F: FnOnce() -> Result<S>,
 {
+    // FLAC frames in common lossless files can contain only 256 PCM frames
+    // (~5.8 ms at 44.1 kHz). Polling once per 10 ms starves the native queue
+    // before its next block arrives. Native sinks provide their own bounded
+    // backpressure, so keep the worker responsive enough to refill them.
+    const PLAYBACK_POLL_INTERVAL: Duration = Duration::from_millis(1);
     let focus = ProcessFocus {
         grant: Arc::new(AtomicBool::new(false)),
     };
@@ -1331,7 +1336,7 @@ where
     // without extending the View layout or changing the protocol version.
     let mut playback_error: Option<Reply> = None;
     loop {
-        match requests.recv_timeout(Duration::from_millis(10)) {
+        match requests.recv_timeout(PLAYBACK_POLL_INTERVAL) {
             Ok(UnitRequest::Eof) | Err(RecvTimeoutError::Disconnected) => {
                 focus.grant.store(false, Ordering::Release);
                 let _ = slot.handle(Command::Stop, &focus);
