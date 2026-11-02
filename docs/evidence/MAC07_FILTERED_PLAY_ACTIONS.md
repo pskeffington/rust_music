@@ -245,3 +245,26 @@ cached order), so these timings should not be treated as a strict A/B trial.
 
 Live search responsiveness, real 250,000-track import, memory on a tagged
 library, and concurrent playback under scanning/search remain unverified.
+
+## Local workspace repeat
+
+The same catalog-index source was applied to the preserved workspace and
+`sh scripts/build-macos-app.sh` exited **0** there as well. Strict app
+signature verification, all included Swift harnesses, `python3 -m json.tool
+docs/mac07-pass-index.json`, `python3 scripts/check_roadmap_index.py`, and
+`git diff --check` passed. This was a repeat in the dirty local worktree, not
+a separate commit checkout.
+
+Repeat catalog measurements were:
+
+| Tracks | Title-index build | Cached sort p95 | Narrow-search p95 | Broad-search p95 |
+| ---: | ---: | ---: | ---: | ---: |
+| 2,000 | 0.252 ms | 0.044 ms | 0.597 ms | 0.751 ms |
+| 20,000 | 2.813 ms | 0.444 ms | 5.782 ms | 7.702 ms |
+| 100,000 | 20.521 ms | 8.948 ms | 28.750 ms | 44.912 ms |
+| 250,000 | 62.475 ms | 25.288 ms | 73.103 ms | 123.791 ms |
+
+Catalog-harness peak RSS was **227,442,688 bytes** in this run. The difference
+from the prior exact-candidate run (204,914,688 bytes) reflects separate
+process runs and peak-RSS measurement; both are recorded rather than
+presented as interchangeable catalog-only memory values.
