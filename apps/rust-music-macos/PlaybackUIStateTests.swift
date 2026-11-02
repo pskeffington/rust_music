@@ -54,6 +54,22 @@ private func decodeSnapshot(_ bytes: Data) throws -> PackagePlaybackSnapshot {
 @main
 struct PlaybackUIStateTests {
     static func main() {
+        var stateRevision = LibraryStateRevision()
+        let oldCatalogRevision = stateRevision.value
+        precondition(stateRevision.accepts(oldCatalogRevision))
+        stateRevision.advance()
+        precondition(!stateRevision.accepts(oldCatalogRevision))
+        precondition(stateRevision.accepts(stateRevision.value))
+
+        var deferredReload = DeferredStateReload()
+        precondition(!deferredReload.request(isStateBusy: true, isTransportBusy: false))
+        precondition(deferredReload.isPending)
+        precondition(!deferredReload.takeIfAvailable(isStateBusy: true, isTransportBusy: false))
+        precondition(!deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: true))
+        precondition(deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: false))
+        precondition(!deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: false))
+        precondition(!deferredReload.isPending)
+
         precondition(PlaybackUIState.flags(for: 2).playing)
         precondition(!PlaybackUIState.flags(for: 2).paused)
         precondition(!PlaybackUIState.flags(for: 6).playing)

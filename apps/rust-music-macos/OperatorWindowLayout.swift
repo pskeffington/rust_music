@@ -15,6 +15,11 @@ enum OperatorWindowLayout {
         library: NSSize(width: 520, height: 360)
     ]
 
+    static func applyMinimumSize(for name: String, to window: NSWindow) {
+        guard let minimumSize = minimumFrames[name] else { return }
+        window.minSize = minimumSize
+    }
+
     static func canTileAll(in visibleFrame: NSRect, gap: CGFloat = 12) -> Bool {
         let leftMinimum = max(
             minimumFrames[player]!.width,

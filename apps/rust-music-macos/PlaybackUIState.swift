@@ -49,6 +49,33 @@ struct PlaybackPCMFormat: Equatable {
     let bitsPerSample: UInt8
 }
 
+struct LibraryStateRevision {
+    private(set) var value: UInt64 = 0
+
+    mutating func advance() {
+        value &+= 1
+    }
+
+    func accepts(_ operationRevision: UInt64) -> Bool {
+        operationRevision == value
+    }
+}
+
+struct DeferredStateReload {
+    private(set) var isPending = false
+
+    mutating func request(isStateBusy: Bool, isTransportBusy: Bool) -> Bool {
+        isPending = true
+        return takeIfAvailable(isStateBusy: isStateBusy, isTransportBusy: isTransportBusy)
+    }
+
+    mutating func takeIfAvailable(isStateBusy: Bool, isTransportBusy: Bool) -> Bool {
+        guard isPending, !isStateBusy, !isTransportBusy else { return false }
+        isPending = false
+        return true
+    }
+}
+
 struct PackagePlaybackSnapshot: Equatable {
     let state: UInt8
     let selected: UInt16?

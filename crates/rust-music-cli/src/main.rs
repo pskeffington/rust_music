@@ -49,6 +49,8 @@ const PCM_GUID: [u8; 16] = [
 
 const MAX_CATALOG_OUTPUT_BYTES: usize = 20 * 1024 * 1024;
 const MAX_STATE_TSV_BYTES: usize = 6 * 1024 * 1024;
+// `playlist move-many` carries a name, direction, and up to 64 indexes.
+const MAX_STATE_ARGUMENTS: usize = 66;
 const STANDALONE_MAX_TRACKS: usize = 20_000;
 const STANDALONE_SCAN_LIMITS: ScanLimits = ScanLimits {
     max_entries: 100_000,
@@ -458,6 +460,17 @@ fn parse_state_index(value: &str) -> Result<usize> {
     value
         .parse::<usize>()
         .map_err(|_| MusicError::Invalid("music state index is invalid"))
+}
+
+fn collect_state_arguments(args: impl IntoIterator<Item = String>) -> Result<Vec<String>> {
+    let mut arguments = Vec::new();
+    for argument in args {
+        if arguments.len() >= MAX_STATE_ARGUMENTS || argument.len() > 4096 {
+            return Err(MusicError::Limit("too many or oversized state arguments"));
+        }
+        arguments.push(argument);
+    }
+    Ok(arguments)
 }
 
 fn state_command(
@@ -1901,13 +1914,7 @@ fn run() -> Result<()> {
         let operation = args
             .next()
             .ok_or(MusicError::Invalid("state requires a command"))?;
-        let mut arguments = Vec::new();
-        for argument in args {
-            if arguments.len() >= 2 || argument.len() > 4096 {
-                return Err(MusicError::Limit("too many or oversized state arguments"));
-            }
-            arguments.push(argument);
-        }
+        let arguments = collect_state_arguments(args)?;
         if managed {
             supervise_parent_stdin()?;
         }
@@ -2115,6 +2122,23 @@ mod tests {
             .map(|value| (*value).to_owned())
             .collect::<Vec<_>>();
         state_command(base, category, root, operation, &arguments)
+    }
+
+    #[test]
+    fn state_cli_accepts_bounded_playlist_batch_arguments() {
+        let valid_batch = (0..MAX_STATE_ARGUMENTS)
+            .map(|index| format!("entry-{index}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            collect_state_arguments(valid_batch.clone()).unwrap(),
+            valid_batch
+        );
+
+        let oversized_batch = (0..=MAX_STATE_ARGUMENTS)
+            .map(|index| format!("entry-{index}"))
+            .collect::<Vec<_>>();
+        assert!(collect_state_arguments(oversized_batch).is_err());
+        assert!(collect_state_arguments(["x".repeat(4097)]).is_err());
     }
 
     #[test]

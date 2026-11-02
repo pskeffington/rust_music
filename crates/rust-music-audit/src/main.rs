@@ -26,8 +26,11 @@ fn requirement(ok: bool, context: impl Into<String>) -> Result<(), String> {
 }
 
 fn allowed_command_spawn(path: &Path, line: &str) -> bool {
-    path.ends_with("rust-music-cli/tests/package_process.rs")
-        && line == "let child = Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))"
+    let local_cli = "Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))";
+    (path.ends_with("rust-music-cli/tests/package_process.rs")
+        && line == format!("let child = {local_cli}"))
+        || (path.ends_with("rust-music-cli/tests/state_cli_batch.rs")
+            && line == format!("let output = {local_cli}"))
 }
 
 // Strictly allow in-workspace dependencies of the form:
@@ -365,7 +368,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_exact_cargo_cli_lifecycle_test_may_spawn_a_child() {
+    fn only_exact_cargo_cli_integration_tests_may_spawn_a_child() {
         let path = Path::new("crates/rust-music-cli/tests/package_process.rs");
         assert!(allowed_command_spawn(
             path,
@@ -374,6 +377,15 @@ mod tests {
         assert!(!allowed_command_spawn(
             path,
             "let child = Command::new(\"/bin/sh\")"
+        ));
+        let batch_path = Path::new("crates/rust-music-cli/tests/state_cli_batch.rs");
+        assert!(allowed_command_spawn(
+            batch_path,
+            "let output = Command::new(env!(\"CARGO_BIN_EXE_rust-music-cli\"))"
+        ));
+        assert!(!allowed_command_spawn(
+            batch_path,
+            "let output = Command::new(\"/bin/sh\")"
         ));
         assert!(!allowed_command_spawn(
             Path::new("crates/rust-music-cli/src/main.rs"),
