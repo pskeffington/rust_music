@@ -538,3 +538,22 @@ artist-group index plus first page **610.501 ms**, artist-query p95
 **228.527 ms**, searchable payload **18,500,000 bytes**, and test-process peak
 RSS **346,128,384 bytes**. These values come from the test process, not the
 interactive app's memory or UI latency.
+
+## Live bounded-page position and selection check — PR #9 candidate
+
+A rebuilt candidate with an isolated temporary bundle identifier explicitly
+loaded a generated 400-entry metadata-only FLAC catalog. The files contained
+bounded title/artist/album comments and no audio frames. On page 1, the Library
+list was moved to its last row (`Track 199`, scrollbar value 1.0) before NEXT
+PAGE was pressed. Page 2 then reported tracks 201 through 400 of 400; its
+accessibility tree began with `Track 200` and subsequent rows, and the list
+scrollbar returned to 0. Returning with PREV PAGE showed `Track 000` at the top,
+restored the prior selection (`Track 023`), kept the selected-count display at
+1, and returned the scrollbar to 0. No Play, Enqueue, or Play Next action was
+invoked; the queue remained empty and playback stayed stopped with no output
+snapshot. The isolated candidate was quit and the generated catalog removed.
+
+This live macOS accessibility-tree check confirms the page-change scroll reset
+and preservation of a selection across pages for a 400-row synthetic catalog.
+It is not a VoiceOver speech/rotor check, playback test, compact-minimum-size
+test, or 250,000-track live UI test. Overall MAC07-03 remains in progress.
