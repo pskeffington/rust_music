@@ -60,6 +60,18 @@ struct CatalogSearchTests {
             ),
             "a selected row hidden by search must not remain actionable"
         )
+        let selectionAfterFirstPage = CatalogSearch.mergingPageSelection(
+            [0, 201],
+            visibleTrackIDs: [0, 1, 2],
+            proposedVisibleSelection: [1, 2]
+        )
+        precondition(selectionAfterFirstPage == [1, 2, 201], "selection edits must retain IDs from other pages")
+        let selectionAfterSecondPage = CatalogSearch.mergingPageSelection(
+            selectionAfterFirstPage,
+            visibleTrackIDs: [200, 201, 202],
+            proposedVisibleSelection: [200, 201]
+        )
+        precondition(selectionAfterSecondPage == [1, 2, 200, 201], "page-local selection must not discard earlier-page rows")
         precondition(
             CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "o\u{0308}STERGÖTLAND") == [unicodeTrack]
         )
@@ -99,6 +111,31 @@ struct CatalogSearchTests {
             sortedBy: .title
         ).map(\.id) == [9], "catalog revision must discard indexes from the previous root")
 
+        let pageIndex = CatalogSearchIndex(tracks: sortTracks)
+        let sortedPage = pageIndex.page(matching: "", sortedBy: .title, offset: 1, limit: 1)
+        precondition(sortedPage.tracks.map(\.id) == [1] && sortedPage.totalMatches == 3 && sortedPage.offset == 1)
+        let filteredPage = pageIndex.page(matching: "Able", sortedBy: .artist, offset: 1, limit: 200)
+        precondition(filteredPage.tracks.map(\.id) == [1] && filteredPage.totalMatches == 2)
+        let beyondEndPage = pageIndex.page(matching: "Beta", sortedBy: .album, offset: 10, limit: 1)
+        precondition(beyondEndPage.tracks.isEmpty && beyondEndPage.totalMatches == 1 && beyondEndPage.offset == 1)
+        let pageCache = CatalogSearchViewCache()
+        precondition(pageCache.page(
+            in: sortTracks,
+            revision: 11,
+            matching: "",
+            sortedBy: .title,
+            offset: 0,
+            limit: 2
+        ).tracks.map(\.id) == [0, 1])
+        precondition(pageCache.page(
+            in: replacementCatalog,
+            revision: 12,
+            matching: "",
+            sortedBy: .title,
+            offset: 0,
+            limit: 2
+        ).tracks.map(\.id) == [9], "page cache must invalidate on catalog revision changes")
+
         let tracks = (0..<20_000).map { index in
             let title = String(format: "Track %05d", index)
             return CatalogTrack(
@@ -110,6 +147,16 @@ struct CatalogSearchTests {
                 relativePath: "folder/\(title).wav"
             )
         }
+        let cappedPage = CatalogSearchIndex(tracks: tracks).page(
+            matching: "",
+            sortedBy: .title,
+            offset: 0,
+            limit: 10_000
+        )
+        precondition(
+            cappedPage.tracks.count == CatalogSearch.maximumPageSize && cappedPage.totalMatches == 20_000,
+            "page materialization must stay within the 200-row limit"
+        )
         precondition(CatalogSearch.visibleTracks(in: tracks, matching: "").count == 20_000)
         let lastQuery = "track 19999"
         let lastMatches = CatalogSearch.visibleTracks(in: tracks, matching: lastQuery)
@@ -262,6 +309,25 @@ struct CatalogSearchTests {
         searchDurations.sort()
         let searchP50 = Double(searchDurations[10]) / 1_000_000
         let searchP95 = Double(searchDurations[19]) / 1_000_000
+        var pageDurations: [UInt64] = []
+        pageDurations.reserveCapacity(21)
+        for _ in 0..<21 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let page = index.page(
+                matching: "synthetic artist",
+                sortedBy: .title,
+                offset: count / 2,
+                limit: 10_000
+            )
+            pageDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(
+                page.totalMatches == count
+                    && page.tracks.count == min(CatalogSearch.maximumPageSize, count - count / 2),
+                "broad-query pages report full count and materialize no more than 200 rows"
+            )
+        }
+        pageDurations.sort()
+        let broadPageP95 = Double(pageDurations[19]) / 1_000_000
         var linearSearchDurations: [UInt64] = []
         linearSearchDurations.reserveCapacity(5)
         for _ in 0..<5 {
@@ -289,7 +355,7 @@ struct CatalogSearchTests {
         let broadSearchP95 = Double(broadSearchDurations[4]) / 1_000_000
         let indexPayloadBytes = tracks.reduce(0) { $0 + $1.searchableBytes.count }
         return String(format:
-            "PASS: synthetic catalog scale n=%d; title-index-build=%.3fms; cached-sort p50=%.3fms p95=%.3fms; narrow-search p50=%.3fms p95=%.3fms linear-reference-p95=%.3fms; broad-search p50=%.3fms p95=%.3fms; searchable payload=%d bytes",
+            "PASS: synthetic catalog scale n=%d; title-index-build=%.3fms; cached-sort p50=%.3fms p95=%.3fms; narrow-search p50=%.3fms p95=%.3fms linear-reference-p95=%.3fms; broad-search p50=%.3fms p95=%.3fms; bounded-200-row broad-page p95=%.3fms; searchable payload=%d bytes",
             count,
             indexBuildMilliseconds,
             sortP50,
@@ -299,6 +365,7 @@ struct CatalogSearchTests {
             linearSearchP95,
             broadSearchP50,
             broadSearchP95,
+            broadPageP95,
             indexPayloadBytes
         )
     }

@@ -1395,6 +1395,7 @@ final class PlayerModel: ObservableObject {
     @Published var tracks: [CatalogTrack] = [] {
         didSet {
             catalogRevision &+= 1
+            catalogPageOffset = 0
             refreshVisibleTracks()
         }
     }
@@ -1407,15 +1408,22 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var librarySearchFocusGeneration: UInt64 = 0
     @Published private(set) var playlistNameFocusGeneration: UInt64 = 0
     @Published var searchText = "" {
-        didSet { refreshVisibleTracks() }
+        didSet {
+            if oldValue != searchText { catalogPageOffset = 0 }
+            refreshVisibleTracks()
+        }
     }
     @Published var sortOrder: CatalogSearch.SortOrder {
         didSet {
             UserDefaults.standard.set(sortOrder.rawValue, forKey: "RustMusic.catalogSortOrder")
+            if oldValue != sortOrder { catalogPageOffset = 0 }
             refreshVisibleTracks()
         }
     }
     @Published private(set) var visibleTracks: [CatalogTrack] = []
+    @Published private(set) var visibleTrackTotal = 0
+    @Published private(set) var catalogPageOffset = 0
+    let catalogPageSize = CatalogSearch.maximumPageSize
     @Published var status = "Choose a local library folder."
     @Published var isPlaying = false
     @Published var isPaused = false
@@ -1486,8 +1494,16 @@ final class PlayerModel: ObservableObject {
         return CatalogSearch.matches(selectedTrack, matching: searchText)
     }
 
+    var selectedTrackIsVisibleOnCurrentLibraryPage: Bool {
+        guard let selectedTrack else { return false }
+        return visibleTracks.contains(where: { $0.id == selectedTrack.id })
+    }
+
     var selectedTrackIsActionableInLibrary: Bool {
-        CatalogSearch.isActionableSelectedTrack(
+        guard let selectedTrack, visibleTracks.contains(where: { $0.id == selectedTrack.id }) else {
+            return false
+        }
+        return CatalogSearch.isActionableSelectedTrack(
             selectedTrack,
             selectedTrackIDs: selectedTrackIDs,
             matching: searchText
@@ -1599,20 +1615,35 @@ final class PlayerModel: ObservableObject {
         let revision = catalogRevision
         let query = CatalogSearch.boundedQuery(searchText)
         let order = sortOrder
+        let offset = catalogPageOffset
         let searchCache = catalogSearchCache
         catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             guard !cancellation.isCancelled else { return }
-            let result = searchCache.visibleTracks(
+            let page = searchCache.page(
                 in: catalog,
                 revision: revision,
                 matching: query,
-                sortedBy: order
+                sortedBy: order,
+                offset: offset,
+                limit: CatalogSearch.maximumPageSize
             )
             DispatchQueue.main.async {
                 guard let self, self.catalogViewGeneration == generation else { return }
-                self.visibleTracks = result
+                self.visibleTracks = page.tracks
+                self.visibleTrackTotal = page.totalMatches
+                self.catalogPageOffset = page.offset
             }
         }
+    }
+
+    func moveCatalogPage(by direction: Int) {
+        guard direction != 0, !isTransportBusy, !isStateBusy else { return }
+        let pageCount = max(1, (visibleTrackTotal + catalogPageSize - 1) / catalogPageSize)
+        let currentPage = catalogPageOffset / catalogPageSize
+        let nextPage = min(max(currentPage + direction, 0), pageCount - 1)
+        guard nextPage != currentPage else { return }
+        catalogPageOffset = nextPage * catalogPageSize
+        refreshVisibleTracks()
     }
 
     private func runStateCommand(
@@ -2490,7 +2521,12 @@ final class PlayerModel: ObservableObject {
     }
 
     func selectTracksManually(_ ids: Set<Int>) {
-        selectedTrackIDs = ids
+        let visibleIDs = Set(visibleTracks.map(\.id))
+        selectedTrackIDs = CatalogSearch.mergingPageSelection(
+            selectedTrackIDs,
+            visibleTrackIDs: visibleIDs,
+            proposedVisibleSelection: ids
+        )
         guard let selected = visibleTracks.last(where: { ids.contains($0.id) })?.id else { return }
         let id: Int? = selected
         guard selectedIndex != id else { return }
@@ -3036,8 +3072,8 @@ private struct PlayerView: View {
                     .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
                     .accessibilityIdentifier("library-sort-order")
                     Text(model.isScanning
-                        ? "SCANNING · \(visibleTracks.count) PRIOR RESULTS"
-                        : "\(visibleTracks.count) TRACKS")
+                        ? "SCANNING · \(model.visibleTrackTotal) PRIOR RESULTS"
+                        : "\(model.visibleTrackTotal) TRACKS")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize()
@@ -3062,8 +3098,8 @@ private struct PlayerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if model.selectedTrack != nil && !model.selectedTrackMatchesCurrentSearch {
-                    Text("CURRENT SELECTION IS OUTSIDE SEARCH · SELECT A RESULT OR CLEAR SEARCH TO PLAY")
+                if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {
+                    Text("CURRENT TRACK IS OUTSIDE THIS PAGE OR SEARCH · SELECT IT TO PLAY")
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -3152,6 +3188,24 @@ private struct PlayerView: View {
                     }
                 }
                 .frame(minHeight: 96, maxHeight: .infinity)
+
+                let pageCount = max(1, (model.visibleTrackTotal + model.catalogPageSize - 1) / model.catalogPageSize)
+                let currentPage = min(model.catalogPageOffset / model.catalogPageSize + 1, pageCount)
+                let firstTrack = model.visibleTrackTotal == 0 ? 0 : model.catalogPageOffset + 1
+                let lastTrack = min(model.catalogPageOffset + visibleTracks.count, model.visibleTrackTotal)
+                HStack(spacing: 8) {
+                    Button("PREV PAGE") { model.moveCatalogPage(by: -1) }
+                        .disabled(model.catalogPageOffset == 0 || model.isStateBusy || model.isTransportBusy)
+                    Text("PAGE \(currentPage)/\(pageCount) · \(firstTrack)–\(lastTrack) OF \(model.visibleTrackTotal)")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .accessibilityLabel("Library page \(currentPage) of \(pageCount), tracks \(firstTrack) through \(lastTrack) of \(model.visibleTrackTotal)")
+                        .accessibilityIdentifier("library-page-status")
+                    Button("NEXT PAGE") { model.moveCatalogPage(by: 1) }
+                        .disabled(lastTrack >= model.visibleTrackTotal || model.isStateBusy || model.isTransportBusy)
+                }
 
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }

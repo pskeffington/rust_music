@@ -268,3 +268,35 @@ Catalog-harness peak RSS was **227,442,688 bytes** in this run. The difference
 from the prior exact-candidate run (204,914,688 bytes) reflects separate
 process runs and peak-RSS measurement; both are recorded rather than
 presented as interchangeable catalog-only memory values.
+
+## Bounded Media Library pages — PR #9 candidate
+
+Based on PR head `e54b85e28cd0dffaaf04089f25160bc89c9bfa3e`, the Media Library
+now publishes at most 200 matching rows at a time. Search counts the full result
+set and keeps the chosen order; PREV PAGE / NEXT PAGE and an accessible
+page/range value report navigation state. Search or sort changes reset to the
+first page. Selection edits preserve selected IDs on other pages. Play Selected
+and Play Next require the active track to be selected and visible on the
+current page; bulk Enqueue still includes selected IDs from other pages. Search
+and page construction use the existing serial background queue. IPC's
+20,000-track limit and wire format are unchanged.
+
+In this isolated PR-head checkout, `sh scripts/build-macos-app.sh` exited **0**.
+Page tests cover title/artist order, filtered middle pages, out-of-range
+offsets, cache revision invalidation, the 200-row maximum, and selection across
+two pages. All bundled UI harnesses passed, including playlist selection,
+window geometry, playback snapshots, catalog bounds, process lifecycle and
+shutdown. Strict app signature validation reported valid on disk and a
+satisfied designated requirement. The existing 17 unused AudioQueue
+diagnostic warnings remain.
+
+The synthetic broad-query page p95 at 2,000, 20,000, 100,000 and 250,000 rows
+was **0.557 ms, 5.212 ms, 43.554 ms and 123.240 ms** respectively. At 250,000,
+the catalog harness process peak RSS was **204,980,224 bytes**. Those larger
+profiles exercise only the in-memory algorithm: scanner and IPC imports remain
+limited to 20,000 tracks. These figures are not full-app memory, real-import
+latency, or playback-under-load results.
+
+The desktop availability check reports macOS locked and requires manual
+unlock. The paging controls, compact-window fit, cross-page selection in the
+live app, and VoiceOver page-status speech therefore remain unverified.

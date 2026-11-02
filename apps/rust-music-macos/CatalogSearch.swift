@@ -48,6 +48,15 @@ struct CatalogTrack: Identifiable, Equatable {
 }
 
 enum CatalogSearch {
+    static let maximumPageSize = 200
+
+    struct Page {
+        let tracks: [CatalogTrack]
+        let totalMatches: Int
+        let offset: Int
+        let pageSize: Int
+    }
+
     enum SortOrder: String, CaseIterable, Identifiable {
         case title
         case artist
@@ -86,6 +95,15 @@ enum CatalogSearch {
     ) -> Bool {
         guard let track, selectedTrackIDs.contains(track.id) else { return false }
         return matches(track, matching: searchText)
+    }
+
+    static func mergingPageSelection(
+        _ selectedTrackIDs: Set<Int>,
+        visibleTrackIDs: Set<Int>,
+        proposedVisibleSelection: Set<Int>
+    ) -> Set<Int> {
+        selectedTrackIDs.subtracting(visibleTrackIDs)
+            .union(proposedVisibleSelection.intersection(visibleTrackIDs))
     }
 
     static func queryBytes(for searchText: String) -> Data? {
@@ -159,6 +177,47 @@ final class CatalogSearchIndex {
         return result
     }
 
+    /// Materializes at most `limit` rows while counting the full result set.
+    /// Filtering and sorting stay on the catalog-view queue; SwiftUI receives
+    /// only a bounded page, even when the query matches the whole catalog.
+    func page(
+        matching searchText: String,
+        sortedBy order: CatalogSearch.SortOrder = .title,
+        offset requestedOffset: Int,
+        limit requestedLimit: Int = CatalogSearch.maximumPageSize
+    ) -> CatalogSearch.Page {
+        let limit = min(max(requestedLimit, 1), CatalogSearch.maximumPageSize)
+        let offset = max(requestedOffset, 0)
+        let queryBytes = CatalogSearch.queryBytes(for: searchText)
+        let indices = sortedIndices(for: order)
+        guard let queryBytes else {
+            let start = min(offset, tracks.count)
+            let end = min(start + limit, tracks.count)
+            return CatalogSearch.Page(
+                tracks: indices[start..<end].map { tracks[$0] },
+                totalMatches: tracks.count,
+                offset: start,
+                pageSize: limit
+            )
+        }
+
+        var totalMatches = 0
+        var pageTracks: [CatalogTrack] = []
+        pageTracks.reserveCapacity(limit)
+        for index in indices where tracks[index].searchableBytes.range(of: queryBytes) != nil {
+            if totalMatches >= offset, pageTracks.count < limit {
+                pageTracks.append(tracks[index])
+            }
+            totalMatches += 1
+        }
+        return CatalogSearch.Page(
+            tracks: pageTracks,
+            totalMatches: totalMatches,
+            offset: min(offset, totalMatches),
+            pageSize: limit
+        )
+    }
+
     private func sortedIndices(for order: CatalogSearch.SortOrder) -> [Int] {
         switch order {
         case .title:
@@ -212,6 +271,26 @@ final class CatalogSearchViewCache: @unchecked Sendable {
             revision = requestedRevision
         }
         return index?.visibleTracks(matching: searchText, sortedBy: order) ?? []
+    }
+
+    func page(
+        in tracks: [CatalogTrack],
+        revision requestedRevision: UInt64,
+        matching searchText: String,
+        sortedBy order: CatalogSearch.SortOrder,
+        offset: Int,
+        limit: Int = CatalogSearch.maximumPageSize
+    ) -> CatalogSearch.Page {
+        if revision != requestedRevision {
+            index = CatalogSearchIndex(tracks: tracks)
+            revision = requestedRevision
+        }
+        return index?.page(
+            matching: searchText,
+            sortedBy: order,
+            offset: offset,
+            limit: limit
+        ) ?? CatalogSearch.Page(tracks: [], totalMatches: 0, offset: 0, pageSize: limit)
     }
 }
 
