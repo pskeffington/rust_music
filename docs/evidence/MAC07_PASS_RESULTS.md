@@ -1578,3 +1578,15 @@ again failed with `windowNotFoundAtPosition`; the window did not resize. This
 fresh launch therefore confirms startup and Library presentation only. The
 520×360-point live resize remains unverified; the AppKit geometry test remains
 the strongest available size evidence.
+
+### 2026-11-02 CUA display-coordinate diagnosis
+
+The fresh Library window's Window menu offered `Move to Built-in Retina Display`,
+showing it was on a different display. Moving it to the built-in display did not
+make CUA pointer resizing usable: the same lower-right drag failed with
+`windowNotFoundAtPosition` at the translated point `(-279, 2332)`. The Library
+was returned with the Window menu's `Move to Unknown Display` action, then
+Player was brought to the front. No files were loaded and playback remained
+stopped. This narrows the live-resize verification gap to the CUA display/input
+coordinate path; it says nothing about whether the native window minimum
+behaves correctly during an actual user drag.
