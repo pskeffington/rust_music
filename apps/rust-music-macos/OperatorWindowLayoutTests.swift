@@ -56,6 +56,12 @@ private enum OperatorWindowLayoutTests {
             precondition(frame.height >= OperatorWindowLayout.minimumFrames[name]!.height)
         }
 
+        let minimumLibraryViewport = NSRect(x: 0, y: 0, width: 544, height: 384)
+        precondition(!OperatorWindowLayout.canTileAll(in: minimumLibraryViewport))
+        let minimumLibraryFrames = OperatorWindowLayout.initialFrames(in: minimumLibraryViewport)
+        let minimumLibraryFrame = minimumLibraryFrames[OperatorWindowLayout.library]!
+        precondition(minimumLibraryFrame == NSRect(x: 12, y: 12, width: 520, height: 360))
+
         let staleSavedLibraryFrame = NSRect(x: 900, y: -300, width: 1000, height: 800)
         let restoredLibraryFrame = OperatorWindowLayout.fittedFrame(
             staleSavedLibraryFrame,

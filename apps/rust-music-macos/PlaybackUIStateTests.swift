@@ -72,6 +72,45 @@ struct PlaybackUIStateTests {
 
         precondition(PlaybackUIState.flags(for: 2).playing)
         precondition(!PlaybackUIState.flags(for: 2).paused)
+        precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: true, isPaused: false))
+        precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: true))
+        precondition(PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: false))
+        precondition(!PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "ordinary queue refreshes must preserve an independent Library selection during playback")
+        precondition(!PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: true,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "ordinary queue refreshes must preserve an independent Library selection while paused")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "when stopped, the queue current entry remains the play target")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: true,
+            continuePlayback: false
+        ), "explicit queue selection must be reflected during playback")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: true,
+            reflectQueueSelection: true,
+            continuePlayback: false
+        ), "explicit queue selection must be reflected while paused")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: true
+        ), "Next/Previous continuation must reflect its new queue target")
         precondition(!PlaybackUIState.flags(for: 6).playing)
         precondition(PlaybackUIState.flags(for: 6).paused)
         for terminalState: UInt8 in [3, 4, 5] {
@@ -106,14 +145,35 @@ struct PlaybackUIStateTests {
             let paused = try decodeSnapshot(snapshotBody(state: 6, audioClaimed: 0))
             let resumed = try decodeSnapshot(snapshotBody(state: 2, audioClaimed: 1))
             precondition(paused.framesDelivered == resumed.framesDelivered)
-            precondition(!PlaybackUIState.shouldClearProgress(snapshot: paused, selectedIndex: 0))
-            precondition(!PlaybackUIState.shouldClearProgress(snapshot: resumed, selectedIndex: 0))
+            precondition(PlaybackUIState.displayedTrackIndex(
+                isPlaying: true,
+                isPaused: false,
+                snapshot: resumed,
+                selectedIndex: 1
+            ) == 0, "a new Library selection must not replace the track shown as playing")
+            precondition(PlaybackUIState.displayedTrackIndex(
+                isPlaying: false,
+                isPaused: true,
+                snapshot: paused,
+                selectedIndex: 1
+            ) == 0, "a new Library selection must not replace the paused track")
+            precondition(PlaybackUIState.displayedTrackIndex(
+                isPlaying: false,
+                isPaused: false,
+                snapshot: resumed,
+                selectedIndex: 1
+            ) == 1, "when stopped, the Player follows the selected play target")
+            precondition(!PlaybackUIState.shouldClearProgress(snapshot: paused))
+            precondition(!PlaybackUIState.shouldClearProgress(snapshot: resumed))
             let finished = try decodeSnapshot(snapshotBody(state: 4, frames: 441_000))
-            precondition(!PlaybackUIState.shouldClearProgress(snapshot: finished, selectedIndex: 0))
-            precondition(PlaybackUIState.shouldClearProgress(snapshot: resumed, selectedIndex: 1))
+            precondition(!PlaybackUIState.shouldClearProgress(snapshot: finished))
+            // Library selection is independent of the package snapshot's
+            // currently playing track, so selecting a different row must not
+            // discard active playback progress.
+            precondition(!PlaybackUIState.shouldClearProgress(snapshot: resumed))
             for terminalState: UInt8 in [0, 3, 5] {
                 let terminal = try decodeSnapshot(snapshotBody(state: terminalState))
-                precondition(PlaybackUIState.shouldClearProgress(snapshot: terminal, selectedIndex: 0))
+                precondition(PlaybackUIState.shouldClearProgress(snapshot: terminal))
             }
 
             let longDurationFrames = UInt64(44_100) * 3600 * 101

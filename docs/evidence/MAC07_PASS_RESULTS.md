@@ -1326,3 +1326,410 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 rebuilt-candidate catalog import and hidden-target enqueue
+
+On source commit `d09f4a2` (the pass-index-only follow-up was committed
+afterward), `sh scripts/build-macos-app.sh` exited **0**, then the rebuilt
+bundle was freshly launched and explicitly loaded a generated three-file
+metadata-only FLAC catalog. Each file contained STREAMINFO and bounded title,
+artist and album comments, with no FLAC frames or audio samples. The Media
+Library reported three tracks, showed the first selected row, and rendered the
+selection summary. This exercised the refreshed catalog parser and installed
+catalog-ID membership on the rebuilt app.
+
+Searching for the second track left the first track selected and displayed
+`1 SELECTED · 1 OUTSIDE PAGE/SEARCH · BULK USE ALL 1`; Play Selected and Play
+Next were disabled, while Enqueue Selected remained enabled. The Playlist
+Editor then showed exactly one queue row for the first (hidden) selected
+track. Playback remained Ready / No Track with no output snapshot. The queue
+was cleared to zero, the app was quit, and the exact three generated files
+were removed. A subsequent fresh launch showed Player / Ready / No Track,
+not-started time, no output snapshot, and disabled transport controls, with
+no catalog scan or autoplay observed. This is metadata-only UI/state evidence,
+not audio acceptance.
+
+Using macOS Window → Move & Resize → Left and then Top Left produced a
+**736×462 screenshot-pixel** Media Library window where search, browse, sort,
+density, empty-state guidance, paging and bulk actions remained visible.
+Screenshot pixels are not AppKit points; this does not verify the declared
+520×360-point minimum or direct resize enforcement. The app was returned to
+Player / Ready / No Track. VoiceOver remains skipped at the operator's
+direction; private-corpus, hardware and release acceptance remain open.
+
+### 2026-11-02 MAC07-03 compact density controls and 40-track scroll
+
+Candidate source is based on `main` commit `cf83cf22dee8ffba0e58e32fe83039c2acde733f`;
+the RustMusicApp.swift patch from that base has SHA-256
+`c5c90ae209e36016113b165846d25c4d6a51a15f2ef4dbf3fc4bb81caaf88ad5`.
+The Library row-density menu frame was widened from 86 to 160 points. This
+changes only control sizing; Rust Boy colors, type, and surrounding styling are
+unchanged.
+
+The rebuilt bundle was launched and explicitly loaded a generated 40-entry
+metadata-only FLAC-signature catalog (no FLAC frames or audio samples). In the
+macOS `Window > Move & Resize > Top Left` tile, captured at 736×462 screenshot
+pixels, the selected density label changed from clipped `S` to fully visible
+`STANDARD`. Selecting Compact showed the full `COMPACT` label and tighter
+rows. The catalog count stayed at 40, and scrolling to the end exposed
+`Compact Track 039` with the scrollbar at 1. Playback was not started. These
+are screenshot pixels, not AppKit point dimensions, and do not validate the
+declared 520×360-point minimum frame. The attempted native resize was rejected
+by the UI automation layer (`windowNotFoundAtPosition`), so that minimum-frame
+check remains open. VoiceOver testing was omitted at the operator's direction.
+Before quitting, Standard density was restored. The rebuilt app session was
+then quit; the temporary fixture was verified to contain exactly 40 generated
+FLAC-signature files and removed.
+
+`sh scripts/build-macos-app.sh` exited **0**. The strict local app signature
+and included catalog search/scaling, playlist selection, operator-window
+geometry, playback snapshot, catalog bounds, and process-lifecycle harnesses
+passed. The build emitted 17 unused AudioQueue meter/tap diagnostics in
+`rust-music-native`; this UI pass did not change or suppress them. Its synthetic
+250,000-track harness measured index build 125.009 ms, cached-sort p95 39.549
+ms, narrow-search p95 84.224 ms, broad-search p95 131.668 ms, bounded
+200-row broad-page p95 124.432 ms, artist-group index plus page 632.627 ms,
+artist-group narrow-query p95 223.113 ms, and process peak RSS 333,692,928
+bytes. These are synthetic core-harness results, not interactive UI latency,
+full-app memory, or playback-under-load measurements.
+
+At the same source candidate, `sh scripts/offline-gate.sh` exited **0**. It
+passed the full offline gate across 17 local crates and 32 path-only internal
+edges, with zero registry/Git crates; all 36 native macOS AudioQueue tests
+passed. This does not close hardware playback, VoiceOver, private-corpus, or
+acoustic acceptance.
+
+### 2026-11-02 MAC07-03 hidden multi-selection enqueue and current candidate gates
+
+Candidate source is based on `main` commit
+`cf83cf22dee8ffba0e58e32fe83039c2acde733f` (working branch
+`codex/mac07-compact-window-acceptance`, prior committed UI adjustment
+`8cab45e`). The source adds a text-only Library selection summary that reports
+selected rows hidden by the current search/page and clarifies that bulk actions
+use the entire selection. It does not alter Rust Boy styling or start playback.
+
+`sh scripts/build-macos-app.sh` exited **0** on this candidate. Embedded
+synthetic catalog checks passed at 2,000, 20,000, 100,000 and 250,000 tracks;
+the 250k harness reported index build 88.010 ms, cached-sort p95 36.468 ms,
+narrow-search p95 80.742 ms, broad-search p95 140.639 ms, bounded 200-row
+broad-page p95 176.984 ms, artist-group index plus page 666.024 ms,
+artist-group narrow-query p95 233.989 ms, and process peak RSS 327,794,688
+bytes. These are synthetic core-harness metrics, not interactive UI latency or
+full application memory. The bundle's local signature was valid on disk and
+satisfied its designated requirement. The build emitted 17 dead-code warnings
+for optional AudioQueue meter and siphon-tap diagnostics in
+`crates/rust-music-native/src/macos.rs`; that audio-backend-owned crate was not
+modified in this UI pass.
+
+The rebuilt app explicitly loaded a generated three-entry metadata-only
+catalog (FLAC signatures and tags, no audio frames). Shift selection retained
+tracks 01 and 02 while search displayed only track 03. The UI summary reported
+`2 SELECTED · 2 OUTSIDE PAGE/SEARCH · BULK USE ALL 2`; Play and Play Next were
+disabled while Enqueue Selected remained enabled. Activating Enqueue Selected
+made Playlist Editor show exactly `PLAY QUEUE · 2`, with Selection Track 01
+and Selection Track 02. Playback stayed at Ready / No Track with no output
+snapshot. The queue was cleared to `PLAY QUEUE · 0`; the app was quit and the
+exact three-file generated fixture was removed. This verifies hidden-selection
+feedback and bulk enqueue state only, not audio playback.
+
+`sh scripts/offline-gate.sh` exited **0** across 17 local crates and 32
+path-only internal edges; all 36 native AudioQueue tests passed. `git diff
+--check`, `python3 scripts/check_roadmap_index.py`, and JSON parsing for both
+roadmap and MAC07 indexes passed. VoiceOver work was skipped at the operator's
+direction. MAC07-03 remains in progress: VoiceOver speech, direct live window
+resizing, and the exact 520×360 AppKit-point minimum remain unverified.
+Private-corpus parity, route-context diagnosis, physical output/device recovery,
+and full release acceptance also remain open; this build and offline gate do
+not establish production readiness.
+
+### 2026-11-02 MAC07 selection-summary stale-ID regression follow-up
+
+Review of the selection-summary helper found that selected IDs retained after
+a catalog replacement could be counted as tracks hidden by search/page even
+when those IDs no longer exist in the catalog. The summary now counts IDs
+outside the visible set directly, and `CatalogSearchTests.swift` adds a
+regression case with a stale ID. The existing generated three-track UI
+exercise above remains the live evidence for visible/hidden selections and
+queue behavior; this follow-up has not been separately repeated in the UI.
+
+`sh scripts/build-macos-app.sh` exited **0** after the correction. The embedded
+synthetic catalog checks passed at 2,000, 20,000, 100,000 and 250,000 tracks;
+the 250k harness measured index build 94.446 ms, cached-sort p95 41.442 ms,
+narrow-search p95 81.853 ms, broad-search p95 148.836 ms, bounded 200-row
+broad-page p95 150.938 ms, artist-group index plus page 697.213 ms,
+artist-group narrow-query p95 238.629 ms, and process peak RSS 332,890,112
+bytes. These are synthetic core-harness measurements, not interactive UI
+latency or full app memory. The local bundle signature was valid on disk and
+satisfied its designated requirement; 17 unused AudioQueue meter/tap warnings
+remain in the audio-backend-owned source tree.
+
+`sh scripts/offline-gate.sh` exited **0** after the correction across 17 local
+crates and 32 path-only internal edges, including all 36 native macOS
+AudioQueue tests. The exact 520×360-point live window check and VoiceOver
+speech remain open; VoiceOver was skipped at the operator's direction.
+
+### 2026-11-02 correction: selection summary catalog membership
+
+Correction to the preceding stale-ID follow-up: its first implementation used
+set subtraction against only visible rows and therefore still counted a
+selected ID absent from the catalog as hidden. The associated initial
+regression expectation did not catch that distinction. The current candidate
+passes catalog membership into the helper and reports only selected IDs that
+exist in the catalog but are outside the visible search/page. Catalog IDs are
+built alongside the parsed scan result off the main actor; rendering the
+summary uses set intersection/subtraction and does not rescan the catalog.
+Tests cover visible rows, valid hidden rows, no hidden rows, and an ID absent
+from catalog membership.
+
+After this correction, `sh scripts/build-macos-app.sh` exited **0**, including
+the catalog/helper tests, four synthetic scale profiles, process lifecycle,
+and local bundle signature checks. The 250k synthetic harness reported index
+build 194.389 ms, cached-sort p95 61.186 ms, narrow-search p95 138.578 ms,
+broad-search p95 241.004 ms, bounded 200-row page p95 285.971 ms,
+artist-group index plus page 1,083.390 ms, artist-group narrow-query p95
+436.619 ms, and process peak RSS 332,447,744 bytes. The host was measurably
+slower than earlier runs, so these are recorded as one run, not a performance
+regression claim or interactive UI timings. `sh scripts/offline-gate.sh`
+exited **0** across 17 local crates and 32 path-only edges; all 36 native
+AudioQueue tests passed. The build continues to emit 17 unused AudioQueue
+meter/tap warnings in the audio-backend-owned crate. Live resizing, the exact
+520×360-point minimum, VoiceOver speech, private-corpus parity and hardware
+acceptance remain open.
+
+### 2026-11-02 native diagnostic warning cleanup and release gates
+
+Candidate source commit `c18d648` removes the unused AudioQueue level-meter
+and siphon-tap implementations and their fake API stubs. They had no production
+call sites and generated 17 dead-code warnings. The public playback queue,
+route selection, write, and lifecycle paths were not changed; serialized
+diagnostic fields and their defaults remain for protocol compatibility.
+
+`cargo test --locked --offline -p rust-music-native --features macos` passed
+36/36. The release feature build
+`CARGO_NET_OFFLINE=true cargo build --locked --offline --release -p
+rust-music-cli --features macos-output` passed with zero warnings.
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+internal edges, no registry/Git dependencies, warnings-denied Clippy, and all
+36 native AudioQueue tests passed. `cargo fmt --all -- --check`,
+`git diff --check`, `python3 scripts/check_roadmap_index.py` and
+`python3 scripts/check_literature.py` passed.
+
+`sh scripts/build-macos-app.sh` exited **0** with 18/18 symlink-path guards,
+synthetic 2k/20k/100k/250k catalog profiles, UI/IPC and lifecycle harnesses,
+and strict local bundle signature validation. The 250k profile reported
+75.197 ms index construction, 33.323 ms cached-sort p95, 78.272 ms narrow
+search p95, 129.369 ms broad search p95, 124.097 ms bounded 200-row page
+p95, 609.575 ms artist-group index plus page, and 229.540 ms artist-group
+narrow-query p95; peak process RSS was 330,547,200 bytes. These are synthetic
+harness measurements, not interactive UI or representative-media qualification.
+The rebuilt local app opened at `READY / NO TRACK`, with no scan or autoplay.
+
+VoiceOver work was skipped at the operator's direction and is not claimed as
+accepted. The exact live 520×360-point window minimum remains unverified; the
+prior compact screenshot was 736×462 pixels. The private six-file parity
+corpus is unavailable, and CLI route parity, physical device-error recovery,
+DAC/panel/focus checks, and complete release acceptance remain open. These
+local gates do not establish production readiness.
+
+### 2026-11-02 minimum Library viewport geometry regression
+
+At UI candidate commit `db11a08`, the macOS layout harness now exercises the
+minimum viable viewport that leaves the Library's 12-point perimeter margin:
+544×384 AppKit points. It asserts the calculated Library frame is exactly
+`x=12, y=12, width=520, height=360`, the required window tiling path is the
+compact cascade, and the existing `NSWindow.minSize` check remains 520×360.
+`sh scripts/build-macos-app.sh` exited **0**, including this assertion, catalog
+profiles through 250,000 tracks, lifecycle checks, and local bundle signature
+validation. `sh scripts/offline-gate.sh` exited **0** on the exact UI candidate,
+including all 36 native AudioQueue tests.
+
+This closes a deterministic AppKit layout-geometry regression case, not a live
+drag-resize observation. The exact 520×360 live window behavior remains open.
+The current UI automation interface did not provide a usable screenshot or
+native frame measurement in this check; no live-size claim is made. VoiceOver
+remains skipped at the operator's direction.
+
+### 2026-11-02 outer-frame minimum constraint correction
+
+At source commit `148d64d`, redundant SwiftUI content-frame minimums were
+removed from the Player, Playlist, Library, and Equalizer scene content. The
+minimum now comes from `NSWindow.minSize`, which constrains the outer native
+window frame in AppKit points; the 544×384 layout regression continues to
+assert the Library's exact 520×360-point calculated frame. Rust Boy styling and
+window content were not changed.
+
+`sh scripts/build-macos-app.sh` exited **0**, including the minimum viewport
+assertion, scale harnesses, lifecycle checks, and local bundle signature
+validation. `sh scripts/offline-gate.sh` exited **0** on the candidate with 17
+local crates, 32 path-only edges, and all 36 native AudioQueue tests. The CUA
+accessibility tree and screenshot remained available, but coordinate input
+returned `windowNotFoundAtPosition`; this prevented a live drag-size check.
+The correction is source/build verified; live behavior remains unverified.
+
+### 2026-11-02 fresh-bundle compact-window follow-up
+
+The app bundle built from source commit `148d64d` was relaunched after the
+outer-frame minimum correction. The Player opened at `READY / NO TRACK`; the
+Library was then shown through the native Window menu and displayed its
+text-only controls and empty-library guidance. No library load, scan, or
+playback was started. Its screenshot was 1000×850 pixels, not a point-size
+measurement. A new drag attempt at the Library window's lower-right edge
+again failed with `windowNotFoundAtPosition`; the window did not resize. This
+fresh launch therefore confirms startup and Library presentation only. The
+520×360-point live resize remains unverified; the AppKit geometry test remains
+the strongest available size evidence.
+
+### 2026-11-02 CUA display-coordinate diagnosis
+
+The fresh Library window's Window menu offered `Move to Built-in Retina Display`,
+showing it was on a different display. Moving it to the built-in display did not
+make CUA pointer resizing usable: the same lower-right drag failed with
+`windowNotFoundAtPosition` at the translated point `(-279, 2332)`. The Library
+was returned with the Window menu's `Move to Unknown Display` action, then
+Player was brought to the front. No files were loaded and playback remained
+stopped. This narrows the live-resize verification gap to the CUA display/input
+coordinate path; it says nothing about whether the native window minimum
+behaves correctly during an actual user drag.
+
+### 2026-11-02 exact-head local release diagnostics
+
+On source commit `23dcba272a4eccb3814f98153130309dc4279e88` (`codex/mac07-compact-window-acceptance`), the current local release checks were rerun on macOS 26.5.2 (build 25F84), Rust 1.99.1, Cargo 1.99.1, and Swift 6.3.3:
+
+- `sh scripts/offline-gate.sh` exited **0**. It audited 17 local crates, 32 path-only internal edges, zero registry/Git crates, and zero third-party system links; all 36 native AudioQueue tests passed, including simulated invalid-device recovery and diagnostic-session reset coverage.
+- `sh scripts/build-macos-app.sh` exited **0**. It passed 18 symlink-path guards, catalog/UI/IPC/lifecycle harnesses, local app signature validation, and synthetic 2k/20k/100k/250k catalog profiles. At 250k, index construction was 80.621 ms, cached-sort p95 34.465 ms, narrow-search p95 81.062 ms, broad-search p95 136.287 ms, bounded 200-row page p95 132.530 ms, artist-group index plus page 663.754 ms, artist-group narrow-query p95 238.558 ms, and harness process peak RSS 336,887,808 bytes. These synthetic harness measurements are not interactive UI or representative-media qualification.
+- `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check` each exited **0**. The roadmap validator reported 16 gates, 30 tasks, six Codex agents, eight shared-path locks, and three blocked tasks.
+- PR #13 diagnostics for this exact head returned no check runs, status checks, or annotations. This is an empty CI result, not a CI pass.
+
+The local compiler/build diagnostic warnings are clear for these commands. This does not complete MAC07 release acceptance: the private six-track parity corpus is unavailable; same-file CLI output-route parity, live 520×360-point resize, operator playback/transport confirmation on the current candidate, physical device recovery, DAC/panel/focus hardware checks, distribution signing/notarization, and the dependent A/B/UX acceptance remain open or unrun. VoiceOver was skipped at the operator's direction. No production-readiness claim is made.
+
+### 2026-11-02 Library selection playback isolation
+
+At source commit `2c818fe7316d9210ae2eabcf737e8c36df363b1f`, manual Library row selection no longer sends a Stop command, replaces the active playback progress snapshot, or overwrites the playback status. The Player now takes its displayed track identity from the package playback snapshot while playing or paused, and follows the selected play target while stopped. This preserves the single-click-select / explicit-play behavior and avoids stopping playback merely to inspect another row.
+
+`sh scripts/build-macos-app.sh` exited **0**, including the focused playback UI state assertions, 18 symlink-path guards, catalog/UI/IPC/lifecycle harnesses, and local app signature validation. Synthetic 250k-catalog results were: index construction 85.790 ms, cached-sort p95 33.357 ms, narrow-search p95 79.810 ms, broad-search p95 142.283 ms, bounded 200-row page p95 130.988 ms, artist-group index plus page 655.021 ms, artist-group narrow-query p95 229.919 ms, and harness process peak RSS 332,660,736 bytes. `sh scripts/offline-gate.sh` exited **0** with all 36 native AudioQueue tests passing. Roadmap/literature validators and `git diff --check` each exited **0**.
+
+At the time of this build entry, live flicker acceptance had not run because the existing app session was actively playing. The build alone validated source and harness behavior, not the visible blinking symptom. The operator later authorized a restart; the resulting live selection smoke is recorded below. VoiceOver remains skipped at the operator's direction.
+
+### 2026-11-02 live Library selection isolation smoke
+
+Correction to the immediately preceding live-check status: after the operator authorized a restart, the app built from source commit `2c818fe7316d9210ae2eabcf737e8c36df363b1f` was relaunched and exercised with two locally generated, silent 16-bit/44.1-kHz stereo WAVE fixtures. After explicitly loading the test folder and starting the first 60-second silent track, a single click selected the second track. The Library accessibility tree showed the second row selected; the Player still reported the first row as `PLAYING`, and its elapsed time advanced from 00:08 to 00:29 while submitted-frame progress increased from 393,216 to 1,310,720. The selection did not stop playback or reset the Player to the newly selected target. No user music was used in this test, and the silent fixtures were removed afterward.
+
+The live smoke verifies playback/selection state separation on the rebuilt app. It does **not** establish that no transient visual blink occurred: no screen recording was captured. The test output's zero-valued PCM and output-claimed status do not establish audible sound. After the test track completed, the app was quit and relaunched; it returned to `READY / NO TRACK` without an automatic scan or playback.
+
+### 2026-11-02 Play Selected during active playback
+
+The Library `PLAY SELECTED` action was disabled while the Player was Playing or Paused, so the selected track could not be started without stopping first. The button is now enabled whenever the selected visible track is actionable and the scanner/state/transport are idle. Its existing explicit `.select → .setVolumePercent → .play` command sequence replaces the active play target; single-click row selection remains select-only. This does not modify queue or playlist state.
+
+`sh scripts/build-macos-app.sh` exited **0**, including synthetic catalog checks through 250,000 tracks, 18 symlink build-path guards, UI state/window/catalog/playlist harnesses, lifecycle checks, and local bundle signature validation. `sh scripts/offline-gate.sh` exited **0** across the local workspace, including 36 native AudioQueue tests. `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check` each exited **0**.
+
+A fresh live interaction check could not be completed: Launch Services returned `kLSNoExecutableErr` for the rebuilt bundle despite the app executable being present and its signature valid; launching the executable directly exited 134. The app's live selection-to-play transition therefore remains unverified and should be checked after a normal user-session launch. VoiceOver was skipped at the operator's direction.
+
+### 2026-11-02 active-playback Library track switching
+
+On the rebuilt native macOS app, I explicitly loaded two generated 60-second silent 16-bit/44.1-kHz stereo WAVE tracks from a temporary directory. While the first track was Playing, a single click on the second Library row changed the selected row while the Player continued to show the first track and its submitted-frame progress advanced. Activating `PLAY SELECTED` then changed the Player to track 2 and its progress advanced without pressing Stop. Selecting track 1 during track 2 playback and activating `PLAY SELECTED` switched back in the same way. The visible Play Selected control remained enabled while playback was active. The Player's separate Play action and the Command-Return menu action are also no longer disabled solely by active playback.
+
+This confirms state/UI track switching with generated silent PCM and a claimed native output route; it does **not** confirm audible output. A CUA accessibility double-click attempt did not activate row playback, and coordinate double-click input was unavailable due a window-coordinate mapping error; double-click acceptance remains unverified and is not claimed. The silent fixtures were stopped, the app returned to `READY / NO TRACK`, and the generated directory was removed.
+
+`sh scripts/build-macos-app.sh` exited **0** on the final source diff, including synthetic catalog checks through 250,000 tracks, 18 symlink-path guards, UI/window/snapshot/catalog/playlist harnesses, child-process lifecycle checks, and local app signature validation. The exact final source also passed `sh scripts/offline-gate.sh` (17 local crates, 32 path-only edges, and all 36 native AudioQueue tests), `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check`; each exited **0**.
+
+### 2026-11-02 Command-Return track replacement smoke
+
+On the rebuilt app, I explicitly loaded two generated 30-second silent 16-bit/44.1-kHz stereo WAVE tracks and started track 1. While track 1 was Playing, I selected track 2 in the Library and invoked Command-Return. The Player then showed track 2 Playing, with progress advancing. This verifies the Library keyboard action can replace the active play target without Stop. It establishes UI/engine state and output-queue submission only; the fixtures were silent, so audible output was not tested. The generated files were removed, and after closing the test session the app returned to `READY / NO TRACK` without scanning or playback.
+
+### 2026-11-02 live Player resize on built-in display
+
+The rebuilt Player was on another display, so I used its native Window menu to move it to the built-in Retina display before resizing. A bottom-right drag reduced its captured window image from 620×429 screenshot pixels to a compact 494×188 screenshot pixels. At the compact size the heading wrapped, the transport labels shortened, and Previous/Play/Pause/Stop/Next plus volume remained visible. The source window minimum is 520×200 AppKit points; screenshot pixels are not a point measurement and do not establish the exact live frame size. The Player was moved back to its prior display and restored to the larger frame; the app remained `READY / NO TRACK`.
+
+I attempted the same live drag check on Media Library after moving it to the built-in display, but CUA rejected the input at mapped screen coordinate `(-278, 2329)` with `windowNotFoundAtPosition`. The Library was returned to its prior display without resizing. Its exact 520×360-point live minimum and live Library drag behavior remain unverified. This is Player-only live resize evidence; MAC07-03 acceptance remains open.
+
+**Resize follow-up (2026-11-02):** I also used the native Window > Center action on Media Library while it was on the built-in display, then retried the bottom-right drag. CUA still returned `windowNotFoundAtPosition`, now at mapped coordinate `(-237, 2355)`. The Library was returned to its prior display and original size. This confirms the input mapping issue persists after centering; it does not establish native resize failure.
+
+### 2026-11-02 Player Play track replacement smoke
+
+On the rebuilt app, I explicitly loaded two generated 60-second silent 16-bit/44.1-kHz stereo WAVE tracks and started track 1 from the Library. While it was Playing, I selected track 2 in the Library, brought Player forward, and activated the Player `PLAY` control. The Player changed to track 2 without a prior Stop and advanced from 00:00 / 0 submitted frames to 00:03 / 135,168 submitted frames. This verifies the Player control's selected-track replacement path and output-queue submission only; the silent fixture does not verify audibility. I stopped the test playback, removed the generated files, quit the session, and confirmed a fresh launch opened in `READY / NO TRACK` without scanning or autoplay.
+
+### 2026-11-02 Library selection during busy operations
+
+The Library track list was disabled whenever a transport or persistent-state operation was busy, even though clicking a row only changes local selection. That made selection unavailable during playback startup, stop, or queue refresh. The list-level disable was removed; Play, Enqueue, Play Next, and context actions retain their existing busy-state guards.
+
+`sh scripts/build-macos-app.sh` exited **0** on the changed source. It passed the macOS release build, UI/window/snapshot/catalog/playlist and lifecycle harnesses, local signature validation, and synthetic catalog profiles through 250,000 tracks. For the 250k profile, title-index build was 128.843 ms, cached-sort p95 58.495 ms, narrow-search p95 139.946 ms, broad-search p95 211.364 ms, bounded 200-row page p95 215.944 ms, artist-group index plus page 1,363.835 ms, artist-group narrow-query p95 408.564 ms, and harness process peak RSS 332,251,136 bytes. These are synthetic harness measurements, not interactive Library latency.
+
+`sh scripts/offline-gate.sh` also exited **0** with 17 local crates, 32 path-only internal edges, and all 36 native AudioQueue tests passing. `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check` each exited **0**.
+
+On that rebuilt app, two generated 60-second silent 16-bit/44.1-kHz stereo WAVE fixtures were loaded. During track 1 playback, clicking track 2 changed the selected row. Player still showed track 1 Playing at 00:35 with 1,564,672 submitted frames; after stopping, its state changed to Stopped. This verifies row selection stays responsive while playback continues and does not change the active track. It does not confirm audible output. The fixtures were removed; the app was quit and relaunched to `READY / NO TRACK` without scanning or autoplay. MAC07-03 remains in progress; this single interaction is not full UI or release acceptance.
+
+### 2026-11-02 Library keyboard navigation smoke
+
+With three generated one-second silent WAVE fixtures loaded, Down moved the selected Library row from the first track to the third. Tab from the track list focused Search; Shift-Tab from Search returned focus to the window in the current macOS keyboard-navigation configuration. This confirms row arrow navigation and the list-to-search focus handoff only; full Tab/Shift-Tab order across every Library control remains unverified. The app's existing hint points to macOS Keyboard settings for tabbing through all controls; no system preference was changed. The generated fixtures were removed, and a fresh app launch showed `READY / NO TRACK` with no scan or autoplay. VoiceOver remains skipped at the operator's direction.
+
+**Keyboard-navigation follow-up:** System Settings showed “Use keyboard navigation to move focus between controls” was off. With that setting temporarily on, Tab and Shift-Tab traversed the Library's window switcher, Load Library, Search, browse/search/sort/density controls and Play Selected, Enqueue Selected and Play Next actions in both directions. One focus stop between row density and Play Selected did not expose a focused element name in the accessibility snapshot, so the exact track-list focus target was not captured. Down still changed the selected row when the list was activated. The preference was restored to off afterward; no persistent system setting was changed. This verifies the app controls' forward/reverse focus cycle when the macOS preference is enabled, while the exact list focus target remains unverified. MAC07-03 remains in progress; VoiceOver speech was not tested.
+
+### 2026-11-02 Library group browsing and pagination during busy operations
+
+The track list had been made selectable during transport and persistent-state activity, but the Artist/Album list, Browse Selected action and page controls still used the same transport/state lock even though they only change local catalog-view state. Those browsing controls now remain available during such operations; queue and playback mutations keep their existing busy guards. `moveCatalogPage` no longer rejects an otherwise valid local page change because transport or state work is active.
+
+`sh scripts/build-macos-app.sh` exited **0** on this change. The macOS app built and passed the UI, window, snapshot, catalog, playlist, lifecycle and signature checks. Synthetic 250k-catalog results were: title-index build 76.163 ms, cached-sort p95 38.166 ms, narrow-search p95 77.291 ms, broad-search p95 135.251 ms, bounded 200-row page p95 117.058 ms, artist-group index plus page 603.333 ms, artist-group narrow-query p95 227.954 ms, and harness process peak RSS 346,275,840 bytes. These harness timings do not measure live SwiftUI responsiveness.
+
+A live interaction check was not run because the Mac session was locked and CUA reported that automatic unlock was paused after physical input. This source/build evidence does not verify that the Artist/Album list or page controls visibly respond during live playback or a state command. MAC07-03 remains in progress; no playback or audio claim is made.
+
+### 2026-11-02 stale Artist/Album selection after view refresh
+
+The Artist/Album browse action was enabled whenever `selectedBrowseGroupID` was non-nil, even if a new search or page no longer contained that group. Activating the enabled action then became a no-op because `openSelectedBrowseGroup` only acts on an item in the visible page. Search and page changes now clear the selection immediately; completed browse refreshes also discard IDs that are no longer visible. The button and accessibility action require the selected ID to be visible. A CatalogSearch regression covers retaining a visible selection and clearing it for an empty, filtered, or paged-away result.
+
+`sh scripts/build-macos-app.sh` exited **0**, including the macOS release build, catalog and UI harnesses, lifecycle checks, and local app signature validation. Synthetic 250k catalog results were: title-index build 152.680 ms, cached-sort p95 64.035 ms, narrow-search p95 140.802 ms, broad-search p95 219.227 ms, bounded 200-row page p95 246.620 ms, artist-group index plus page 1,087.655 ms, artist-group narrow-query p95 488.417 ms, and test-process peak RSS 330,924,032 bytes. These are harness measurements, not interactive Library latency. `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check` exited **0**.
+
+The newly reported track-selection-only-after-Stop symptom was not reproduced in this session: the running app had no library loaded, and the native folder chooser navigation did not complete. Current source has no playback-state guard in the track-selection binding/handler; prior live smoke evidence showed a row selection during active playback, but it does not verify the current candidate or explain the new report. No real library files were loaded, and no playback or audio claim is made. MAC07-03 remains in progress.
+
+**Live-check correction (2026-11-02):** I then loaded two generated 30-second zero-PCM, 44.1-kHz mono WAVE fixtures from a temporary workspace folder. With track 2 Playing, Library row 1 became selected on click; the Player stayed on track 2 and its progress advanced from 00:09 / 430,080 submitted frames to 00:17 / 778,240 frames. `PLAY SELECTED` remained enabled and switched playback to track 1, which showed 00:05 / 237,568 submitted frames. This demonstrates row selection and target switching without Stop in the running app session. PCM was intentionally silent, so audibility is not established. I stopped playback, quit the app, and removed the fixtures.
+
+The live session predated the latest bundle rebuild; its track-selection source path is unchanged from `7789875`. The rebuilt `cd9b3a8` app passed build and signature verification, but Launch Services could not relaunch it from `target/macos/RustMusic.app` (`kLSNoExecutableErr`); launching its executable directly is not a valid GUI test and aborted at `GetCurrentProcess`. Candidate-binary runtime acceptance remains pending. MAC07-03 remains in progress.
+
+**Launch-check correction (2026-11-02):** The prior `open` and direct-executable attempts ran from the restricted engineering shell, so their Launch Services results do not establish a bundle-launch defect. After the test app was confirmed quit and all generated fixtures were removed, `cua.getApp("dev.rustmusic.standalone")` launched the rebuilt bundle in the desktop session. The Player showed `READY / NO TRACK`, no playback snapshot, and disabled transport controls. This confirms fresh candidate launch without scan or autoplay in the desktop UI. It does not establish audible output or other hardware acceptance.
+
+**Selection report follow-up (2026-11-02):** On the launched app, I loaded two generated 30-second, mono, 16-bit/44.1-kHz silent WAVE fixtures. With track 2 Playing, one click selected track 1 in Media Library while track 2 remained Playing and its submitted-frame count advanced. Activating `PLAY SELECTED` then switched to track 1 without a Stop command. This confirms the visible row selection and replacement path work during playback in this session; the silent fixtures do not establish audibility or explain why selection may still be blocked in the user's music session. I stopped playback, quit the app, removed both fixtures, and relaunched to `READY / NO TRACK` without scanning or autoplay. No selection-handler code change was needed because the current binding has no playback-state guard. MAC07-03 remains in progress.
+
+**Library search-during-scan follow-up (2026-11-02):** A generated catalog of 20,000 one-frame silent WAVE tracks loaded successfully. I then added 80,000 unsupported text files (100,000 total directory entries, the configured scan-entry ceiling) to lengthen a second scan. During that scan, the Library showed `SCANNING · 100 PRIOR TRACKS`; the Search text field was exposed as settable and the retained 100 matching rows remained visible. I issued a Title-scope query change from `group-199` to `group-198`; the next AX snapshot, about two seconds later, showed 100 matching `group-198` tracks, with scanning already complete. This confirms Search remains enabled and the old filtered catalog remains visible during a scan. The snapshot timing does not establish that query filtering completed before the rescan ended. The scan itself completed with the new catalog loaded and did not start playback. I quit, removed the generated directory, and relaunched to `READY / NO TRACK` without scanning or autoplay. This is UI behavior evidence, not audio evidence; MAC07-03 remains in progress.
+
+### 2026-11-02 current-candidate Player compact/expanded layout
+
+After the fresh desktop launch, the Player was visually inspected at its expanded frame (about 620×440 screenshot pixels), resized live to about 525×365 screenshot pixels, and expanded again to about 625×440 screenshot pixels. At the compact frame the now-playing heading wrapped and transport labels shortened; Previous, Play, Pause, Stop, Next, and volume remained visible. These are screenshot-pixel estimates, not AppKit point measurements. No playback or library scan was active.
+
+The same candidate's Media Library showed its toolbar, zero-track empty state, page controls, and disabled track actions in an expanded screenshot (about 1280×660 screenshot pixels). Two live resize drags were rejected by CUA with `windowNotFoundAtPosition`, so compact Library layout and the exact 520×360-point live minimum remain unverified. MAC07-03 remains in progress.
+
+### 2026-11-02 height-responsive Library layout source/build pass
+
+At worktree source based on `dc5e7e5`, `LibraryPanelLayout` now selects a compact presentation below 420 points of available Library content height. Compact mode reduces Library section/content spacing to 4 points, outer content padding to 4 points, GroupBox padding to 6 points, and the results region's minimum height from 96 to 40 points. Standard mode retains the prior values. Rust Boy colors, type, and components are unchanged. A focused Swift harness covers the compact and standard configuration values and is included in `scripts/build-macos-app.sh`.
+
+`sh scripts/build-macos-app.sh` exited **0** on this worktree. The new layout harness, catalog correctness, synthetic profiles through 250,000 tracks, playlist/window/snapshot/catalog-bound harnesses, process lifecycle checks, and local app signature validation passed. The 250k harness process peak RSS was 336,887,808 bytes. The layout harness checks breakpoints and parameter values; it does not render the SwiftUI hierarchy or prove that all controls remain visible at a 520×360-point native window size.
+
+Live layout review was not possible because CUA reported that the Mac was locked and automatic unlock could not unlock it. The exact native 520×360-point minimum, expanded-size comparison, control visibility at both sizes, and keyboard order therefore remain unverified. MAC07-03 remains in progress; this is source/build evidence only, with no playback or audio claim.
+
+### 2026-11-02 compact Library toolbar and queue-refresh selection guard
+
+The responsive Library toolbar now uses compact widths for its search-scope, sort, and row-density menus below 644 points of measured content width, with a 9-point monospaced control font; standard sizing is unchanged. The AppKit layout harness checks picker label/value widths, a 12-point chevron allowance, and at least 16 points of remaining toolbar width in a modeled 520×360-point outer window. This is geometry arithmetic, not a rendered SwiftUI or native frame measurement.
+
+Queue refresh previously reflected the current queue entry back into the Library selection unconditionally. It now does so only while neither Playing nor Paused, preserving the user's selected Library row across queue refreshes during active playback. A PlaybackUIState regression covers Playing, Paused, and stopped behavior. The Library list remains locally selectable while transport and persistent-state actions are busy; queue and playback mutations retain their busy guards.
+
+`git diff --check` and `sh scripts/build-macos-app.sh` completed successfully (build exit **0**). The app build, playback-state and compact-layout harnesses, catalog correctness and synthetic 2k/20k/100k/250k profiles, playlist/window/lifecycle harnesses, and local signature validation passed. For the 250k synthetic catalog, title-index build was 74.290 ms, cached-sort p95 37.390 ms, narrow-search p95 77.828 ms, broad-search p95 135.114 ms, bounded 200-row page p95 117.674 ms, artist-group index plus page 601.193 ms, artist-group narrow-query p95 239.425 ms, and harness peak RSS 336,953,344 bytes. These are synthetic harness measurements, not interactive Library latency.
+
+The desktop session is currently locked, so the reported song-selection issue could not be reproduced against this rebuilt candidate. Live selection while Playing/Paused, queue-refresh interaction, and actual 520×360-point toolbar visibility remain unverified. No playback or audio claim is made; MAC07-03 remains in progress.
+
+**Selection-path correction (2026-11-02, after source `c5ebb77`):** The earlier statement that no selection-handler code change was needed described the direct row-binding path only. Review found a separate `applyQueueResult` path: ordinary queue mutations could copy `queue.current` into the Library play target while Playing or Paused, and could stop playback if that replaced the current selected target. Ordinary queue results now preserve independent Library selection during active or paused playback. Stopped results, explicit queue-entry selection, and Next/Previous/EOF continuation still update the target under their existing semantics. A focused state matrix covers these cases.
+
+The focused `PlaybackUIState` harness and `sh scripts/build-macos-app.sh` both exited **0** on the follow-up source. The build passed the macOS app build and signature, playback/UI, catalog, window, and lifecycle checks. This is source/build evidence only: the Mac remains locked, so the user's click behavior has not been reproduced on the rebuilt candidate and this fix is not live-verified. MAC07-03 remains in progress; no audio claim is made.
+
+**Read-only safety review:** `safety_reviewer` found no blocking findings and no new audio-focus or playback side effects in this selection-policy change. The regression exercises the helper policy, not the full `PlayerModel.applyQueueResult` flow; the live click remains unverified while macOS is locked. MAC07-03 stays in progress.
+
+**Compact-toolbar harness correction (2026-11-02):** The earlier paragraph describes a modeled 520×360-point outer window using an estimated inset. The current `LibraryPanelLayoutTests` instead directly constructs compact and standard `GeometryReader` content sizes of 484×320 and 964×660 points, respectively. It does not assert that either content size maps to a particular outer native window frame. The live 520×360-point window's toolbar visibility remains unverified; MAC07-03 remains in progress.
+
+### 2026-11-02 verification at `2b7c49be79ff10f7013fa805cb58f7d9a63287b7`
+
+An independent `sh scripts/build-macos-app.sh` run exited **0**. App signature validation and the catalog, layout, playback, window, and lifecycle harnesses passed. Synthetic 250k-catalog results: index build 68.106 ms; cached-sort p95 33.800 ms; narrow-search p95 79.280 ms; broad-search p95 130.711 ms; bounded 200-row page p95 113.940 ms; artist-group index plus page 589.442 ms; artist-group narrow-query p95 226.668 ms; harness process peak RSS 336,887,808 bytes. These are synthetic harness metrics. No live SwiftUI, song-selection, or audio behavior was verified; MAC07-03 remains in progress.
+
+### 2026-11-02 live selection regression and toolbar review
+
+On the rebuilt app containing the current Library toolbar width adjustment, I explicitly loaded a temporary two-track silent WAV fixture. While Alpha was Playing, clicking Bravo changed the selected Library row to Bravo and left Alpha Playing; the Player time advanced from 00:17 to 00:20. Enqueue Selected then left Alpha as the Player's current track (00:32 through 00:41 observed) and Playlist Editor showed Alpha as the current queue entry followed by Bravo. This reproduces the reported selection/queue interaction with synthetic silent fixtures. It does not establish audible output or validate the supplied lossless corpus.
+
+Expanded Media Library screenshot and accessibility state showed the full `TITLE` search-scope value alongside Browse, Sort, Rows, and the track count. This verifies visible standard-size toolbar content. A live 520×360-point Library frame was not reached: CUA's native resize hit-testing previously failed, and no exact point-sized frame was observed. The screen was not tested with a compact-width outer frame in this turn. Keyboard forward/reverse traversal evidence from the preceding session remains recorded above; VoiceOver was not tested per user direction.
+
+The temporary fixtures were silent, and the UI itself stated `Audible output is not confirmed`; no audio claim is made. MAC07-03 is partially verified and remains in progress pending exact compact-frame and broader interaction acceptance.

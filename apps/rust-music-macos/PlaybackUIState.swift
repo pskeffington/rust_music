@@ -219,15 +219,41 @@ struct PackagePlaybackSnapshot: Equatable {
 }
 
 enum PlaybackUIState {
+    static func shouldReflectQueueSelection(isPlaying: Bool, isPaused: Bool) -> Bool {
+        !isPlaying && !isPaused
+    }
+
+    static func shouldApplyQueueResultSelection(
+        isPlaying: Bool,
+        isPaused: Bool,
+        reflectQueueSelection: Bool,
+        continuePlayback: Bool
+    ) -> Bool {
+        reflectQueueSelection
+            || continuePlayback
+            || shouldReflectQueueSelection(isPlaying: isPlaying, isPaused: isPaused)
+    }
+
     static func flags(for state: UInt8) -> (playing: Bool, paused: Bool) {
         (playing: state == 2, paused: state == 6)
     }
 
-    static func shouldClearProgress(snapshot: PackagePlaybackSnapshot, selectedIndex: Int?) -> Bool {
-        guard snapshot.state != 0, snapshot.state != 3, snapshot.state != 5,
-              let selectedIndex, let selected = UInt16(exactly: selectedIndex) else {
+    static func displayedTrackIndex(
+        isPlaying: Bool,
+        isPaused: Bool,
+        snapshot: PackagePlaybackSnapshot?,
+        selectedIndex: Int?
+    ) -> Int? {
+        if (isPlaying || isPaused), let playing = snapshot?.selected {
+            return Int(playing)
+        }
+        return selectedIndex
+    }
+
+    static func shouldClearProgress(snapshot: PackagePlaybackSnapshot) -> Bool {
+        guard ![0, 3, 5].contains(snapshot.state), snapshot.selected != nil else {
             return true
         }
-        return snapshot.selected != selected
+        return false
     }
 }

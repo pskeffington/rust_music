@@ -802,10 +802,6 @@ struct RustMusicApp: App {
         .windowResizability(.automatic)
         Window("Rust Music — Equalizer", id: "equalizer") {
             EqualizerWindow()
-                .frame(
-                    minWidth: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.equalizer]!.width,
-                    minHeight: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.equalizer]!.height
-                )
                 .background(WindowFramePersistence(name: OperatorWindowLayout.equalizer))
                 .background(RustMusicPalette.background)
                 .preferredColorScheme(.dark)
@@ -817,7 +813,6 @@ struct RustMusicApp: App {
 
     private func playerWindow(_ kind: PlayerWindowKind) -> some View {
         PlayerView(model: model, kind: kind)
-            .frame(minWidth: kind.minimumWidth, minHeight: kind.minimumHeight)
             .background(WindowFramePersistence(name: kind.frameName))
             .background(RustMusicPalette.background)
             .preferredColorScheme(.dark)
@@ -903,8 +898,6 @@ private struct RustMusicCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(
                     !model.selectedTrackIsActionableInLibrary
-                        || model.isPlaying
-                        || model.isPaused
                         || model.isScanning
                         || model.isStateBusy
                         || model.isTransportBusy
@@ -997,22 +990,6 @@ private enum PlayerWindowKind {
     case player
     case playlist
     case library
-
-    var minimumWidth: CGFloat {
-        switch self {
-        case .player: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.player]!.width
-        case .playlist: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.playlist]!.width
-        case .library: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.width
-        }
-    }
-
-    var minimumHeight: CGFloat {
-        switch self {
-        case .player: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.player]!.height
-        case .playlist: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.playlist]!.height
-        case .library: OperatorWindowLayout.minimumFrames[OperatorWindowLayout.library]!.height
-        }
-    }
 
     var frameName: String {
         switch self {
@@ -1407,9 +1384,12 @@ final class PlayerModel: ObservableObject {
             refreshVisibleTracks()
         }
     }
+    private var catalogTrackIDs: Set<Int> = []
     @Published var selectedIndex: Int? {
         didSet {
-            if oldValue != selectedIndex { playbackSnapshot = nil }
+            if oldValue != selectedIndex, !isPlaying, !isPaused {
+                playbackSnapshot = nil
+            }
         }
     }
     @Published var selectedTrackIDs: Set<Int> = []
@@ -1417,7 +1397,10 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var playlistNameFocusGeneration: UInt64 = 0
     @Published var searchText = "" {
         didSet {
-            if oldValue != searchText { catalogPageOffset = 0 }
+            if oldValue != searchText {
+                catalogPageOffset = 0
+                selectedBrowseGroupID = nil
+            }
             refreshVisibleTracks()
         }
     }
@@ -1537,6 +1520,17 @@ final class PlayerModel: ObservableObject {
         return tracks.first(where: { $0.id == selectedIndex })
     }
 
+    var nowPlayingTrack: CatalogTrack? {
+        let displayedIndex = PlaybackUIState.displayedTrackIndex(
+            isPlaying: isPlaying,
+            isPaused: isPaused,
+            snapshot: playbackSnapshot,
+            selectedIndex: selectedIndex
+        )
+        guard let displayedIndex else { return nil }
+        return tracks.first(where: { $0.id == displayedIndex })
+    }
+
     var selectedTrackMatchesCurrentSearch: Bool {
         guard let selectedTrack else { return false }
         return CatalogSearch.matches(selectedTrack, matching: searchText, in: searchScope)
@@ -1545,6 +1539,14 @@ final class PlayerModel: ObservableObject {
     var selectedTrackIsVisibleOnCurrentLibraryPage: Bool {
         guard let selectedTrack else { return false }
         return visibleTracks.contains(where: { $0.id == selectedTrack.id })
+    }
+
+    var selectedTrackCountOutsideLibraryView: Int {
+        CatalogSearch.selectedTrackCountOutsideView(
+            selectedTrackIDs,
+            catalogTrackIDs: catalogTrackIDs,
+            visibleTrackIDs: Set(visibleTracks.map(\.id))
+        )
     }
 
     var selectedTrackIsActionableInLibrary: Bool {
@@ -1559,6 +1561,13 @@ final class PlayerModel: ObservableObject {
             matching: searchText,
             in: searchScope
         )
+    }
+
+    var selectedBrowseGroupIsVisible: Bool {
+        CatalogSearch.retainedBrowseSelection(
+            selectedBrowseGroupID,
+            visibleGroups: visibleBrowseGroups
+        ) != nil
     }
 
     var selectedTracksInCatalogOrder: [CatalogTrack] {
@@ -1706,6 +1715,10 @@ final class PlayerModel: ObservableObject {
                 self.visibleTrackTotal = trackPage?.totalMatches ?? 0
                 self.visibleBrowseGroups = groupPage?.groups ?? []
                 self.visibleBrowseGroupTotal = groupPage?.totalMatches ?? 0
+                self.selectedBrowseGroupID = CatalogSearch.retainedBrowseSelection(
+                    self.selectedBrowseGroupID,
+                    visibleGroups: self.visibleBrowseGroups
+                )
                 self.catalogPageOffset = trackPage?.offset ?? groupPage?.offset ?? 0
                 self.visibleResultGeneration &+= 1
             }
@@ -1713,7 +1726,7 @@ final class PlayerModel: ObservableObject {
     }
 
     func moveCatalogPage(by direction: Int) {
-        guard direction != 0, !isTransportBusy, !isStateBusy else { return }
+        guard direction != 0 else { return }
         let navigation = CatalogPageNavigation(
             totalItems: browseMode == .tracks ? visibleTrackTotal : visibleBrowseGroupTotal,
             offset: catalogPageOffset,
@@ -1722,6 +1735,7 @@ final class PlayerModel: ObservableObject {
         )
         guard let nextOffset = navigation.adjacentOffset(forward: direction > 0) else { return }
         catalogPageOffset = nextOffset
+        selectedBrowseGroupID = nil
         refreshVisibleTracks()
     }
 
@@ -1858,7 +1872,11 @@ final class PlayerModel: ObservableObject {
                 self.selectedQueueIndex = queue.current
                 self.repeatMode = queue.repeatMode
                 self.shuffleSeed = queue.shuffleSeed
-                if let current = queue.current,
+                if PlaybackUIState.shouldReflectQueueSelection(
+                    isPlaying: self.isPlaying,
+                    isPaused: self.isPaused
+                ),
+                   let current = queue.current,
                    let entry = queue.entries.first(where: { $0.index == current }),
                    let track = self.tracks.first(where: { $0.relativePath == entry.relativePath }) {
                     self.selectedIndex = track.id
@@ -2142,7 +2160,13 @@ final class PlayerModel: ObservableObject {
                 }
                 return
             }
-            if let current = queue.current,
+            if PlaybackUIState.shouldApplyQueueResultSelection(
+                isPlaying: isPlaying,
+                isPaused: isPaused,
+                reflectQueueSelection: reflectQueueSelection,
+                continuePlayback: continuePlayback
+            ),
+               let current = queue.current,
                let entry = queue.entries.first(where: { $0.index == current }),
                let track = tracks.first(where: { $0.relativePath == entry.relativePath }) {
                 let selectionChanged = selectedIndex != track.id
@@ -2255,7 +2279,7 @@ final class PlayerModel: ObservableObject {
                     outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
                 }
                 process.waitUntilExit()
-                let result: Result<[CatalogTrack], RustMusicFailure>
+                let result: Result<ParsedCatalog, RustMusicFailure>
                 if let outputFailure {
                     result = .failure(RustMusicFailure(message: outputFailure))
                 } else if process.terminationStatus == 0 {
@@ -2276,15 +2300,16 @@ final class PlayerModel: ObservableObject {
             let wasCancelled = self.scanCancellationRequested
             self.scanCancellationRequested = false
             switch result {
-            case .success(let tracks):
+            case .success(let catalog):
                 self.libraryScanNotice = nil
                 self.audioQueueDiagnosticSummary = nil
                 self.libraryStateRevision.advance()
                 self.libraryRoot = root
-                self.tracks = tracks
-                self.selectedIndex = tracks.first?.id
-                self.selectedTrackIDs = tracks.first.map { Set([$0.id]) } ?? []
-                self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
+                self.catalogTrackIDs = catalog.trackIDs
+                self.tracks = catalog.tracks
+                self.selectedIndex = catalog.tracks.first?.id
+                self.selectedTrackIDs = catalog.tracks.first.map { Set([$0.id]) } ?? []
+                self.status = "Loaded \(catalog.tracks.count) tracks. Playback is stopped."
                 self.reloadPersistentState()
             case .failure(let failure):
                 self.libraryScanNotice = wasCancelled
@@ -2412,7 +2437,7 @@ final class PlayerModel: ObservableObject {
         switch response {
         case .view(let snapshot, let diagnostic):
             if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
-            if PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+            if PlaybackUIState.shouldClearProgress(snapshot: snapshot) {
                 playbackSnapshot = nil
             } else {
                 playbackSnapshot = snapshot
@@ -2525,7 +2550,7 @@ final class PlayerModel: ObservableObject {
         switch response {
         case .view(let snapshot, let diagnostic):
             if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
-            if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+            if !PlaybackUIState.shouldClearProgress(snapshot: snapshot) {
                 playbackSnapshot = snapshot
             }
             let flags = PlaybackUIState.flags(for: snapshot.state)
@@ -2632,7 +2657,9 @@ final class PlayerModel: ObservableObject {
         let id: Int? = selected
         guard selectedIndex != id else { return }
         selectedIndex = id
-        if isPlaying || isPaused { stop() }
+        if !isPlaying, !isPaused, let track = selectedTrack {
+            status = "Selected \(track.title). Press Play to start output."
+        }
     }
 
     private func advanceQueueAfterEnd() {
@@ -2664,7 +2691,12 @@ final class PlayerModel: ObservableObject {
         return changed
     }
 
-    nonisolated private static func parseCatalog(_ data: Data) -> Result<[CatalogTrack], RustMusicFailure> {
+    private struct ParsedCatalog: Sendable {
+        let tracks: [CatalogTrack]
+        let trackIDs: Set<Int>
+    }
+
+    nonisolated private static func parseCatalog(_ data: Data) -> Result<ParsedCatalog, RustMusicFailure> {
         let maximumTrackCount = 20_000
         guard data.count <= CatalogValidation.maximumOutputBytes else {
             return .failure(RustMusicFailure(message: "Rust Music catalog exceeded its output limit."))
@@ -2673,6 +2705,7 @@ final class PlayerModel: ObservableObject {
             return .failure(RustMusicFailure(message: "Rust Music returned invalid catalog text."))
         }
         var tracks: [CatalogTrack] = []
+        var trackIDs = Set<Int>()
         let estimatedRows = min(maximumTrackCount, data.count / 96)
         tracks.reserveCapacity(estimatedRows)
         var reportedCount: Int?
@@ -2707,11 +2740,12 @@ final class PlayerModel: ObservableObject {
                 album: album,
                 relativePath: relativePath
             ))
+            trackIDs.insert(index)
         }
         guard reportedCount == tracks.count else {
             return .failure(RustMusicFailure(message: "Rust Music catalog count did not match its rows."))
         }
-        return .success(tracks)
+        return .success(ParsedCatalog(tracks: tracks, trackIDs: trackIDs))
     }
 
     nonisolated private static func decodeHex(_ value: Substring) -> String? {
@@ -2854,12 +2888,15 @@ private struct PlayerView: View {
         PipBoyChassis {
             VStack(spacing: 0) {
                 if kind == .library {
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                        libraryPanel
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    GeometryReader { proxy in
+                        let layout = LibraryPanelLayout(contentSize: proxy.size)
+                        VStack(alignment: .leading, spacing: layout.sectionSpacing) {
+                            header
+                            libraryPanel(layout: layout)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        }
+                        .padding(layout.contentPadding)
                     }
-                    .padding(10)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
@@ -2952,11 +2989,11 @@ private struct PlayerView: View {
                         .tracking(1.3)
                         .foregroundStyle(model.isPlaying ? RustMusicPalette.phosphor : RustMusicPalette.muted)
                     Spacer()
-                    Text(model.selectedTrack.map { String(format: "TRACK %03d", $0.id + 1) } ?? "NO TRACK")
+                    Text(model.nowPlayingTrack.map { String(format: "TRACK %03d", $0.id + 1) } ?? "NO TRACK")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                 }
-                Text(model.selectedTrack?.title ?? "Choose a track from your library")
+                Text(model.nowPlayingTrack?.title ?? "Choose a track from your library")
                     .font(.system(size: 23, weight: .semibold, design: .monospaced))
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
@@ -3052,7 +3089,7 @@ private struct PlayerView: View {
     }
 
     private var nowPlayingDetail: String {
-        guard let track = model.selectedTrack else {
+        guard let track = model.nowPlayingTrack else {
             return "Playback starts only after you press Play."
         }
         let creator = [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -3122,7 +3159,7 @@ private struct PlayerView: View {
         TextField(searchPlaceholder, text: $model.searchText)
             .modifier(RustMusicTextFieldStyle())
             .focused($librarySearchIsFocused)
-            .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
+            .disabled(model.tracks.isEmpty)
             .accessibilityLabel(searchAccessibilityLabel)
     }
 
@@ -3156,59 +3193,62 @@ private struct PlayerView: View {
         .accessibilityIdentifier("library-browse-mode")
     }
 
-    private var librarySearchScopePicker: some View {
+    private func librarySearchScopePicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("IN", selection: $model.searchScope) {
             ForEach(CatalogSearch.SearchScope.allCases) { scope in
                 Text(scope.label).tag(scope)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 86)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Search library in")
         .accessibilityHint("Choose all fields, title, artist, or album.")
         .accessibilityIdentifier("library-search-scope")
     }
 
-    private var librarySortPicker: some View {
+    private func librarySortPicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("SORT", selection: $model.sortOrder) {
             ForEach(CatalogSearch.SortOrder.allCases) { order in
                 Text(order.label).tag(order)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 132)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Sort library tracks")
         .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
         .accessibilityIdentifier("library-sort-order")
     }
 
-    private var libraryDensityPicker: some View {
+    private func libraryDensityPicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("ROWS", selection: $libraryRowDensityRawValue) {
             ForEach(LibraryRowDensity.allCases) { density in
                 Text(density.label).tag(density.rawValue)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 86)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Library row density")
         .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
         .accessibilityIdentifier("library-row-density")
     }
 
-    private var libraryTrackCountLabel: some View {
+    private func libraryTrackCountLabel(layout: LibraryPanelLayout) -> some View {
         let count = model.browseMode == .tracks ? model.visibleTrackTotal : model.visibleBrowseGroupTotal
         return Text(model.isScanning
             ? "SCANNING · \(count) PRIOR \(model.browseMode.label)"
             : "\(count) \(model.browseMode.label)")
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(.system(size: layout.countLabelFontSize, weight: .medium, design: .monospaced))
             .foregroundStyle(RustMusicPalette.muted)
             .fixedSize()
     }
 
-    private var libraryPanel: some View {
+    private func libraryPanel(layout: LibraryPanelLayout) -> some View {
         let visibleTracks = model.visibleTracks
         let visibleGroups = model.visibleBrowseGroups
         let rowDensity = LibraryRowDensity(rawValue: libraryRowDensityRawValue) ?? .standard
@@ -3260,18 +3300,20 @@ private struct PlayerView: View {
             emptyState = nil
         }
         return GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: layout.contentSpacing) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: layout.toolbarItemSpacing) {
                         librarySearchField
                             .frame(minWidth: 145)
                         libraryBrowseModePicker
                         if model.browseMode == .tracks {
-                            librarySearchScopePicker
+                            librarySearchScopePicker(width: layout.searchScopePickerWidth, layout: layout)
                         }
-                        if model.browseMode == .tracks { librarySortPicker }
-                        libraryDensityPicker
-                        libraryTrackCountLabel
+                        if model.browseMode == .tracks {
+                            librarySortPicker(width: layout.sortPickerWidth, layout: layout)
+                        }
+                        libraryDensityPicker(width: layout.densityPickerWidth, layout: layout)
+                        libraryTrackCountLabel(layout: layout)
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
@@ -3279,14 +3321,14 @@ private struct PlayerView: View {
                                 .frame(maxWidth: .infinity)
                             libraryBrowseModePicker
                         }
-                        HStack(spacing: 8) {
+                        HStack(spacing: layout.toolbarItemSpacing) {
                             if model.browseMode == .tracks {
-                                librarySearchScopePicker
-                                librarySortPicker
+                                librarySearchScopePicker(width: layout.searchScopePickerWidth, layout: layout)
+                                librarySortPicker(width: layout.sortPickerWidth, layout: layout)
                             }
-                            libraryDensityPicker
+                            libraryDensityPicker(width: layout.densityPickerWidth, layout: layout)
                             Spacer(minLength: 0)
-                            libraryTrackCountLabel
+                            libraryTrackCountLabel(layout: layout)
                         }
                     }
                 }
@@ -3325,6 +3367,22 @@ private struct PlayerView: View {
                             .accessibilityLabel("Clear artist and album filters")
                     }
                     .accessibilityIdentifier("library-group-track-filters")
+                }
+
+                if model.browseMode == .tracks, !model.selectedTrackIDs.isEmpty {
+                    let selectedCount = model.selectedTrackIDs.count
+                    let outsideViewCount = model.selectedTrackCountOutsideLibraryView
+                    let selectionSummary = outsideViewCount == 0
+                        ? "\(selectedCount) SELECTED · BULK ACTIONS USE ALL SELECTED TRACKS"
+                        : "\(selectedCount) SELECTED · \(outsideViewCount) OUTSIDE PAGE/SEARCH · BULK USE ALL \(selectedCount)"
+                    Text(selectionSummary)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Library selection")
+                        .accessibilityValue(selectionSummary)
+                        .accessibilityIdentifier("library-selection-summary")
                 }
 
                 if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {
@@ -3410,7 +3468,8 @@ private struct PlayerView: View {
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(RustMusicPalette.display)
-                        .disabled(model.isTransportBusy || model.isStateBusy)
+                        // Browsing is local UI state; keep track selection responsive
+                        // while transport or persistent queue commands are in flight.
                         .accessibilityLabel("Library tracks")
                         .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
                         .conditionalAccessibilityAction(
@@ -3468,13 +3527,13 @@ private struct PlayerView: View {
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
                             .background(RustMusicPalette.display)
-                            .disabled(model.isTransportBusy || model.isStateBusy)
+                            // Group selection and browsing only update local catalog view state.
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
                             .accessibilityHint(model.browseMode == .artists
                                 ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
                                 : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
                             .conditionalAccessibilityAction(
-                                model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
+                                model.selectedBrowseGroupIsVisible,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
                             ) {
                                 model.openSelectedBrowseGroup()
@@ -3486,16 +3545,16 @@ private struct PlayerView: View {
                                 model.openSelectedBrowseGroup()
                             }
                             .keyboardShortcut(.return, modifiers: [])
-                            .disabled(model.selectedBrowseGroupID == nil || model.isTransportBusy || model.isStateBusy)
+                            .disabled(!model.selectedBrowseGroupIsVisible)
                             .accessibilityIdentifier("library-open-selected-group")
                         }
                     }
                 }
-                .frame(minHeight: 96, maxHeight: .infinity)
+                .frame(minHeight: layout.minimumResultsHeight, maxHeight: .infinity)
 
                 HStack(spacing: 8) {
                     Button("PREV PAGE") { model.moveCatalogPage(by: -1) }
-                        .disabled(pageNavigation.adjacentOffset(forward: false) == nil || model.isStateBusy || model.isTransportBusy)
+                        .disabled(pageNavigation.adjacentOffset(forward: false) == nil)
                     Text("PAGE \(pageNavigation.currentPage)/\(pageNavigation.pageCount) · \(pageNavigation.firstItem)–\(pageNavigation.lastItem) OF \(pageNavigation.totalItems)")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
@@ -3504,13 +3563,13 @@ private struct PlayerView: View {
                         .accessibilityLabel("Library page \(pageNavigation.currentPage) of \(pageNavigation.pageCount), \(resultName) \(pageNavigation.firstItem) through \(pageNavigation.lastItem) of \(pageNavigation.totalItems)")
                         .accessibilityIdentifier("library-page-status")
                     Button("NEXT PAGE") { model.moveCatalogPage(by: 1) }
-                        .disabled(pageNavigation.adjacentOffset(forward: true) == nil || model.isStateBusy || model.isTransportBusy)
+                        .disabled(pageNavigation.adjacentOffset(forward: true) == nil)
                 }
 
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }
                         .buttonStyle(RustMusicButtonStyle(prominent: true))
-                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
                         model.addSelectionToQueue()
                     }
@@ -3522,7 +3581,10 @@ private struct PlayerView: View {
         } label: {
             Text("LIBRARY")
         }
-        .groupBoxStyle(RustMusicGroupBoxStyle())
+        .groupBoxStyle(RustMusicGroupBoxStyle(
+            spacing: layout.isCompact ? 4 : 8,
+            padding: layout.groupBoxPadding
+        ))
     }
 
     private var playlistPanel: some View {
@@ -3665,7 +3727,7 @@ private struct PlayerView: View {
             Button("PLAY") { model.play() }
                 .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(RustMusicButtonStyle(prominent: true))
-                .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isScanning || model.isStateBusy || model.isTransportBusy)
                 .accessibilityLabel("Play")
                 .accessibilityIdentifier("transport-play")
             Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
@@ -3841,15 +3903,18 @@ private struct RustMusicButtonStyle: ButtonStyle {
 }
 
 private struct RustMusicGroupBoxStyle: GroupBoxStyle {
+    var spacing: CGFloat = 8
+    var padding: CGFloat = 10
+
     func makeBody(configuration: Configuration) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: spacing) {
             configuration.label
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .tracking(1.15)
                 .foregroundStyle(RustMusicPalette.phosphor)
             configuration.content
         }
-        .padding(10)
+        .padding(padding)
         .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 6))
         .overlay {
             RoundedRectangle(cornerRadius: 6)
@@ -3858,7 +3923,25 @@ private struct RustMusicGroupBoxStyle: GroupBoxStyle {
     }
 }
 
+private struct LibraryCompactControlFont: ViewModifier {
+    let isCompact: Bool
+    let size: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isCompact {
+            content.font(.system(size: size, weight: .medium, design: .monospaced))
+        } else {
+            content
+        }
+    }
+}
+
 private extension View {
+    func libraryCompactControlFont(_ isCompact: Bool, size: CGFloat) -> some View {
+        modifier(LibraryCompactControlFont(isCompact: isCompact, size: size))
+    }
+
     @ViewBuilder
     func conditionalAccessibilityAction(
         _ isAvailable: Bool,

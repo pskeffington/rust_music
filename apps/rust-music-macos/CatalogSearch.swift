@@ -11,7 +11,7 @@ private enum CatalogTextNormalizer {
     }
 }
 
-struct CatalogTrack: Identifiable, Equatable {
+struct CatalogTrack: Identifiable, Equatable, Sendable {
     let id: Int
     let container: String
     let title: String
@@ -169,6 +169,17 @@ enum CatalogSearch {
         return matches(track, matching: searchText, in: scope)
     }
 
+    static func retainedBrowseSelection(
+        _ selectedID: String?,
+        visibleGroups: [BrowseGroup]
+    ) -> String? {
+        guard let selectedID,
+              visibleGroups.contains(where: { $0.id == selectedID }) else {
+            return nil
+        }
+        return selectedID
+    }
+
     static func mergingPageSelection(
         _ selectedTrackIDs: Set<Int>,
         visibleTrackIDs: Set<Int>,
@@ -176,6 +187,17 @@ enum CatalogSearch {
     ) -> Set<Int> {
         selectedTrackIDs.subtracting(visibleTrackIDs)
             .union(proposedVisibleSelection.intersection(visibleTrackIDs))
+    }
+
+    static func selectedTrackCountOutsideView(
+        _ selectedTrackIDs: Set<Int>,
+        catalogTrackIDs: Set<Int>,
+        visibleTrackIDs: Set<Int>
+    ) -> Int {
+        selectedTrackIDs
+            .intersection(catalogTrackIDs)
+            .subtracting(visibleTrackIDs)
+            .count
     }
 
     static func queryBytes(for searchText: String) -> Data? {

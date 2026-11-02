@@ -13,6 +13,25 @@ private struct UnindexedCatalogTrack {
 @main
 struct CatalogSearchTests {
     static func main() {
+        let visibleBrowseGroup = CatalogSearch.BrowseGroup(
+            id: "artist:one",
+            name: "Artist One",
+            trackCount: 3,
+            searchKey: "artist one",
+            detail: nil,
+            artistFilterKey: "artist one",
+            albumFilterKey: nil
+        )
+        precondition(
+            CatalogSearch.retainedBrowseSelection("artist:one", visibleGroups: [visibleBrowseGroup]) == "artist:one",
+            "browse selection remains when its group is still visible"
+        )
+        precondition(
+            CatalogSearch.retainedBrowseSelection("artist:one", visibleGroups: []) == nil
+                && CatalogSearch.retainedBrowseSelection("artist:gone", visibleGroups: [visibleBrowseGroup]) == nil
+                && CatalogSearch.retainedBrowseSelection(nil, visibleGroups: [visibleBrowseGroup]) == nil,
+            "paging or filtering away a group clears stale browse selection"
+        )
         precondition(LibraryRowDensity.allCases.map(\.rawValue) == ["compact", "standard"])
         precondition(
             LibraryRowDensity.standard.titleFontSize == 12
@@ -126,6 +145,30 @@ struct CatalogSearchTests {
                 matching: "not-present"
             ),
             "a selected row hidden by search must not remain actionable"
+        )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView(
+                [0, 1, 2, 9],
+                catalogTrackIDs: [0, 1, 2, 3, 9],
+                visibleTrackIDs: [0, 2, 3]
+            ) == 2,
+            "selection feedback must include rows hidden by search or pagination"
+        )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView(
+                [0, 2],
+                catalogTrackIDs: [0, 1, 2, 3],
+                visibleTrackIDs: [0, 2, 3]
+            ) == 0,
+            "selection feedback must report zero hidden rows when all are visible"
+        )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView(
+                [0, 2, 99],
+                catalogTrackIDs: [0, 1, 2, 3],
+                visibleTrackIDs: [0, 2, 3]
+            ) == 0,
+            "selection feedback must exclude stale IDs from a replaced catalog"
         )
         let selectionAfterFirstPage = CatalogSearch.mergingPageSelection(
             [0, 201],
