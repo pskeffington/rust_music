@@ -3198,7 +3198,7 @@ private struct PlayerView: View {
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 86)
+        .frame(width: 160)
         .layoutPriority(1)
         .accessibilityLabel("Library row density")
         .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")

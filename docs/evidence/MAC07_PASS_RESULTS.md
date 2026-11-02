@@ -1365,3 +1365,32 @@ workspace-local crates, 32 path-only internal edges, no registry/Git crates,
 and no third-party system links. `python3 scripts/check_roadmap_index.py`,
 `python3 scripts/check_literature.py`, JSON parsing, and `git diff --check`
 also exited **0**.
+
+### 2026-11-02 MAC07-03 row-density label sizing investigation
+
+The isolated live Library window with a generated 40-track metadata catalog
+showed the row-density menu label truncated to `STA...` while the accessibility
+value remained `STANDARD`. The control frame in `RustMusicApp.swift` was widened
+from 86 to 160 points to retain the full menu label and allow `ViewThatFits` to
+select its two-row toolbar layout at narrower widths. No palette, typography,
+or other Rust Boy styling changed.
+
+`sh scripts/build-macos-app.sh` exited **0** after the source change. It passed
+the catalog/search, playlist-selection, window-geometry, playback-snapshot,
+catalog-validation, build-path guard, strict ad-hoc signature, and process
+lifecycle checks. The included synthetic catalog run completed at 2,000,
+20,000, 100,000, and 250,000 tracks; at 250,000 it reported 103.947 ms
+title-index build, 44.144 ms cached-sort p50, 68.233 ms cached-sort p95,
+143.704 ms narrow-search p50, 340.931 ms narrow-search p95, 392.387 ms
+bounded 200-row broad-page p95, and 1,388.895 ms artist-group index plus page.
+These are harness measurements, not full-app latency or memory claims.
+
+The rebuilt bundle passed `codesign --verify --deep --strict`; however,
+Launch Services refused to open the app from the isolated `/private/tmp`
+worktree with `kLSNoExecutableErr`, and direct executable launch exited 134.
+Thus the post-change rendered label, compact/expanded geometry, and app startup
+are **not verified**. No synthetic fixtures were played. Keep MAC07-03 open
+until the rebuilt app can be launched from a normal application location and
+both window sizes are inspected. The intended live verification uses only the
+generated 40-track empty-WAVE metadata catalog; it does not establish audio
+playback, VoiceOver, or release readiness.
