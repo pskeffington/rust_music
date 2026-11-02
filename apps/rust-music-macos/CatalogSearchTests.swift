@@ -141,6 +141,13 @@ struct CatalogSearchTests {
             ) == 0,
             "selection feedback must report zero hidden rows when all are visible"
         )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView(
+                [0, 2, 99],
+                visibleTrackIDs: [0, 2, 3]
+            ) == 1,
+            "selection feedback must include selections retained after a catalog refresh"
+        )
         let selectionAfterFirstPage = CatalogSearch.mergingPageSelection(
             [0, 201],
             visibleTrackIDs: [0, 1, 2],

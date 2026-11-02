@@ -1411,3 +1411,29 @@ resizing, and the exact 520×360 AppKit-point minimum remain unverified.
 Private-corpus parity, route-context diagnosis, physical output/device recovery,
 and full release acceptance also remain open; this build and offline gate do
 not establish production readiness.
+
+### 2026-11-02 MAC07 selection-summary stale-ID regression follow-up
+
+Review of the selection-summary helper found that selected IDs retained after
+a catalog replacement could be counted as tracks hidden by search/page even
+when those IDs no longer exist in the catalog. The summary now counts IDs
+outside the visible set directly, and `CatalogSearchTests.swift` adds a
+regression case with a stale ID. The existing generated three-track UI
+exercise above remains the live evidence for visible/hidden selections and
+queue behavior; this follow-up has not been separately repeated in the UI.
+
+`sh scripts/build-macos-app.sh` exited **0** after the correction. The embedded
+synthetic catalog checks passed at 2,000, 20,000, 100,000 and 250,000 tracks;
+the 250k harness measured index build 94.446 ms, cached-sort p95 41.442 ms,
+narrow-search p95 81.853 ms, broad-search p95 148.836 ms, bounded 200-row
+broad-page p95 150.938 ms, artist-group index plus page 697.213 ms,
+artist-group narrow-query p95 238.629 ms, and process peak RSS 332,890,112
+bytes. These are synthetic core-harness measurements, not interactive UI
+latency or full app memory. The local bundle signature was valid on disk and
+satisfied its designated requirement; 17 unused AudioQueue meter/tap warnings
+remain in the audio-backend-owned source tree.
+
+`sh scripts/offline-gate.sh` exited **0** after the correction across 17 local
+crates and 32 path-only internal edges, including all 36 native macOS
+AudioQueue tests. The exact 520×360-point live window check and VoiceOver
+speech remain open; VoiceOver was skipped at the operator's direction.

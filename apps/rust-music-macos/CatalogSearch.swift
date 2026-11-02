@@ -182,10 +182,7 @@ enum CatalogSearch {
         _ selectedTrackIDs: Set<Int>,
         visibleTrackIDs: Set<Int>
     ) -> Int {
-        let selectedVisibleCount = visibleTrackIDs.reduce(into: 0) { count, id in
-            if selectedTrackIDs.contains(id) { count += 1 }
-        }
-        return selectedTrackIDs.count - selectedVisibleCount
+        selectedTrackIDs.subtracting(visibleTrackIDs).count
     }
 
     static func queryBytes(for searchText: String) -> Data? {
