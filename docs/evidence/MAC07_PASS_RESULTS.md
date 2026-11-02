@@ -1635,3 +1635,9 @@ This confirms state/UI track switching with generated silent PCM and a claimed n
 ### 2026-11-02 Command-Return track replacement smoke
 
 On the rebuilt app, I explicitly loaded two generated 30-second silent 16-bit/44.1-kHz stereo WAVE tracks and started track 1. While track 1 was Playing, I selected track 2 in the Library and invoked Command-Return. The Player then showed track 2 Playing, with progress advancing. This verifies the Library keyboard action can replace the active play target without Stop. It establishes UI/engine state and output-queue submission only; the fixtures were silent, so audible output was not tested. The generated files were removed, and after closing the test session the app returned to `READY / NO TRACK` without scanning or playback.
+
+### 2026-11-02 live Player resize on built-in display
+
+The rebuilt Player was on another display, so I used its native Window menu to move it to the built-in Retina display before resizing. A bottom-right drag reduced its captured window image from 620×429 screenshot pixels to a compact 494×188 screenshot pixels. At the compact size the heading wrapped, the transport labels shortened, and Previous/Play/Pause/Stop/Next plus volume remained visible. The source window minimum is 520×200 AppKit points; screenshot pixels are not a point measurement and do not establish the exact live frame size. The Player was moved back to its prior display and restored to the larger frame; the app remained `READY / NO TRACK`.
+
+I attempted the same live drag check on Media Library after moving it to the built-in display, but CUA rejected the input at mapped screen coordinate `(-278, 2329)` with `windowNotFoundAtPosition`. The Library was returned to its prior display without resizing. Its exact 520×360-point live minimum and live Library drag behavior remain unverified. This is Player-only live resize evidence; MAC07-03 acceptance remains open.
