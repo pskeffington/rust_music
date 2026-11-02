@@ -1396,6 +1396,9 @@ private final class CatalogViewCancellation: @unchecked Sendable {
 final class PlayerModel: ObservableObject {
     @Published var libraryRoot: URL?
     @Published private(set) var savedLibraryLocationPaths: [String] = []
+    var savedLibraryLocationLabels: [String: String] {
+        libraryLocationRegistry.displayLabels(activePath: libraryRoot?.standardizedFileURL.path)
+    }
     @Published var tracks: [CatalogTrack] = [] {
         didSet {
             catalogRevision &+= 1
@@ -3235,13 +3238,14 @@ private struct PlayerView: View {
 
     private var libraryLocationsMenu: some View {
         let activePath = model.libraryRoot?.standardizedFileURL.path
+        let displayLabels = model.savedLibraryLocationLabels
         return Menu {
             if model.savedLibraryLocationPaths.isEmpty {
                 Text("No saved locations yet")
             } else {
                 ForEach(model.savedLibraryLocationPaths, id: \.self) { path in
-                    let name = URL(fileURLWithPath: path).lastPathComponent
-                    Menu(path == activePath ? "ACTIVE · \(name)" : name) {
+                    let name = displayLabels[path] ?? URL(fileURLWithPath: path).lastPathComponent
+                    Menu(name) {
                         Button("Load This Location") {
                             model.loadSavedLibraryLocation(path)
                         }

@@ -71,6 +71,34 @@ struct PlaybackUIStateTests {
         precondition(locations.paths.count == LibraryLocationRegistry.maximumLocations)
         precondition(locations.add(URL(fileURLWithPath: "/Overflow")) == .limitReached)
         precondition(LibraryLocationRegistry.normalizedAbsolutePath("/Music/\nUnsafe") == nil)
+        var collidingLocations = LibraryLocationRegistry(storedPaths: [
+            "/Volumes/Archive/Music",
+            "/Volumes/Backup/Music",
+            "/Users/null/Podcasts"
+        ])
+        let locationLabels = collidingLocations.displayLabels()
+        precondition(locationLabels["/Volumes/Archive/Music"] == "Archive ▸ Music")
+        precondition(locationLabels["/Volumes/Backup/Music"] == "Backup ▸ Music")
+        precondition(locationLabels["/Users/null/Podcasts"] == "Podcasts")
+        _ = collidingLocations.add(URL(fileURLWithPath: "/Volumes/Archive/Live/Music"))
+        let deeperLocationLabels = collidingLocations.displayLabels()
+        precondition(deeperLocationLabels["/Volumes/Archive/Music"] == "Archive ▸ Music")
+        precondition(deeperLocationLabels["/Volumes/Backup/Music"] == "Backup ▸ Music")
+        precondition(deeperLocationLabels["/Volumes/Archive/Live/Music"] == "Live ▸ Music")
+        let delimiterCollision = LibraryLocationRegistry(storedPaths: [
+            "/A/B",
+            "/X/B",
+            "/A ▸ B"
+        ]).displayLabels()
+        precondition(delimiterCollision["/A/B"] == "/A/B")
+        precondition(delimiterCollision["/X/B"] == "X ▸ B")
+        precondition(delimiterCollision["/A ▸ B"] == "/A ▸ B")
+        let activeMarkerCollision = LibraryLocationRegistry(storedPaths: [
+            "/Volumes/Archive/Music",
+            "/Other/ACTIVE · Music"
+        ]).displayLabels(activePath: "/Volumes/Archive/Music")
+        precondition(activeMarkerCollision["/Volumes/Archive/Music"] == "ACTIVE · /Volumes/Archive/Music")
+        precondition(activeMarkerCollision["/Other/ACTIVE · Music"] == "/Other/ACTIVE · Music")
 
         var stateRevision = LibraryStateRevision()
         let oldCatalogRevision = stateRevision.value
