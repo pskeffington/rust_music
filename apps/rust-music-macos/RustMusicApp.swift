@@ -3537,7 +3537,7 @@ private struct PlayerView: View {
                 HStack(spacing: 8) {
                     Button("PLAY SELECTED") { model.play() }
                         .buttonStyle(RustMusicButtonStyle(prominent: true))
-                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                        .disabled(!model.selectedTrackIsActionableInLibrary || model.isScanning || model.isStateBusy || model.isTransportBusy)
                     Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
                         model.addSelectionToQueue()
                     }
