@@ -3328,7 +3328,7 @@ private struct PlayerView: View {
                 }
 
                 if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {
-                    Text("CURRENT TRACK IS OUTSIDE THIS PAGE OR SEARCH · SELECT IT TO PLAY")
+                    Text("SELECTED PLAY TARGET IS OUTSIDE THIS PAGE OR SEARCH · SELECT A VISIBLE TRACK TO PLAY")
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize(horizontal: false, vertical: true)

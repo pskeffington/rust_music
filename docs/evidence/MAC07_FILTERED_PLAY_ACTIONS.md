@@ -625,3 +625,36 @@ This verifies Return-key routing via the live macOS accessibility tree for
 artist and album selection, including same-title album disambiguation. It does
 not verify VoiceOver speech/rotor navigation, hardware playback, or all
 keyboard focus arrangements. Overall MAC07-03 remains in progress.
+
+## Hidden selected-target status wording — PR #9 candidate
+
+The Library previously called a retained, filtered-out selection the
+`CURRENT TRACK`, which could imply that playback was active. It now identifies
+it as the `SELECTED PLAY TARGET` and tells the user to select a visible track.
+No Rust Boy colors or layout were changed.
+
+`sh scripts/build-macos-app.sh` completed its app build, strict local bundle
+signature check, and included catalog/search and scaling, playlist-selection,
+operator-window geometry, playback-snapshot, catalog-bounds, lifecycle, and
+shutdown harnesses. At 250,000 synthetic tracks the catalog harness measured
+title-index build 72.339 ms, cached-sort p95 34.908 ms, narrow-search p95
+77.189 ms, broad-search p95 128.388 ms, bounded 200-row page p95 119.136 ms,
+artist-group index plus first page 630.168 ms, artist-query p95 227.706 ms,
+and test-process peak RSS 294,273,024 bytes. These figures are harness
+measurements, not full-app memory or UI latency.
+
+In live macOS accessibility interaction, the rebuilt candidate loaded three
+generated metadata-only FLAC entries with no audio frames. In Artists mode,
+the retained Alpha Song target was outside the current view; the Library
+displayed `SELECTED PLAY TARGET IS OUTSIDE THIS PAGE OR SEARCH · SELECT A
+VISIBLE TRACK TO PLAY`. In Tracks mode, searching for Beta kept Alpha selected
+but hidden, showed the same message, and left Play Selected, Enqueue Selected,
+and Play Next disabled. Selecting visible Beta Song cleared the message and
+enabled those actions. No transport or queue action was invoked, and the
+Player remained stopped with no output snapshot. The isolated app and fixture
+were closed and removed.
+
+This verifies the corrected copy alongside the hidden-target guard and its
+visible-selection recovery for the tested synthetic catalog. It does not
+verify playback, VoiceOver speech/rotor behavior, or compact minimum-frame
+interaction. Overall MAC07-03 remains in progress.
