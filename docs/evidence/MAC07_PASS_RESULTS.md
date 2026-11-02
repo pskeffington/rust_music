@@ -1326,3 +1326,45 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 MAC07-03 compact density controls and 40-track scroll
+
+Candidate source is based on `main` commit `cf83cf22dee8ffba0e58e32fe83039c2acde733f`;
+the RustMusicApp.swift patch from that base has SHA-256
+`c5c90ae209e36016113b165846d25c4d6a51a15f2ef4dbf3fc4bb81caaf88ad5`.
+The Library row-density menu frame was widened from 86 to 160 points. This
+changes only control sizing; Rust Boy colors, type, and surrounding styling are
+unchanged.
+
+The rebuilt bundle was launched and explicitly loaded a generated 40-entry
+metadata-only FLAC-signature catalog (no FLAC frames or audio samples). In the
+macOS `Window > Move & Resize > Top Left` tile, captured at 736×462 screenshot
+pixels, the selected density label changed from clipped `S` to fully visible
+`STANDARD`. Selecting Compact showed the full `COMPACT` label and tighter
+rows. The catalog count stayed at 40, and scrolling to the end exposed
+`Compact Track 039` with the scrollbar at 1. Playback was not started. These
+are screenshot pixels, not AppKit point dimensions, and do not validate the
+declared 520×360-point minimum frame. The attempted native resize was rejected
+by the UI automation layer (`windowNotFoundAtPosition`), so that minimum-frame
+check remains open. VoiceOver testing was omitted at the operator's direction.
+Before quitting, Standard density was restored. The rebuilt app session was
+then quit; the temporary fixture was verified to contain exactly 40 generated
+FLAC-signature files and removed.
+
+`sh scripts/build-macos-app.sh` exited **0**. The strict local app signature
+and included catalog search/scaling, playlist selection, operator-window
+geometry, playback snapshot, catalog bounds, and process-lifecycle harnesses
+passed. The build emitted 17 unused AudioQueue meter/tap diagnostics in
+`rust-music-native`; this UI pass did not change or suppress them. Its synthetic
+250,000-track harness measured index build 125.009 ms, cached-sort p95 39.549
+ms, narrow-search p95 84.224 ms, broad-search p95 131.668 ms, bounded
+200-row broad-page p95 124.432 ms, artist-group index plus page 632.627 ms,
+artist-group narrow-query p95 223.113 ms, and process peak RSS 333,692,928
+bytes. These are synthetic core-harness results, not interactive UI latency,
+full-app memory, or playback-under-load measurements.
+
+At the same source candidate, `sh scripts/offline-gate.sh` exited **0**. It
+passed the full offline gate across 17 local crates and 32 path-only internal
+edges, with zero registry/Git crates; all 36 native macOS AudioQueue tests
+passed. This does not close hardware playback, VoiceOver, private-corpus, or
+acoustic acceptance.
