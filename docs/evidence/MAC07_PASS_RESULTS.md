@@ -1326,3 +1326,44 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 saved library location switcher
+
+The standalone UI now keeps up to 32 explicitly loaded folder paths in local
+preferences. Paths are normalized and duplicate entries collapse. The Library
+panel's LOCATIONS menu can switch to a saved folder or forget a saved reference;
+forgetting does not remove files or root-scoped queue/playlist records. Loading
+and switching both run the existing explicit folder scan. Startup only reads
+the saved path list and does not scan or play. Per-folder catalog, queue, and
+playlist state remain isolated; this UI does not merge locations into one
+catalog.
+
+`sh scripts/build-macos-app.sh` exited **0** on branch
+`codex/mac07-library-management`. The saved-location registry harness covered
+canonicalization, duplicate removal, invalid stored paths, forgetting a path,
+and the 32-location bound. The app bundle passed strict signature validation;
+catalog/search/page, artist-group, playlist-selection, window-geometry,
+playback-snapshot, catalog-bound, and process-lifecycle harnesses passed.
+
+At 250,000 synthetic tracks, title-index build was **142.710 ms**, cached sort
+p95 **74.589 ms**, narrow-search p95 **184.305 ms**, broad-search p95
+**250.086 ms**, bounded 200-row page p95 **254.158 ms**, artist-group
+index+page **1,218.648 ms**, and artist-query p95 **922.545 ms**. Searchable
+payload was **18,500,000 bytes** and catalog-harness process peak RSS was
+**273,711,104 bytes**. These results exercise in-memory synthetic data only;
+they are not full-app memory or end-to-end UI latency. Each actual root scan
+and IPC catalog remains capped at 20,000 tracks.
+
+Live UI checks used two generated empty folders: both were added from the
+native folder picker, the menu showed the active location and saved count, and
+switching back to the first location loaded it successfully. After quitting
+and relaunching, the menu still showed both saved locations while the library
+remained unloaded; the Player showed READY / NO TRACK and no playback started.
+These checks verify location preference persistence and explicit switching,
+not scanning or playback with actual media.
+
+A saved path is not a security-scoped bookmark, a changed mount path can become
+stale, and unavailable-root UI recovery remains unverified. True cross-root
+catalog aggregation, persistent root identities, offline-root reconciliation
+and cross-root queue/playlist records remain follow-up work. MAC07-03 and
+RM-020 remain in progress.

@@ -54,6 +54,24 @@ private func decodeSnapshot(_ bytes: Data) throws -> PackagePlaybackSnapshot {
 @main
 struct PlaybackUIStateTests {
     static func main() {
+        var locations = LibraryLocationRegistry(storedPaths: [
+            "/Music/Albums/../Albums",
+            "/Music/Albums/",
+            "relative/path",
+            "/Music/"
+        ])
+        precondition(locations.paths == ["/Music/Albums", "/Music"])
+        precondition(locations.add(URL(fileURLWithPath: "/Music/Albums")) == .alreadySaved)
+        precondition(locations.add(URL(fileURLWithPath: "/Music/New Library")) == .added)
+        precondition(locations.remove("/Music/New Library/"))
+        precondition(!locations.remove("/Music/New Library"))
+        for index in 0..<LibraryLocationRegistry.maximumLocations {
+            _ = locations.add(URL(fileURLWithPath: "/Extra/\(index)"))
+        }
+        precondition(locations.paths.count == LibraryLocationRegistry.maximumLocations)
+        precondition(locations.add(URL(fileURLWithPath: "/Overflow")) == .limitReached)
+        precondition(LibraryLocationRegistry.normalizedAbsolutePath("/Music/\nUnsafe") == nil)
+
         var stateRevision = LibraryStateRevision()
         let oldCatalogRevision = stateRevision.value
         precondition(stateRevision.accepts(oldCatalogRevision))

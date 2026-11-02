@@ -76,6 +76,57 @@ struct DeferredStateReload {
     }
 }
 
+struct LibraryLocationRegistry: Equatable {
+    static let maximumLocations = 32
+
+    enum AddResult: Equatable {
+        case added
+        case alreadySaved
+        case limitReached
+        case invalid
+    }
+
+    private(set) var paths: [String]
+
+    init(storedPaths: [String] = []) {
+        var unique: [String] = []
+        for path in storedPaths {
+            guard let normalized = Self.normalizedAbsolutePath(path),
+                  !unique.contains(normalized) else { continue }
+            guard unique.count < Self.maximumLocations else { break }
+            unique.append(normalized)
+        }
+        paths = unique
+    }
+
+    mutating func add(_ url: URL) -> AddResult {
+        guard url.isFileURL,
+              let path = Self.normalizedAbsolutePath(url.path) else { return .invalid }
+        guard !paths.contains(path) else { return .alreadySaved }
+        guard paths.count < Self.maximumLocations else { return .limitReached }
+        paths.append(path)
+        return .added
+    }
+
+    mutating func remove(_ path: String) -> Bool {
+        guard let normalized = Self.normalizedAbsolutePath(path),
+              let index = paths.firstIndex(of: normalized) else { return false }
+        paths.remove(at: index)
+        return true
+    }
+
+    static func normalizedAbsolutePath(_ path: String) -> String? {
+        guard !path.isEmpty,
+              path.utf8.count <= 4096,
+              path.hasPrefix("/"),
+              !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+            return nil
+        }
+        return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path
+    }
+
+}
+
 struct PackagePlaybackSnapshot: Equatable {
     let state: UInt8
     let selected: UInt16?
