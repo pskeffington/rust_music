@@ -1453,7 +1453,8 @@ final class PlayerModel: ObservableObject {
     private var snapshotPollScheduled = false
     private var snapshotPollGeneration: UInt64 = 0
     private var snapshotPollInFlightGeneration: UInt64?
-    private var pendingStateReload = false
+    private var pendingStateReload = DeferredStateReload()
+    private var libraryStateRevision = LibraryStateRevision()
     private let shutdownGate = ShutdownCompletionGate()
     private let transientChildOperations = DispatchGroup()
 
@@ -1607,6 +1608,7 @@ final class PlayerModel: ObservableObject {
         completion: @escaping (Result<Data, RustMusicFailure>) -> Void
     ) {
         guard shutdownGate.acceptsWork, libraryRoot != nil, !isStateBusy, !isTransportBusy else { return }
+        let operationRevision = libraryStateRevision.value
         let process = Process()
         process.executableURL = decoderURL
         process.arguments = ["state", "--managed-parent-stdin"] + arguments
@@ -1658,6 +1660,13 @@ final class PlayerModel: ObservableObject {
             guard let self, self.stateProcess === process else { return }
             self.stateProcess = nil
             self.isStateBusy = false
+            guard self.libraryStateRevision.accepts(operationRevision) else {
+                // A scan switched the active catalog while this command still
+                // addressed the old root. Discard its response and refresh the
+                // now-active root instead of publishing stale queue/playlist state.
+                self.reloadPersistentState()
+                return
+            }
             if let outputFailure {
                 completion(.failure(RustMusicFailure(message: outputFailure)))
             } else if exitStatus == 0 {
@@ -1669,21 +1678,25 @@ final class PlayerModel: ObservableObject {
                     message: message?.isEmpty == false ? message ?? "" : "Rust Music state update failed."
                 )))
             }
+            self.drainPendingStateReload()
         }
     }
 
     private func reloadPersistentState() {
-        guard !isTransportBusy else {
-            pendingStateReload = true
-            return
+        if pendingStateReload.request(isStateBusy: isStateBusy, isTransportBusy: isTransportBusy) {
+            reloadQueue()
         }
-        pendingStateReload = false
-        reloadQueue()
+    }
+
+    private func drainPendingStateReload() {
+        if pendingStateReload.takeIfAvailable(isStateBusy: isStateBusy, isTransportBusy: isTransportBusy) {
+            reloadQueue()
+        }
     }
 
     private func finishTransportOperation() {
         isTransportBusy = false
-        if pendingStateReload { reloadPersistentState() }
+        drainPendingStateReload()
     }
 
     private func reloadQueue() {
@@ -2122,6 +2135,7 @@ final class PlayerModel: ObservableObject {
             case .success(let tracks):
                 self.libraryScanNotice = nil
                 self.audioQueueDiagnosticSummary = nil
+                self.libraryStateRevision.advance()
                 self.libraryRoot = root
                 self.tracks = tracks
                 self.selectedIndex = tracks.first?.id
