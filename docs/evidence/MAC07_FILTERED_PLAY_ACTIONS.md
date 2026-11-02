@@ -495,3 +495,19 @@ state. This is live accessibility-tree interaction evidence from the launched
 candidate, not VoiceOver speech, playback, or a bundle-digest-bound UI test.
 VoiceOver, persistence across relaunch, minimum-size layout, and playback under
 search remain unverified.
+
+## Artist and Album row accessibility label — PR #9 candidate
+
+After adding an explicit single-element accessibility boundary to each artist
+or album group row, the rebuilt macOS candidate was launched from the isolated
+PR checkout. An explicitly loaded temporary catalog held two generated
+metadata-only FLAC entries with the same album title and distinct artists; no
+audio frames were included. In ALBUMS mode, the live accessibility tree exposed
+exactly one row per group (`Twin, Artist A, 1 tracks` and
+`Twin, Artist B, 1 tracks`) without repeating child text. Playback remained
+stopped. The candidate was quit, TRACKS mode was restored before exit, and the
+temporary fixture directory was removed. The original Rust Music process was
+left running.
+
+This is live accessibility-tree evidence only. VoiceOver speech and rotor
+behavior, persistence after relaunch, and playback remain unverified.

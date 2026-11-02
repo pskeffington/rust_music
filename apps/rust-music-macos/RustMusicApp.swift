@@ -3438,6 +3438,7 @@ private struct PlayerView: View {
                                     .padding(.vertical, rowDensity.verticalPadding)
                                     .tag(group.id)
                                     .listRowBackground(RustMusicPalette.display)
+                                    .accessibilityElement(children: .ignore)
                                     .accessibilityLabel([group.name, group.detail, "\(group.trackCount) tracks"].compactMap { $0 }.joined(separator: ", "))
                                     .onTapGesture(count: 2) {
                                         model.selectedBrowseGroupID = group.id
