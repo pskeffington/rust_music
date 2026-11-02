@@ -3017,11 +3017,18 @@ private struct PlayerView: View {
                         .fixedSize()
                 }
 
-                if model.isScanning && !model.tracks.isEmpty {
-                    Text("A folder scan is in progress. The previous catalog remains active.")
+                if let scanStatus = LibraryScanPresentation.message(
+                    isScanning: model.isScanning,
+                    retainedTrackCount: model.tracks.count
+                ) {
+                    Text(scanStatus)
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Library scan status")
+                        .accessibilityValue(scanStatus)
+                        .accessibilityIdentifier("library-scan-status")
                 } else if let scanNotice = model.libraryScanNotice, !model.tracks.isEmpty {
                     Text(scanNotice)
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
