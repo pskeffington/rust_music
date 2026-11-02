@@ -169,6 +169,17 @@ enum CatalogSearch {
         return matches(track, matching: searchText, in: scope)
     }
 
+    static func retainedBrowseSelection(
+        _ selectedID: String?,
+        visibleGroups: [BrowseGroup]
+    ) -> String? {
+        guard let selectedID,
+              visibleGroups.contains(where: { $0.id == selectedID }) else {
+            return nil
+        }
+        return selectedID
+    }
+
     static func mergingPageSelection(
         _ selectedTrackIDs: Set<Int>,
         visibleTrackIDs: Set<Int>,

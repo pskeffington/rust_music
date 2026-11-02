@@ -13,6 +13,25 @@ private struct UnindexedCatalogTrack {
 @main
 struct CatalogSearchTests {
     static func main() {
+        let visibleBrowseGroup = CatalogSearch.BrowseGroup(
+            id: "artist:one",
+            name: "Artist One",
+            trackCount: 3,
+            searchKey: "artist one",
+            detail: nil,
+            artistFilterKey: "artist one",
+            albumFilterKey: nil
+        )
+        precondition(
+            CatalogSearch.retainedBrowseSelection("artist:one", visibleGroups: [visibleBrowseGroup]) == "artist:one",
+            "browse selection remains when its group is still visible"
+        )
+        precondition(
+            CatalogSearch.retainedBrowseSelection("artist:one", visibleGroups: []) == nil
+                && CatalogSearch.retainedBrowseSelection("artist:gone", visibleGroups: [visibleBrowseGroup]) == nil
+                && CatalogSearch.retainedBrowseSelection(nil, visibleGroups: [visibleBrowseGroup]) == nil,
+            "paging or filtering away a group clears stale browse selection"
+        )
         precondition(LibraryRowDensity.allCases.map(\.rawValue) == ["compact", "standard"])
         precondition(
             LibraryRowDensity.standard.titleFontSize == 12

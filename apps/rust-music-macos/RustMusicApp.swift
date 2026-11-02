@@ -1397,7 +1397,10 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var playlistNameFocusGeneration: UInt64 = 0
     @Published var searchText = "" {
         didSet {
-            if oldValue != searchText { catalogPageOffset = 0 }
+            if oldValue != searchText {
+                catalogPageOffset = 0
+                selectedBrowseGroupID = nil
+            }
             refreshVisibleTracks()
         }
     }
@@ -1560,6 +1563,13 @@ final class PlayerModel: ObservableObject {
         )
     }
 
+    var selectedBrowseGroupIsVisible: Bool {
+        CatalogSearch.retainedBrowseSelection(
+            selectedBrowseGroupID,
+            visibleGroups: visibleBrowseGroups
+        ) != nil
+    }
+
     var selectedTracksInCatalogOrder: [CatalogTrack] {
         tracks.filter { selectedTrackIDs.contains($0.id) }
     }
@@ -1705,6 +1715,10 @@ final class PlayerModel: ObservableObject {
                 self.visibleTrackTotal = trackPage?.totalMatches ?? 0
                 self.visibleBrowseGroups = groupPage?.groups ?? []
                 self.visibleBrowseGroupTotal = groupPage?.totalMatches ?? 0
+                self.selectedBrowseGroupID = CatalogSearch.retainedBrowseSelection(
+                    self.selectedBrowseGroupID,
+                    visibleGroups: self.visibleBrowseGroups
+                )
                 self.catalogPageOffset = trackPage?.offset ?? groupPage?.offset ?? 0
                 self.visibleResultGeneration &+= 1
             }
@@ -1721,6 +1735,7 @@ final class PlayerModel: ObservableObject {
         )
         guard let nextOffset = navigation.adjacentOffset(forward: direction > 0) else { return }
         catalogPageOffset = nextOffset
+        selectedBrowseGroupID = nil
         refreshVisibleTracks()
     }
 
@@ -3500,7 +3515,7 @@ private struct PlayerView: View {
                                 ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
                                 : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
                             .conditionalAccessibilityAction(
-                                model.selectedBrowseGroupID != nil,
+                                model.selectedBrowseGroupIsVisible,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
                             ) {
                                 model.openSelectedBrowseGroup()
@@ -3512,7 +3527,7 @@ private struct PlayerView: View {
                                 model.openSelectedBrowseGroup()
                             }
                             .keyboardShortcut(.return, modifiers: [])
-                            .disabled(model.selectedBrowseGroupID == nil)
+                            .disabled(!model.selectedBrowseGroupIsVisible)
                             .accessibilityIdentifier("library-open-selected-group")
                         }
                     }
