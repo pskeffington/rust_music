@@ -23,12 +23,6 @@ const QUEUE_PROPERTY_CURRENT_DEVICE: u32 = u32::from_be_bytes(*b"aqcd");
 const QUEUE_PROPERTY_IS_RUNNING: u32 = u32::from_be_bytes(*b"aqrn");
 const QUEUE_PROPERTY_STREAM_DESCRIPTION: u32 = u32::from_be_bytes(*b"aqft");
 const QUEUE_PROPERTY_CONVERTER_ERROR: u32 = u32::from_be_bytes(*b"qcve");
-const QUEUE_TAP_PRE_EFFECTS_SIPHON: u32 = (1 << 0) | (1 << 2);
-const MAX_TAP_BUFFERS: u32 = 32;
-const MAX_TAP_BUFFER_BYTES: u32 = 1_048_576;
-const QUEUE_PROPERTY_ENABLE_LEVEL_METERING: u32 = u32::from_be_bytes(*b"aqme");
-const QUEUE_PROPERTY_CURRENT_LEVEL_METER: u32 = u32::from_be_bytes(*b"aqmv");
-const QUEUE_PROPERTY_CURRENT_LEVEL_METER_DB: u32 = u32::from_be_bytes(*b"aqmd");
 const QUEUE_DEVICE_PROPERTY_SAMPLE_RATE: u32 = u32::from_be_bytes(*b"aqsr");
 const QUEUE_DEVICE_PROPERTY_NUMBER_CHANNELS: u32 = u32::from_be_bytes(*b"aqdc");
 // kAudioQueueParam_Volume from AudioToolbox's public ABI.
@@ -308,20 +302,6 @@ impl Default for AudioQueueDiagnostics {
 }
 
 impl AudioQueueDiagnostics {
-    fn record_tap_format(&self, format: QueueTapFormatObservation) {
-        let store = |field: &AtomicI64, value: Option<u32>| {
-            field.store(value.map_or(NO_STATUS, i64::from), Ordering::Relaxed);
-        };
-        store(&self.tap_format_rate_hz, format.sample_rate_hz);
-        store(&self.tap_format_id, format.format_id);
-        store(&self.tap_format_flags, format.format_flags);
-        store(&self.tap_format_bytes_per_packet, format.bytes_per_packet);
-        store(&self.tap_format_frames_per_packet, format.frames_per_packet);
-        store(&self.tap_format_bytes_per_frame, format.bytes_per_frame);
-        store(&self.tap_format_channels, format.channels_per_frame);
-        store(&self.tap_format_bits, format.bits_per_channel);
-    }
-
     fn record_queue_volume(&self, set_status: i32, get_status: i32, value: Option<f32>) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
@@ -664,34 +644,6 @@ impl AudioQueueDiagnostics {
                 observation.device_listed.map_or(NO_STATUS, i64::from),
                 Ordering::Relaxed,
             );
-        }
-    }
-
-    fn set_output_meter_enable_status(&self, status: i32) {
-        if self.enabled.load(Ordering::Relaxed) {
-            self.output_meter_enable_status
-                .store(i64::from(status), Ordering::Relaxed);
-        }
-    }
-
-    fn record_output_meter(&self, observation: OutputMeterObservation) {
-        if self.enabled.load(Ordering::Relaxed) {
-            self.output_meter_query_status
-                .store(i64::from(observation.linear_status), Ordering::Relaxed);
-            self.output_meter_db_status
-                .store(i64::from(observation.decibel_status), Ordering::Relaxed);
-            if let Some(peak) = observation.linear_peak_millionths {
-                self.output_meter_peak_millionths
-                    .fetch_max(i64::from(peak), Ordering::Relaxed);
-            }
-            if let Some(peak) = observation.decibel_peak_millidb {
-                self.output_meter_peak_millidb
-                    .fetch_max(i64::from(peak), Ordering::Relaxed);
-            }
-            if observation.linear_status == 0 || observation.decibel_status == 0 {
-                self.output_meter_observations
-                    .fetch_add(1, Ordering::Relaxed);
-            }
         }
     }
 
@@ -1436,21 +1388,6 @@ struct AudioStreamBasicDescription {
     reserved: u32,
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Default)]
-struct AudioQueueLevelMeterState {
-    average_power: f32,
-    peak_power: f32,
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-struct OutputMeterObservation {
-    linear_status: i32,
-    linear_peak_millionths: Option<u32>,
-    decibel_status: i32,
-    decibel_peak_millidb: Option<i32>,
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 struct QueueFormatObservation {
     stream_status: i32,
@@ -1468,17 +1405,6 @@ struct QueueFormatObservation {
     converter_error: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-struct QueueTapFormatObservation {
-    sample_rate_hz: Option<u32>,
-    format_id: Option<u32>,
-    format_flags: Option<u32>,
-    bytes_per_packet: Option<u32>,
-    frames_per_packet: Option<u32>,
-    bytes_per_frame: Option<u32>,
-    channels_per_frame: Option<u32>,
-    bits_per_channel: Option<u32>,
-}
 #[repr(C)]
 struct AudioQueueBuffer {
     data_capacity: u32,
@@ -1489,29 +1415,8 @@ struct AudioQueueBuffer {
     packet_descriptions: *mut c_void,
     packet_description_count: u32,
 }
-#[repr(C)]
-struct AudioBuffer {
-    number_channels: u32,
-    data_byte_size: u32,
-    data: *mut c_void,
-}
-#[repr(C)]
-struct AudioBufferList {
-    number_buffers: u32,
-    buffers: [AudioBuffer; 1],
-}
 type AudioQueueRef = *mut c_void;
 type AudioQueueBufferRef = *mut AudioQueueBuffer;
-type AudioQueueProcessingTapRef = *mut c_void;
-type AudioQueueProcessingTapCallback = unsafe extern "C" fn(
-    *mut c_void,
-    AudioQueueProcessingTapRef,
-    u32,
-    *mut c_void,
-    *mut u32,
-    *mut u32,
-    *mut AudioBufferList,
-);
 #[link(name = "AudioToolbox", kind = "framework")]
 unsafe extern "C" {
     fn AudioQueueNewOutput(
@@ -1553,15 +1458,6 @@ unsafe extern "C" {
     fn AudioQueuePause(queue: AudioQueueRef) -> i32;
     fn AudioQueueStop(queue: AudioQueueRef, immediate: u8) -> i32;
     fn AudioQueueDispose(queue: AudioQueueRef, immediate: u8) -> i32;
-    fn AudioQueueProcessingTapNew(
-        queue: AudioQueueRef,
-        callback: AudioQueueProcessingTapCallback,
-        user_data: *mut c_void,
-        flags: u32,
-        max_frames: *mut u32,
-        processing_format: *mut AudioStreamBasicDescription,
-        out_tap: *mut AudioQueueProcessingTapRef,
-    ) -> i32;
 }
 
 trait AudioQueueApi: Send + Sync {
@@ -1592,21 +1488,12 @@ trait AudioQueueApi: Send + Sync {
         queue: AudioQueueRef,
         target_uid: *const c_void,
     ) -> CurrentDeviceObservation;
-    fn enable_output_meter(&self, queue: AudioQueueRef) -> i32;
-    fn output_meter(&self, queue: AudioQueueRef, channels: u8) -> OutputMeterObservation;
-    fn output_meter_observed(&self, queue: AudioQueueRef, channels: u8) -> OutputMeterObservation;
     fn is_running(&self, queue: AudioQueueRef) -> (i32, Option<bool>);
     fn queue_format_observation(
         &self,
         queue: AudioQueueRef,
         expected: AudioFormat,
     ) -> QueueFormatObservation;
-    fn create_siphon_tap(
-        &self,
-        queue: AudioQueueRef,
-        user_data: *mut c_void,
-        format_out: *mut QueueTapFormatObservation,
-    ) -> i32;
     fn pause(&self, queue: AudioQueueRef) -> i32;
     fn stop(&self, queue: AudioQueueRef, immediate: u8) -> i32;
     fn dispose(&self, queue: AudioQueueRef, immediate: u8) -> i32;
@@ -1767,92 +1654,6 @@ impl AudioQueueApi for SystemAudioQueue {
         }
     }
 
-    fn enable_output_meter(&self, queue: AudioQueueRef) -> i32 {
-        let enabled = 1_u32;
-        unsafe {
-            AudioQueueSetProperty(
-                queue,
-                QUEUE_PROPERTY_ENABLE_LEVEL_METERING,
-                (&enabled as *const u32).cast(),
-                std::mem::size_of_val(&enabled) as u32,
-            )
-        }
-    }
-
-    fn output_meter(&self, queue: AudioQueueRef, channels: u8) -> OutputMeterObservation {
-        let mut observation = OutputMeterObservation::default();
-        let bytes = u32::from(channels) * std::mem::size_of::<AudioQueueLevelMeterState>() as u32;
-        let mut linear_meters = [AudioQueueLevelMeterState::default(); 8];
-        let mut linear_size = bytes;
-        observation.linear_status = unsafe {
-            AudioQueueGetProperty(
-                queue,
-                QUEUE_PROPERTY_CURRENT_LEVEL_METER,
-                linear_meters.as_mut_ptr().cast(),
-                &mut linear_size,
-            )
-        };
-        if observation.linear_status == 0 {
-            let count = linear_size as usize / std::mem::size_of::<AudioQueueLevelMeterState>();
-            if linear_size as usize % std::mem::size_of::<AudioQueueLevelMeterState>() != 0
-                || count == 0
-                || count > usize::from(channels)
-            {
-                observation.linear_status = AUDIOQUEUE_ERR_INVALID_DEVICE;
-            } else {
-                let mut peak = 0.0_f32;
-                for meter in &linear_meters[..count] {
-                    if !meter.peak_power.is_finite() || !(0.0..=1.0).contains(&meter.peak_power) {
-                        observation.linear_status = AUDIOQUEUE_ERR_INVALID_DEVICE;
-                        break;
-                    }
-                    peak = peak.max(meter.peak_power);
-                }
-                if observation.linear_status == 0 {
-                    observation.linear_peak_millionths = Some((peak * 1_000_000.0).round() as u32);
-                }
-            }
-        }
-
-        let mut db_meters = [AudioQueueLevelMeterState::default(); 8];
-        let mut db_size = bytes;
-        observation.decibel_status = unsafe {
-            AudioQueueGetProperty(
-                queue,
-                QUEUE_PROPERTY_CURRENT_LEVEL_METER_DB,
-                db_meters.as_mut_ptr().cast(),
-                &mut db_size,
-            )
-        };
-        if observation.decibel_status == 0 {
-            let count = db_size as usize / std::mem::size_of::<AudioQueueLevelMeterState>();
-            if db_size as usize % std::mem::size_of::<AudioQueueLevelMeterState>() != 0
-                || count == 0
-                || count > usize::from(channels)
-            {
-                observation.decibel_status = AUDIOQUEUE_ERR_INVALID_DEVICE;
-            } else {
-                let mut peak = -160.0_f32;
-                for meter in &db_meters[..count] {
-                    if !meter.peak_power.is_finite() || !(-160.0..=0.0).contains(&meter.peak_power)
-                    {
-                        observation.decibel_status = AUDIOQUEUE_ERR_INVALID_DEVICE;
-                        break;
-                    }
-                    peak = peak.max(meter.peak_power);
-                }
-                if observation.decibel_status == 0 {
-                    observation.decibel_peak_millidb = Some((peak * 1_000.0).round() as i32);
-                }
-            }
-        }
-        observation
-    }
-
-    fn output_meter_observed(&self, queue: AudioQueueRef, channels: u8) -> OutputMeterObservation {
-        self.output_meter(queue, channels)
-    }
-
     fn is_running(&self, queue: AudioQueueRef) -> (i32, Option<bool>) {
         let mut running = 0_u32;
         let mut size = std::mem::size_of_val(&running) as u32;
@@ -1985,51 +1786,6 @@ impl AudioQueueApi for SystemAudioQueue {
         observation
     }
 
-    fn create_siphon_tap(
-        &self,
-        queue: AudioQueueRef,
-        user_data: *mut c_void,
-        format_out: *mut QueueTapFormatObservation,
-    ) -> i32 {
-        let mut max_frames = 0_u32;
-        let mut processing_format = AudioStreamBasicDescription::default();
-        let mut tap = ptr::null_mut();
-        let status = unsafe {
-            AudioQueueProcessingTapNew(
-                queue,
-                observe_queue_tap,
-                user_data,
-                QUEUE_TAP_PRE_EFFECTS_SIPHON,
-                &mut max_frames,
-                &mut processing_format,
-                &mut tap,
-            )
-        };
-        let status = if status == 0 && tap.is_null() {
-            AUDIOQUEUE_ERR_INVALID_DEVICE
-        } else {
-            status
-        };
-        let format = QueueTapFormatObservation {
-            sample_rate_hz: (processing_format.sample_rate.is_finite()
-                && processing_format.sample_rate > 0.0)
-                .then_some(processing_format.sample_rate.round() as u32),
-            format_id: Some(processing_format.format_id),
-            format_flags: Some(processing_format.format_flags),
-            bytes_per_packet: Some(processing_format.bytes_per_packet),
-            frames_per_packet: Some(processing_format.frames_per_packet),
-            bytes_per_frame: Some(processing_format.bytes_per_frame),
-            channels_per_frame: Some(processing_format.channels_per_frame),
-            bits_per_channel: Some(processing_format.bits_per_channel),
-        };
-        if !format_out.is_null() {
-            unsafe {
-                *format_out = format;
-            }
-        }
-        status
-    }
-
     fn pause(&self, queue: AudioQueueRef) -> i32 {
         unsafe { AudioQueuePause(queue) }
     }
@@ -2063,66 +1819,6 @@ impl CallbackContext {
             diagnostics,
         }
     }
-}
-
-unsafe extern "C" fn observe_queue_tap(
-    user: *mut c_void,
-    _tap: AudioQueueProcessingTapRef,
-    frames: u32,
-    _time_stamp: *mut c_void,
-    _flags: *mut u32,
-    out_frames: *mut u32,
-    io_data: *mut AudioBufferList,
-) {
-    if user.is_null() {
-        return;
-    }
-    let context = unsafe { &*(user.cast::<CallbackContext>()) };
-    context
-        .diagnostics
-        .add(&context.diagnostics.tap_callbacks, 1);
-    context
-        .diagnostics
-        .add(&context.diagnostics.tap_frames, u64::from(frames));
-    if !out_frames.is_null() {
-        unsafe { *out_frames = frames };
-    }
-    if io_data.is_null() {
-        return;
-    }
-    let list = unsafe { &*io_data };
-    if list.number_buffers == 0 || list.number_buffers > MAX_TAP_BUFFERS {
-        return;
-    }
-    let buffers = std::ptr::addr_of!(list.buffers).cast::<AudioBuffer>();
-    let mut nonzero_bytes = 0_u64;
-    let mut data_buffers = 0_u64;
-    let mut total_bytes = 0_u32;
-    for index in 0..list.number_buffers as usize {
-        let buffer = unsafe { &*buffers.add(index) };
-        if buffer.data_byte_size == 0 {
-            continue;
-        }
-        if buffer.data.is_null()
-            || buffer.data_byte_size > MAX_TAP_BUFFER_BYTES
-            || total_bytes.saturating_add(buffer.data_byte_size) > MAX_TAP_BUFFER_BYTES
-        {
-            return;
-        }
-        total_bytes += buffer.data_byte_size;
-        data_buffers += 1;
-        let data = unsafe {
-            std::slice::from_raw_parts(buffer.data.cast::<u8>(), buffer.data_byte_size as usize)
-        };
-        nonzero_bytes =
-            nonzero_bytes.saturating_add(data.iter().filter(|&&byte| byte != 0).count() as u64);
-    }
-    context
-        .diagnostics
-        .add(&context.diagnostics.tap_data_buffers, data_buffers);
-    context
-        .diagnostics
-        .add(&context.diagnostics.tap_nonzero_bytes, nonzero_bytes);
 }
 
 struct OrphanedQueue {
@@ -2864,11 +2560,6 @@ mod tests {
         current_device_matches_target: Option<bool>,
         current_device_list_status: Option<i32>,
         current_device_listed: Option<bool>,
-        output_meter_enable_status: i32,
-        output_meter_status: i32,
-        output_meter_peak_millionths: u32,
-        output_meter_db_status: i32,
-        output_meter_peak_millidb: i32,
         queue_running_status: i32,
         queue_is_running: bool,
         pause_status: i32,
@@ -3044,38 +2735,6 @@ mod tests {
             }
         }
 
-        fn enable_output_meter(&self, _queue: AudioQueueRef) -> i32 {
-            self.0.lock().unwrap().output_meter_enable_status
-        }
-
-        fn output_meter(&self, _queue: AudioQueueRef, _channels: u8) -> OutputMeterObservation {
-            let state = self.0.lock().unwrap();
-            OutputMeterObservation {
-                linear_status: state.output_meter_status,
-                linear_peak_millionths: (state.output_meter_status == 0)
-                    .then_some(state.output_meter_peak_millionths),
-                decibel_status: state.output_meter_db_status,
-                decibel_peak_millidb: (state.output_meter_db_status == 0)
-                    .then_some(state.output_meter_peak_millidb),
-            }
-        }
-
-        fn output_meter_observed(
-            &self,
-            _queue: AudioQueueRef,
-            _channels: u8,
-        ) -> OutputMeterObservation {
-            let state = self.0.lock().unwrap();
-            OutputMeterObservation {
-                linear_status: state.output_meter_status,
-                linear_peak_millionths: (state.output_meter_status == 0)
-                    .then_some(state.output_meter_peak_millionths),
-                decibel_status: state.output_meter_db_status,
-                decibel_peak_millidb: (state.output_meter_db_status == 0)
-                    .then_some(state.output_meter_peak_millidb),
-            }
-        }
-
         fn is_running(&self, _queue: AudioQueueRef) -> (i32, Option<bool>) {
             let state = self.0.lock().unwrap();
             (
@@ -3090,20 +2749,6 @@ mod tests {
             _expected: AudioFormat,
         ) -> QueueFormatObservation {
             QueueFormatObservation::default()
-        }
-
-        fn create_siphon_tap(
-            &self,
-            _queue: AudioQueueRef,
-            _user_data: *mut c_void,
-            format_out: *mut QueueTapFormatObservation,
-        ) -> i32 {
-            if !format_out.is_null() {
-                unsafe {
-                    *format_out = QueueTapFormatObservation::default();
-                }
-            }
-            0
         }
 
         fn pause(&self, _queue: AudioQueueRef) -> i32 {
@@ -3757,7 +3402,6 @@ mod tests {
         let (mut sink, api) = fake_sink();
         {
             let mut state = api.0.lock().unwrap();
-            state.output_meter_peak_millionths = 123_456;
             state.queue_is_running = true;
         }
         let disabled = sink.diagnostics_snapshot();
