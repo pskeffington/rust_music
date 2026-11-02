@@ -1548,3 +1548,20 @@ drag-resize observation. The exact 520×360 live window behavior remains open.
 The current UI automation interface did not provide a usable screenshot or
 native frame measurement in this check; no live-size claim is made. VoiceOver
 remains skipped at the operator's direction.
+
+### 2026-11-02 outer-frame minimum constraint correction
+
+At source commit `148d64d`, redundant SwiftUI content-frame minimums were
+removed from the Player, Playlist, Library, and Equalizer scene content. The
+minimum now comes from `NSWindow.minSize`, which constrains the outer native
+window frame in AppKit points; the 544×384 layout regression continues to
+assert the Library's exact 520×360-point calculated frame. Rust Boy styling and
+window content were not changed.
+
+`sh scripts/build-macos-app.sh` exited **0**, including the minimum viewport
+assertion, scale harnesses, lifecycle checks, and local bundle signature
+validation. `sh scripts/offline-gate.sh` exited **0** on the candidate with 17
+local crates, 32 path-only edges, and all 36 native AudioQueue tests. The CUA
+accessibility tree and screenshot remained available, but coordinate input
+returned `windowNotFoundAtPosition`; this prevented a live drag-size check.
+The correction is source/build verified; live behavior remains unverified.
