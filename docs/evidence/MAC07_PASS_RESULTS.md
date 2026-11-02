@@ -1725,3 +1725,11 @@ The focused `PlaybackUIState` harness and `sh scripts/build-macos-app.sh` both e
 ### 2026-11-02 verification at `2b7c49be79ff10f7013fa805cb58f7d9a63287b7`
 
 An independent `sh scripts/build-macos-app.sh` run exited **0**. App signature validation and the catalog, layout, playback, window, and lifecycle harnesses passed. Synthetic 250k-catalog results: index build 68.106 ms; cached-sort p95 33.800 ms; narrow-search p95 79.280 ms; broad-search p95 130.711 ms; bounded 200-row page p95 113.940 ms; artist-group index plus page 589.442 ms; artist-group narrow-query p95 226.668 ms; harness process peak RSS 336,887,808 bytes. These are synthetic harness metrics. No live SwiftUI, song-selection, or audio behavior was verified; MAC07-03 remains in progress.
+
+### 2026-11-02 live selection regression and toolbar review
+
+On the rebuilt app containing the current Library toolbar width adjustment, I explicitly loaded a temporary two-track silent WAV fixture. While Alpha was Playing, clicking Bravo changed the selected Library row to Bravo and left Alpha Playing; the Player time advanced from 00:17 to 00:20. Enqueue Selected then left Alpha as the Player's current track (00:32 through 00:41 observed) and Playlist Editor showed Alpha as the current queue entry followed by Bravo. This reproduces the reported selection/queue interaction with synthetic silent fixtures. It does not establish audible output or validate the supplied lossless corpus.
+
+Expanded Media Library screenshot and accessibility state showed the full `TITLE` search-scope value alongside Browse, Sort, Rows, and the track count. This verifies visible standard-size toolbar content. A live 520×360-point Library frame was not reached: CUA's native resize hit-testing previously failed, and no exact point-sized frame was observed. The screen was not tested with a compact-width outer frame in this turn. Keyboard forward/reverse traversal evidence from the preceding session remains recorded above; VoiceOver was not tested per user direction.
+
+The temporary fixtures were silent, and the UI itself stated `Audible output is not confirmed`; no audio claim is made. MAC07-03 is partially verified and remains in progress pending exact compact-frame and broader interaction acceptance.

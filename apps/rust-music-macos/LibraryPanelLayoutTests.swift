@@ -29,15 +29,15 @@ private enum LibraryPanelLayoutTests {
 
         let labelValueGap: CGFloat = 6
         let chevronAllowance: CGFloat = 12
-        let pickerBudget: (String, String) -> CGFloat = { label, value in
-            measuredWidth(label, font: compactFont)
+        let pickerBudget: (String, String, NSFont) -> CGFloat = { label, value, font in
+            measuredWidth(label, font: font)
                 + labelValueGap
-                + measuredWidth(value, font: compactFont)
+                + measuredWidth(value, font: font)
                 + chevronAllowance
         }
-        precondition(pickerBudget("IN", "ALL FIELDS") <= compact.searchScopePickerWidth)
-        precondition(pickerBudget("SORT", "ARTIST") <= compact.sortPickerWidth)
-        precondition(pickerBudget("ROWS", "STANDARD") <= compact.densityPickerWidth)
+        precondition(pickerBudget("IN", "ALL FIELDS", compactFont) <= compact.searchScopePickerWidth)
+        precondition(pickerBudget("SORT", "ARTIST", compactFont) <= compact.sortPickerWidth)
+        precondition(pickerBudget("ROWS", "STANDARD", compactFont) <= compact.densityPickerWidth)
 
         let standard = LibraryPanelLayout(contentSize: CGSize(width: 964, height: 660))
         precondition(!standard.isCompact)
@@ -48,21 +48,22 @@ private enum LibraryPanelLayoutTests {
         precondition(standard.groupBoxPadding == 10)
         precondition(standard.minimumResultsHeight == 96)
         precondition(standard.toolbarAvailableWidth == 924)
-        precondition(standard.searchScopePickerWidth == 86)
+        precondition(standard.searchScopePickerWidth == 96)
         precondition(standard.sortPickerWidth == 132)
         precondition(standard.densityPickerWidth == 160)
         precondition(standard.toolbarItemSpacing == 8)
         precondition(standard.countLabelFontSize == 10)
+        precondition(pickerBudget("IN", "TITLE", standardFont) <= standard.searchScopePickerWidth)
         let standardScanningCountWidth = measuredWidth("SCANNING · 20000 PRIOR ARTISTS", font: standardFont)
         let standardBudget = standard.toolbarControlWidthBudget(countLabelWidth: standardScanningCountWidth)
         precondition(standardBudget < standard.toolbarAvailableWidth)
-        let justBelowStandardWidth = LibraryPanelLayout(contentSize: CGSize(width: 643, height: 700))
+        let justBelowStandardWidth = LibraryPanelLayout(contentSize: CGSize(width: 647, height: 700))
         precondition(justBelowStandardWidth.isCompactWidth)
         precondition(
             justBelowStandardWidth.toolbarControlWidthBudget(countLabelWidth: compactScanningCountWidth)
                 <= justBelowStandardWidth.toolbarAvailableWidth
         )
-        let firstStandardWidth = LibraryPanelLayout(contentSize: CGSize(width: 644, height: 700))
+        let firstStandardWidth = LibraryPanelLayout(contentSize: CGSize(width: 648, height: 700))
         precondition(!firstStandardWidth.isCompactWidth)
         precondition(standardBudget <= firstStandardWidth.toolbarAvailableWidth)
     }

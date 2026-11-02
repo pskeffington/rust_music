@@ -2,7 +2,7 @@ import Foundation
 
 struct LibraryPanelLayout {
     static let compactContentHeight: CGFloat = 420
-    static let compactContentWidth: CGFloat = 644
+    static let compactContentWidth: CGFloat = 648
 
     let isCompact: Bool
     let isCompactWidth: Bool
@@ -21,7 +21,7 @@ struct LibraryPanelLayout {
     var minimumResultsHeight: CGFloat { isCompact ? 40 : 96 }
 
     var toolbarItemSpacing: CGFloat { isCompactWidth ? 4 : 8 }
-    var searchScopePickerWidth: CGFloat { isCompactWidth ? 92 : 86 }
+    var searchScopePickerWidth: CGFloat { isCompactWidth ? 92 : 96 }
     var sortPickerWidth: CGFloat { isCompactWidth ? 80 : 132 }
     var densityPickerWidth: CGFloat { isCompactWidth ? 92 : 160 }
     var compactControlFontSize: CGFloat { 9 }
