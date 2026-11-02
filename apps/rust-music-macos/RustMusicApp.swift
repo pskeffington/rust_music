@@ -1297,21 +1297,28 @@ private struct EqualizerWindow: View {
                     .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(RustMusicPalette.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                ForEach(["31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"], id: \.self) { band in
-                    HStack(spacing: 10) {
-                        Text(band)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .frame(width: 52, alignment: .trailing)
-                        Slider(value: .constant(0.5), in: 0...1)
-                            .disabled(true)
-                            .accessibilityLabel("\(band) equalizer band unavailable")
-                        Text("OFF")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(RustMusicPalette.muted)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(["31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"], id: \.self) { band in
+                            HStack(spacing: 10) {
+                                Text(band)
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .frame(width: 52, alignment: .trailing)
+                                Slider(value: .constant(0.5), in: 0...1)
+                                    .disabled(true)
+                                    .accessibilityLabel("\(band) equalizer band unavailable")
+                                Text("OFF")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(RustMusicPalette.muted)
+                            }
+                        }
                     }
                 }
+                .scrollIndicators(.visible)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(RustMusicPalette.background.ignoresSafeArea())
         .foregroundStyle(RustMusicPalette.phosphor)
@@ -3412,7 +3419,8 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .accessibilityHint("Use the Library Results VoiceOver rotor to move among visible tracks on this page. Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .accessibilityRotor("Library Results", entries: visibleTracks, entryLabel: \.accessibilityRotorLabel)
                         .conditionalAccessibilityAction(
                             !model.selectedTrackIDs.isEmpty && !model.isStateBusy && !model.isTransportBusy,
                             named: "Enqueue Selected Tracks"
@@ -3471,8 +3479,9 @@ private struct PlayerView: View {
                             .disabled(model.isTransportBusy || model.isStateBusy)
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
                             .accessibilityHint(model.browseMode == .artists
-                                ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
-                                : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
+                                ? "Use the Library Results VoiceOver rotor to move among visible artists. Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
+                                : "Use the Library Results VoiceOver rotor to move among visible albums. Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
+                            .accessibilityRotor("Library Results", entries: visibleGroups, entryLabel: \.accessibilityRotorLabel)
                             .conditionalAccessibilityAction(
                                 model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"

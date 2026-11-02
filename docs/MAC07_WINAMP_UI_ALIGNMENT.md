@@ -21,6 +21,19 @@ acceptance remain open. The catalog, scanner, and v1 playback protocol remain
 limited to 20,000 tracks. The named AUI02 reference file is absent from this
 checkout; this pass follows the operator requirements supplied in the task.
 
+**Live UI correction (2026-11-02):** On the isolated macOS candidate, the
+native Window menu brought each of the four named operator windows forward,
+and Arrange returned focus to Player after all windows were presented. Player,
+Playlist Editor, Media Library, and Equalizer were inspected at compact and
+expanded frames; screenshot dimensions are pixels and do not establish point
+sizes. Testing Equalizer at a short compact frame revealed that its lower bands
+were clipped. Candidate `87e141c` now top-aligns the control stack and scrolls
+the band list; the compact live check reached 16 kHz, while the expanded check
+showed all ten disabled bands at once. Separately, the operator confirmed that
+VoiceOver's Library Results rotor lists the visible track. Rotor navigation
+and spoken output, minimum point-size enforcement, saved-frame restart, and
+other display layouts remain open. No playback occurred during these UI checks.
+
 ## Evidence boundary and current state
 
 - At source baseline `e9cacb1d8d1a3464fd1ba973449767f7152cffd1`, two same-file CLI playback attempts failed at `AudioQueueStart` with OSStatus `-66680`; the local SDK header maps this to `kAudioQueueErr_InvalidDevice`.

@@ -23,6 +23,10 @@ struct CatalogTrack: Identifiable, Equatable {
     let artistSortKey: String
     let albumSortKey: String
 
+    var accessibilityRotorLabel: String {
+        [title, artist, album].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
     init(
         id: Int,
         container: String,
@@ -74,6 +78,10 @@ enum CatalogSearch {
         let detail: String?
         let artistFilterKey: String?
         let albumFilterKey: String?
+
+        var accessibilityRotorLabel: String {
+            [name, detail].compactMap { $0 }.joined(separator: ", ")
+        }
     }
 
     struct BrowsePage {
