@@ -219,6 +219,10 @@ struct PackagePlaybackSnapshot: Equatable {
 }
 
 enum PlaybackUIState {
+    static func shouldReflectQueueSelection(isPlaying: Bool, isPaused: Bool) -> Bool {
+        !isPlaying && !isPaused
+    }
+
     static func flags(for state: UInt8) -> (playing: Bool, paused: Bool) {
         (playing: state == 2, paused: state == 6)
     }

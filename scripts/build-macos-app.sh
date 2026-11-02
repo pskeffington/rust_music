@@ -56,7 +56,7 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   apps/rust-music-macos/CatalogValidationTests.swift \
   -o "$ROOT/target/macos/CatalogValidationTests"
 "$ROOT/target/macos/CatalogValidationTests"
-swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" -framework AppKit \
   apps/rust-music-macos/LibraryPanelLayout.swift \
   apps/rust-music-macos/LibraryPanelLayoutTests.swift \
   -o "$ROOT/target/macos/LibraryPanelLayoutTests"

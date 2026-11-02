@@ -1872,7 +1872,11 @@ final class PlayerModel: ObservableObject {
                 self.selectedQueueIndex = queue.current
                 self.repeatMode = queue.repeatMode
                 self.shuffleSeed = queue.shuffleSeed
-                if let current = queue.current,
+                if PlaybackUIState.shouldReflectQueueSelection(
+                    isPlaying: self.isPlaying,
+                    isPaused: self.isPaused
+                ),
+                   let current = queue.current,
                    let entry = queue.entries.first(where: { $0.index == current }),
                    let track = self.tracks.first(where: { $0.relativePath == entry.relativePath }) {
                     self.selectedIndex = track.id
@@ -2879,7 +2883,7 @@ private struct PlayerView: View {
             VStack(spacing: 0) {
                 if kind == .library {
                     GeometryReader { proxy in
-                        let layout = LibraryPanelLayout(contentHeight: proxy.size.height)
+                        let layout = LibraryPanelLayout(contentSize: proxy.size)
                         VStack(alignment: .leading, spacing: layout.sectionSpacing) {
                             header
                             libraryPanel(layout: layout)
@@ -3183,54 +3187,57 @@ private struct PlayerView: View {
         .accessibilityIdentifier("library-browse-mode")
     }
 
-    private var librarySearchScopePicker: some View {
+    private func librarySearchScopePicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("IN", selection: $model.searchScope) {
             ForEach(CatalogSearch.SearchScope.allCases) { scope in
                 Text(scope.label).tag(scope)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 86)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Search library in")
         .accessibilityHint("Choose all fields, title, artist, or album.")
         .accessibilityIdentifier("library-search-scope")
     }
 
-    private var librarySortPicker: some View {
+    private func librarySortPicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("SORT", selection: $model.sortOrder) {
             ForEach(CatalogSearch.SortOrder.allCases) { order in
                 Text(order.label).tag(order)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 132)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Sort library tracks")
         .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
         .accessibilityIdentifier("library-sort-order")
     }
 
-    private var libraryDensityPicker: some View {
+    private func libraryDensityPicker(width: CGFloat, layout: LibraryPanelLayout) -> some View {
         Picker("ROWS", selection: $libraryRowDensityRawValue) {
             ForEach(LibraryRowDensity.allCases) { density in
                 Text(density.label).tag(density.rawValue)
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 160)
+        .libraryCompactControlFont(layout.isCompactWidth, size: layout.compactControlFontSize)
+        .frame(width: width)
         .layoutPriority(1)
         .accessibilityLabel("Library row density")
         .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
         .accessibilityIdentifier("library-row-density")
     }
 
-    private var libraryTrackCountLabel: some View {
+    private func libraryTrackCountLabel(layout: LibraryPanelLayout) -> some View {
         let count = model.browseMode == .tracks ? model.visibleTrackTotal : model.visibleBrowseGroupTotal
         return Text(model.isScanning
             ? "SCANNING · \(count) PRIOR \(model.browseMode.label)"
             : "\(count) \(model.browseMode.label)")
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(.system(size: layout.countLabelFontSize, weight: .medium, design: .monospaced))
             .foregroundStyle(RustMusicPalette.muted)
             .fixedSize()
     }
@@ -3289,16 +3296,18 @@ private struct PlayerView: View {
         return GroupBox {
             VStack(alignment: .leading, spacing: layout.contentSpacing) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: layout.toolbarItemSpacing) {
                         librarySearchField
                             .frame(minWidth: 145)
                         libraryBrowseModePicker
                         if model.browseMode == .tracks {
-                            librarySearchScopePicker
+                            librarySearchScopePicker(width: layout.searchScopePickerWidth, layout: layout)
                         }
-                        if model.browseMode == .tracks { librarySortPicker }
-                        libraryDensityPicker
-                        libraryTrackCountLabel
+                        if model.browseMode == .tracks {
+                            librarySortPicker(width: layout.sortPickerWidth, layout: layout)
+                        }
+                        libraryDensityPicker(width: layout.densityPickerWidth, layout: layout)
+                        libraryTrackCountLabel(layout: layout)
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
@@ -3306,14 +3315,14 @@ private struct PlayerView: View {
                                 .frame(maxWidth: .infinity)
                             libraryBrowseModePicker
                         }
-                        HStack(spacing: 8) {
+                        HStack(spacing: layout.toolbarItemSpacing) {
                             if model.browseMode == .tracks {
-                                librarySearchScopePicker
-                                librarySortPicker
+                                librarySearchScopePicker(width: layout.searchScopePickerWidth, layout: layout)
+                                librarySortPicker(width: layout.sortPickerWidth, layout: layout)
                             }
-                            libraryDensityPicker
+                            libraryDensityPicker(width: layout.densityPickerWidth, layout: layout)
                             Spacer(minLength: 0)
-                            libraryTrackCountLabel
+                            libraryTrackCountLabel(layout: layout)
                         }
                     }
                 }
@@ -3908,7 +3917,25 @@ private struct RustMusicGroupBoxStyle: GroupBoxStyle {
     }
 }
 
+private struct LibraryCompactControlFont: ViewModifier {
+    let isCompact: Bool
+    let size: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isCompact {
+            content.font(.system(size: size, weight: .medium, design: .monospaced))
+        } else {
+            content
+        }
+    }
+}
+
 private extension View {
+    func libraryCompactControlFont(_ isCompact: Bool, size: CGFloat) -> some View {
+        modifier(LibraryCompactControlFont(isCompact: isCompact, size: size))
+    }
+
     @ViewBuilder
     func conditionalAccessibilityAction(
         _ isAvailable: Bool,

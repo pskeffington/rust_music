@@ -72,6 +72,9 @@ struct PlaybackUIStateTests {
 
         precondition(PlaybackUIState.flags(for: 2).playing)
         precondition(!PlaybackUIState.flags(for: 2).paused)
+        precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: true, isPaused: false))
+        precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: true))
+        precondition(PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: false))
         precondition(!PlaybackUIState.flags(for: 6).playing)
         precondition(PlaybackUIState.flags(for: 6).paused)
         for terminalState: UInt8 in [3, 4, 5] {
