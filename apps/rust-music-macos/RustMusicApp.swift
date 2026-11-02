@@ -1297,21 +1297,28 @@ private struct EqualizerWindow: View {
                     .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(RustMusicPalette.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                ForEach(["31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"], id: \.self) { band in
-                    HStack(spacing: 10) {
-                        Text(band)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .frame(width: 52, alignment: .trailing)
-                        Slider(value: .constant(0.5), in: 0...1)
-                            .disabled(true)
-                            .accessibilityLabel("\(band) equalizer band unavailable")
-                        Text("OFF")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(RustMusicPalette.muted)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(["31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"], id: \.self) { band in
+                            HStack(spacing: 10) {
+                                Text(band)
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .frame(width: 52, alignment: .trailing)
+                                Slider(value: .constant(0.5), in: 0...1)
+                                    .disabled(true)
+                                    .accessibilityLabel("\(band) equalizer band unavailable")
+                                Text("OFF")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(RustMusicPalette.muted)
+                            }
+                        }
                     }
                 }
+                .scrollIndicators(.visible)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(RustMusicPalette.background.ignoresSafeArea())
         .foregroundStyle(RustMusicPalette.phosphor)
