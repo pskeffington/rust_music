@@ -13,6 +13,22 @@ private struct UnindexedCatalogTrack {
 @main
 struct CatalogSearchTests {
     static func main() {
+        precondition(LibraryRowDensity.allCases.map(\.rawValue) == ["compact", "standard"])
+        precondition(
+            LibraryRowDensity.standard.titleFontSize == 12
+                && LibraryRowDensity.standard.metadataFontSize == 10
+                && LibraryRowDensity.standard.textSpacing == 2
+                && LibraryRowDensity.standard.verticalPadding == 2,
+            "standard density must retain the original Library typography and row spacing"
+        )
+        precondition(
+            LibraryRowDensity.compact.titleFontSize < LibraryRowDensity.standard.titleFontSize
+                && LibraryRowDensity.compact.metadataFontSize < LibraryRowDensity.standard.metadataFontSize
+                && LibraryRowDensity.compact.textSpacing < LibraryRowDensity.standard.textSpacing
+                && LibraryRowDensity.compact.verticalPadding < LibraryRowDensity.standard.verticalPadding,
+            "compact density must reduce text and row spacing while preserving the same text styles"
+        )
+
         let emptyNavigation = CatalogPageNavigation(totalItems: 0, offset: 0, visibleItemCount: 0)
         precondition(
             emptyNavigation.pageCount == 1

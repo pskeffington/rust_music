@@ -2745,6 +2745,7 @@ private struct PlayerView: View {
     @FocusState private var playlistNameIsFocused: Bool
     @State private var handledLibrarySearchFocusGeneration: UInt64 = 0
     @State private var handledPlaylistNameFocusGeneration: UInt64 = 0
+    @AppStorage("RustMusic.libraryRowDensity") private var libraryRowDensityRawValue = LibraryRowDensity.standard.rawValue
 
     init(model: PlayerModel, kind: PlayerWindowKind) {
         self.model = model
@@ -3021,6 +3022,7 @@ private struct PlayerView: View {
 
     private var libraryPanel: some View {
         let visibleTracks = model.visibleTracks
+        let rowDensity = LibraryRowDensity(rawValue: libraryRowDensityRawValue) ?? .standard
         let pageNavigation = CatalogPageNavigation(
             totalItems: model.visibleTrackTotal,
             offset: model.catalogPageOffset,
@@ -3080,6 +3082,17 @@ private struct PlayerView: View {
                     .accessibilityLabel("Sort library tracks")
                     .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
                     .accessibilityIdentifier("library-sort-order")
+                    Picker("ROWS", selection: $libraryRowDensityRawValue) {
+                        ForEach(LibraryRowDensity.allCases) { density in
+                            Text(density.label).tag(density.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 86)
+                    .layoutPriority(1)
+                    .accessibilityLabel("Library row density")
+                    .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
+                    .accessibilityIdentifier("library-row-density")
                     Text(model.isScanning
                         ? "SCANNING · \(model.visibleTrackTotal) PRIOR RESULTS"
                         : "\(model.visibleTrackTotal) TRACKS")
@@ -3138,17 +3151,17 @@ private struct PlayerView: View {
                             set: { model.selectTracksManually($0) }
                         )) {
                             ForEach(visibleTracks) { track in
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: rowDensity.textSpacing) {
                                     Text(track.title)
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                        .font(.system(size: rowDensity.titleFontSize, weight: .semibold, design: .monospaced))
                                         .lineLimit(1)
                                     Text([track.artist, track.album, track.container.uppercased()]
                                         .filter { !$0.isEmpty }.joined(separator: " · "))
-                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                        .font(.system(size: rowDensity.metadataFontSize, weight: .regular, design: .monospaced))
                                         .foregroundStyle(RustMusicPalette.muted)
                                         .lineLimit(1)
                                 }
-                                .padding(.vertical, 2)
+                                .padding(.vertical, rowDensity.verticalPadding)
                                 .tag(track.id)
                                 .listRowBackground(RustMusicPalette.display)
                                 .contextMenu {

@@ -127,6 +127,18 @@ enum CatalogSearch {
     }
 }
 
+enum LibraryRowDensity: String, CaseIterable, Identifiable {
+    case compact
+    case standard
+
+    var id: String { rawValue }
+    var label: String { rawValue.uppercased() }
+    var titleFontSize: CGFloat { self == .compact ? 11 : 12 }
+    var metadataFontSize: CGFloat { self == .compact ? 9 : 10 }
+    var textSpacing: CGFloat { self == .compact ? 1 : 2 }
+    var verticalPadding: CGFloat { self == .compact ? 0 : 2 }
+}
+
 struct CatalogPageNavigation: Equatable {
     let totalItems: Int
     let offset: Int

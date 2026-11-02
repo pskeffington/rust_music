@@ -317,3 +317,27 @@ repeat synthetic run the 250,000-row broad-page p95 was **107.707 ms** and
 process peak RSS was **204,963,840 bytes**. Imported libraries remain capped
 at 20,000 tracks. Live page control and VoiceOver behavior remain unverified
 because macOS is locked.
+
+## Persisted Library row density
+
+The Library now has COMPACT and STANDARD row density choices, persisted through
+`@AppStorage`. STANDARD is the default and retains the existing title/metadata
+font sizes, text spacing, row padding, colors, and monospaced styles. COMPACT
+reduces title and metadata sizes by one point and reduces text spacing and
+vertical padding, without changing the color palette or typeface. The density
+picker has an accessibility label and explains the compact option. Track IDs
+and selection state do not depend on density.
+
+The candidate `sh scripts/build-macos-app.sh` exited **0**. The catalog harness
+verified STANDARD values remain 12/10-point labels with spacing/padding 2, and
+that COMPACT reduces each measurement. Catalog, page navigation, playlist,
+window geometry, playback-state, catalog-bound, and process lifecycle/shutdown
+harnesses passed; strict signature verification passed. Roadmap/index
+validation and `git diff --check` passed. The run measured synthetic broad-page
+p95 **110.603 ms** and peak harness RSS **204,996,608 bytes** at 250,000 rows.
+These are algorithm-harness numbers, not full-app memory or imported-catalog
+results; the standalone import cap remains 20,000 tracks.
+
+Live confirmation of the density picker, persistence across relaunch, compact
+row count, minimum-window fit, and VoiceOver navigation is pending because the
+Mac is locked. No visual or runtime acceptance is claimed for this change.
