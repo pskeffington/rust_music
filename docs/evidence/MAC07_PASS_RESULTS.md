@@ -1327,6 +1327,36 @@ at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
 
+### 2026-11-02 rebuilt-candidate catalog import and hidden-target enqueue
+
+On source commit `d09f4a2` (the pass-index-only follow-up was committed
+afterward), `sh scripts/build-macos-app.sh` exited **0**, then the rebuilt
+bundle was freshly launched and explicitly loaded a generated three-file
+metadata-only FLAC catalog. Each file contained STREAMINFO and bounded title,
+artist and album comments, with no FLAC frames or audio samples. The Media
+Library reported three tracks, showed the first selected row, and rendered the
+selection summary. This exercised the refreshed catalog parser and installed
+catalog-ID membership on the rebuilt app.
+
+Searching for the second track left the first track selected and displayed
+`1 SELECTED · 1 OUTSIDE PAGE/SEARCH · BULK USE ALL 1`; Play Selected and Play
+Next were disabled, while Enqueue Selected remained enabled. The Playlist
+Editor then showed exactly one queue row for the first (hidden) selected
+track. Playback remained Ready / No Track with no output snapshot. The queue
+was cleared to zero, the app was quit, and the exact three generated files
+were removed. A subsequent fresh launch showed Player / Ready / No Track,
+not-started time, no output snapshot, and disabled transport controls, with
+no catalog scan or autoplay observed. This is metadata-only UI/state evidence,
+not audio acceptance.
+
+Using macOS Window → Move & Resize → Left and then Top Left produced a
+**736×462 screenshot-pixel** Media Library window where search, browse, sort,
+density, empty-state guidance, paging and bulk actions remained visible.
+Screenshot pixels are not AppKit points; this does not verify the declared
+520×360-point minimum or direct resize enforcement. The app was returned to
+Player / Ready / No Track. VoiceOver remains skipped at the operator's
+direction; private-corpus, hardware and release acceptance remain open.
+
 ### 2026-11-02 MAC07-03 compact density controls and 40-track scroll
 
 Candidate source is based on `main` commit `cf83cf22dee8ffba0e58e32fe83039c2acde733f`;
