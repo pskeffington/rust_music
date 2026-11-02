@@ -72,6 +72,10 @@ struct CatalogSearchTests {
             album: "Östergötland",
             relativePath: "Iceland/Östergötland.flac"
         )
+        precondition(
+            unicodeTrack.accessibilityRotorLabel == "Björk, Jónsi, Östergötland",
+            "track rotor entries include title, artist, and album for disambiguation"
+        )
         let unicodeMatches = CatalogSearch.visibleTracks(in: [unicodeTrack], matching: "öSTERGÖTLAND")
         precondition(unicodeMatches == [unicodeTrack], "search must match Unicode case-insensitively")
         precondition(CatalogSearch.matches(unicodeTrack, matching: "östergötland"))
@@ -191,6 +195,11 @@ struct CatalogSearchTests {
                 && sameTitleAlbums.groups.map(\.trackCount) == [3, 1]
                 && sameTitleAlbums.groups[0].id != sameTitleAlbums.groups[1].id,
             "same-titled albums stay distinct by normalized artist while case variants merge"
+        )
+        precondition(
+            sameTitleAlbums.groups[0].accessibilityRotorLabel == "Same Title, Artist One"
+                && sameTitleAlbums.groups[1].accessibilityRotorLabel == "Same Title, Artist Two",
+            "album rotor entries distinguish identically titled albums by artist"
         )
         let artistLimitedAlbumPage = sameTitleAlbumIndex.page(
             matching: "",

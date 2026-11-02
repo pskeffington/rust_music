@@ -720,3 +720,26 @@ showed the `ARTIST · ARTIST A` filter, and displayed only `Alpha Song` by
 Artist A. No playback or queue operation was invoked. This confirms native
 accessibility action exposure and destination behavior. It does not verify
 VoiceOver speech output or rotor navigation.
+
+## Library Results rotor candidate build — 2026-11-02
+
+The candidate based on merged main `cf83cf2` adds a `Library Results` SwiftUI
+accessibility rotor to the visible, paged track and artist/album lists. Track
+entry labels include title, artist, and album; group labels include the group
+name and available detail. Rotor entries use the visible page only, and
+regression assertions verify Unicode labels and distinguish same-titled albums
+by artist.
+
+`sh scripts/build-macos-app.sh` exited 0. Its catalog, playlist-selection,
+window-geometry, playback-state, catalog-bounds, and process-lifecycle
+harnesses passed, including the synthetic 250,000-track catalog run. Strict
+local app bundle signature verification passed.
+
+The rebuilt isolated candidate explicitly loaded two generated metadata-only
+FLAC files with no audio frames. VoiceOver was on; the artist list and selected
+artist accessibility action were present in the native accessibility tree.
+No playback or queue operation occurred. Attempts to open/use the new rotor
+through VoiceOver keyboard commands did not expose rotor UI through the CUA
+observation surface, so actual rotor presentation, navigation, scrolling, and
+speech remain unverified. The prior direct native accessibility-action
+invocation above is separate evidence and does not establish rotor operation.

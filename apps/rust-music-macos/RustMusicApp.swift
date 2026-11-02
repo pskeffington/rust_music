@@ -3412,7 +3412,8 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .disabled(model.isTransportBusy || model.isStateBusy)
                         .accessibilityLabel("Library tracks")
-                        .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .accessibilityHint("Use the Library Results VoiceOver rotor to move among visible tracks on this page. Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
+                        .accessibilityRotor("Library Results", entries: visibleTracks, entryLabel: \.accessibilityRotorLabel)
                         .conditionalAccessibilityAction(
                             !model.selectedTrackIDs.isEmpty && !model.isStateBusy && !model.isTransportBusy,
                             named: "Enqueue Selected Tracks"
@@ -3471,8 +3472,9 @@ private struct PlayerView: View {
                             .disabled(model.isTransportBusy || model.isStateBusy)
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
                             .accessibilityHint(model.browseMode == .artists
-                                ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
-                                : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
+                                ? "Use the Library Results VoiceOver rotor to move among visible artists. Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
+                                : "Use the Library Results VoiceOver rotor to move among visible albums. Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
+                            .accessibilityRotor("Library Results", entries: visibleGroups, entryLabel: \.accessibilityRotorLabel)
                             .conditionalAccessibilityAction(
                                 model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
