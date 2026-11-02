@@ -1530,3 +1530,21 @@ prior compact screenshot was 736×462 pixels. The private six-file parity
 corpus is unavailable, and CLI route parity, physical device-error recovery,
 DAC/panel/focus checks, and complete release acceptance remain open. These
 local gates do not establish production readiness.
+
+### 2026-11-02 minimum Library viewport geometry regression
+
+At UI candidate commit `db11a08`, the macOS layout harness now exercises the
+minimum viable viewport that leaves the Library's 12-point perimeter margin:
+544×384 AppKit points. It asserts the calculated Library frame is exactly
+`x=12, y=12, width=520, height=360`, the required window tiling path is the
+compact cascade, and the existing `NSWindow.minSize` check remains 520×360.
+`sh scripts/build-macos-app.sh` exited **0**, including this assertion, catalog
+profiles through 250,000 tracks, lifecycle checks, and local bundle signature
+validation. `sh scripts/offline-gate.sh` exited **0** on the exact UI candidate,
+including all 36 native AudioQueue tests.
+
+This closes a deterministic AppKit layout-geometry regression case, not a live
+drag-resize observation. The exact 520×360 live window behavior remains open.
+The current UI automation interface did not provide a usable screenshot or
+native frame measurement in this check; no live-size claim is made. VoiceOver
+remains skipped at the operator's direction.
