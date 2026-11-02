@@ -341,3 +341,23 @@ results; the standalone import cap remains 20,000 tracks.
 Live confirmation of the density picker, persistence across relaunch, compact
 row count, minimum-window fit, and VoiceOver navigation is pending because the
 Mac is locked. No visual or runtime acceptance is claimed for this change.
+
+## Responsive Library toolbar
+
+The Library toolbar now uses `ViewThatFits`: Search, Sort, row density, and
+the result count stay on the original single row when that layout fits; at
+narrower widths Search gets a full row and Sort, row density, and count move to
+a second row. Both arrangements reuse the same fields, bindings, accessibility
+labels, and identifiers. The existing control styles and colors are unchanged.
+
+`sh scripts/build-macos-app.sh` exited **0** on the PR candidate. All bundled
+macOS harnesses passed and strict signature verification succeeded. The JSON
+and roadmap validators plus `git diff --check` passed. The catalog harness's
+250,000-row broad-page p95 was **108.290 ms**, and its process peak RSS was
+**204,980,224 bytes**; these are synthetic catalog measurements and do not
+measure SwiftUI layout or full-app memory. Real imports remain capped at 20,000
+tracks.
+
+The Mac remains locked. The breakpoint, focus behavior across the two toolbar
+arrangements, compact-window fit, and VoiceOver traversal have not been
+verified live.

@@ -3020,6 +3020,51 @@ private struct PlayerView: View {
         .groupBoxStyle(RustMusicGroupBoxStyle())
     }
 
+    private var librarySearchField: some View {
+        TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
+            .modifier(RustMusicTextFieldStyle())
+            .focused($librarySearchIsFocused)
+            .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
+            .accessibilityLabel("Search library by title, artist, album, or path")
+    }
+
+    private var librarySortPicker: some View {
+        Picker("SORT", selection: $model.sortOrder) {
+            ForEach(CatalogSearch.SortOrder.allCases) { order in
+                Text(order.label).tag(order)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 132)
+        .layoutPriority(1)
+        .accessibilityLabel("Sort library tracks")
+        .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
+        .accessibilityIdentifier("library-sort-order")
+    }
+
+    private var libraryDensityPicker: some View {
+        Picker("ROWS", selection: $libraryRowDensityRawValue) {
+            ForEach(LibraryRowDensity.allCases) { density in
+                Text(density.label).tag(density.rawValue)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 86)
+        .layoutPriority(1)
+        .accessibilityLabel("Library row density")
+        .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
+        .accessibilityIdentifier("library-row-density")
+    }
+
+    private var libraryTrackCountLabel: some View {
+        Text(model.isScanning
+            ? "SCANNING · \(model.visibleTrackTotal) PRIOR RESULTS"
+            : "\(model.visibleTrackTotal) TRACKS")
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(RustMusicPalette.muted)
+            .fixedSize()
+    }
+
     private var libraryPanel: some View {
         let visibleTracks = model.visibleTracks
         let rowDensity = LibraryRowDensity(rawValue: libraryRowDensityRawValue) ?? .standard
@@ -3065,40 +3110,24 @@ private struct PlayerView: View {
         }
         return GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
-                        .modifier(RustMusicTextFieldStyle())
-                        .focused($librarySearchIsFocused)
-                        .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
-                        .accessibilityLabel("Search library by title, artist, album, or path")
-                    Picker("SORT", selection: $model.sortOrder) {
-                        ForEach(CatalogSearch.SortOrder.allCases) { order in
-                            Text(order.label).tag(order)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        librarySearchField
+                            .frame(minWidth: 145)
+                        librarySortPicker
+                        libraryDensityPicker
+                        libraryTrackCountLabel
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        librarySearchField
+                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 8) {
+                            librarySortPicker
+                            libraryDensityPicker
+                            Spacer(minLength: 0)
+                            libraryTrackCountLabel
                         }
                     }
-                    .pickerStyle(.menu)
-                    .frame(width: 132)
-                    .layoutPriority(1)
-                    .accessibilityLabel("Sort library tracks")
-                    .accessibilityHint("Use the Library menu shortcuts to sort by title, artist, or album. To Tab through every control, enable Use keyboard navigation to move focus between controls in System Settings > Keyboard.")
-                    .accessibilityIdentifier("library-sort-order")
-                    Picker("ROWS", selection: $libraryRowDensityRawValue) {
-                        ForEach(LibraryRowDensity.allCases) { density in
-                            Text(density.label).tag(density.rawValue)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 86)
-                    .layoutPriority(1)
-                    .accessibilityLabel("Library row density")
-                    .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
-                    .accessibilityIdentifier("library-row-density")
-                    Text(model.isScanning
-                        ? "SCANNING · \(model.visibleTrackTotal) PRIOR RESULTS"
-                        : "\(model.visibleTrackTotal) TRACKS")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(RustMusicPalette.muted)
-                        .fixedSize()
                 }
 
                 if let scanStatus = LibraryScanPresentation.message(
