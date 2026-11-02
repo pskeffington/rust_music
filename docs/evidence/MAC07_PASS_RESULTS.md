@@ -1565,3 +1565,16 @@ local crates, 32 path-only edges, and all 36 native AudioQueue tests. The CUA
 accessibility tree and screenshot remained available, but coordinate input
 returned `windowNotFoundAtPosition`; this prevented a live drag-size check.
 The correction is source/build verified; live behavior remains unverified.
+
+### 2026-11-02 fresh-bundle compact-window follow-up
+
+The app bundle built from source commit `148d64d` was relaunched after the
+outer-frame minimum correction. The Player opened at `READY / NO TRACK`; the
+Library was then shown through the native Window menu and displayed its
+text-only controls and empty-library guidance. No library load, scan, or
+playback was started. Its screenshot was 1000×850 pixels, not a point-size
+measurement. A new drag attempt at the Library window's lower-right edge
+again failed with `windowNotFoundAtPosition`; the window did not resize. This
+fresh launch therefore confirms startup and Library presentation only. The
+520×360-point live resize remains unverified; the AppKit geometry test remains
+the strongest available size evidence.
