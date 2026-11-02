@@ -1336,8 +1336,10 @@ the scope of Enqueue Selected explicit. The play target guard remains separate:
 Play Selected and Play Next stay disabled when the selected target is hidden by
 the active search.
 
-`sh scripts/build-macos-app.sh` exited **0** from base `cf83cf2` with this
-working change. The catalog-search harness passed the new all-visible and
+Implementation source commit: `48b20aa0f102f084c0a8489b1d7ad867eb59665d`,
+based on merged main `cf83cf22dee8ffba0e58e32fe83039c2acde733f`.
+`sh scripts/build-macos-app.sh` exited **0** with this source. The
+catalog-search harness passed the new all-visible and
 partly-hidden selection-count cases. The build also ran the existing catalog
 scale harness at 2,000, 20,000, 100,000, and 250,000 synthetic tracks and
 strict local app signature validation. Its 250,000-track catalog process peak
