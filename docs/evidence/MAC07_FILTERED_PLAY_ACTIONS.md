@@ -689,3 +689,23 @@ This verifies the no-results recovery control for this synthetic catalog. It
 does not verify VoiceOver speech/rotor behavior, full keyboard traversal,
 playback, or compact minimum-frame behavior. Overall MAC07-03 remains in
 progress.
+
+## Compact Library width and long-list reachability — PR #9 QA candidate
+
+To inspect a narrow Library without relying on corner-drag automation, an
+isolated QA copy temporarily set the Library's SwiftUI default size to
+520×360. With a generated 40-entry metadata-only catalog (no audio frames),
+the Library toolbar wrapped to two rows while retaining Search, Browse,
+Search-in, Sort, Density, and the count. The Play Selected, Enqueue Selected,
+and Play Next actions and page status remained visible. The list scrollbar
+reached 1.0 and the screenshot showed the final Track 39 row; the accessibility
+tree retained the catalog's full 40-row page. No playback or queue action was
+invoked.
+
+The actual live window capture measured about **520×1,306 screenshot pixels**.
+The unexpectedly tall height means this does not establish the declared
+520×360 AppKit-point frame, nor does screenshot pixel size prove point size.
+The exact 520×360 default-size edit was only in the QA build and was reverted
+before the source checkout was left clean. No production default window size
+was changed. Direct corner resizing, true minimum-frame behavior, VoiceOver,
+and two-size layout acceptance remain open.
