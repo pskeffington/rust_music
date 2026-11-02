@@ -1495,3 +1495,38 @@ AudioQueue tests passed. The build continues to emit 17 unused AudioQueue
 meter/tap warnings in the audio-backend-owned crate. Live resizing, the exact
 520×360-point minimum, VoiceOver speech, private-corpus parity and hardware
 acceptance remain open.
+
+### 2026-11-02 native diagnostic warning cleanup and release gates
+
+Candidate source commit `c18d648` removes the unused AudioQueue level-meter
+and siphon-tap implementations and their fake API stubs. They had no production
+call sites and generated 17 dead-code warnings. The public playback queue,
+route selection, write, and lifecycle paths were not changed; serialized
+diagnostic fields and their defaults remain for protocol compatibility.
+
+`cargo test --locked --offline -p rust-music-native --features macos` passed
+36/36. The release feature build
+`CARGO_NET_OFFLINE=true cargo build --locked --offline --release -p
+rust-music-cli --features macos-output` passed with zero warnings.
+`sh scripts/offline-gate.sh` exited **0**: 17 local crates, 32 path-only
+internal edges, no registry/Git dependencies, warnings-denied Clippy, and all
+36 native AudioQueue tests passed. `cargo fmt --all -- --check`,
+`git diff --check`, `python3 scripts/check_roadmap_index.py` and
+`python3 scripts/check_literature.py` passed.
+
+`sh scripts/build-macos-app.sh` exited **0** with 18/18 symlink-path guards,
+synthetic 2k/20k/100k/250k catalog profiles, UI/IPC and lifecycle harnesses,
+and strict local bundle signature validation. The 250k profile reported
+75.197 ms index construction, 33.323 ms cached-sort p95, 78.272 ms narrow
+search p95, 129.369 ms broad search p95, 124.097 ms bounded 200-row page
+p95, 609.575 ms artist-group index plus page, and 229.540 ms artist-group
+narrow-query p95; peak process RSS was 330,547,200 bytes. These are synthetic
+harness measurements, not interactive UI or representative-media qualification.
+The rebuilt local app opened at `READY / NO TRACK`, with no scan or autoplay.
+
+VoiceOver work was skipped at the operator's direction and is not claimed as
+accepted. The exact live 520×360-point window minimum remains unverified; the
+prior compact screenshot was 736×462 pixels. The private six-file parity
+corpus is unavailable, and CLI route parity, physical device-error recovery,
+DAC/panel/focus checks, and complete release acceptance remain open. These
+local gates do not establish production readiness.
