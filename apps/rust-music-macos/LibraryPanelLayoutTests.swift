@@ -3,12 +3,7 @@ import AppKit
 @main
 private enum LibraryPanelLayoutTests {
     static func main() {
-        let compactWindow = CGSize(width: 520, height: 360)
-        let compactContent = CGSize(
-            width: LibraryPanelLayout.geometryWidth(forOuterWindowWidth: compactWindow.width),
-            height: compactWindow.height
-        )
-        let compact = LibraryPanelLayout(contentSize: compactContent)
+        let compact = LibraryPanelLayout(contentSize: CGSize(width: 484, height: 320))
         precondition(compact.isCompact)
         precondition(compact.isCompactWidth)
         precondition(compact.sectionSpacing == 4)
@@ -44,11 +39,7 @@ private enum LibraryPanelLayoutTests {
         precondition(pickerBudget("SORT", "ARTIST") <= compact.sortPickerWidth)
         precondition(pickerBudget("ROWS", "STANDARD") <= compact.densityPickerWidth)
 
-        let expandedWindow = CGSize(width: 1000, height: 700)
-        let standard = LibraryPanelLayout(contentSize: CGSize(
-            width: LibraryPanelLayout.geometryWidth(forOuterWindowWidth: expandedWindow.width),
-            height: expandedWindow.height
-        ))
+        let standard = LibraryPanelLayout(contentSize: CGSize(width: 964, height: 660))
         precondition(!standard.isCompact)
         precondition(!standard.isCompactWidth)
         precondition(standard.sectionSpacing == 12)

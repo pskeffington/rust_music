@@ -3,7 +3,6 @@ import Foundation
 struct LibraryPanelLayout {
     static let compactContentHeight: CGFloat = 420
     static let compactContentWidth: CGFloat = 644
-    static let outerWindowToGeometryWidthInset: CGFloat = 36
 
     let isCompact: Bool
     let isCompactWidth: Bool
@@ -13,10 +12,6 @@ struct LibraryPanelLayout {
         self.contentSize = contentSize
         isCompact = contentSize.height < Self.compactContentHeight
         isCompactWidth = contentSize.width < Self.compactContentWidth
-    }
-
-    static func geometryWidth(forOuterWindowWidth width: CGFloat) -> CGFloat {
-        max(0, width - outerWindowToGeometryWidthInset)
     }
 
     var sectionSpacing: CGFloat { isCompact ? 4 : 12 }
