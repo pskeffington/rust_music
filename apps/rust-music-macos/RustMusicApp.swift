@@ -898,8 +898,6 @@ private struct RustMusicCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(
                     !model.selectedTrackIsActionableInLibrary
-                        || model.isPlaying
-                        || model.isPaused
                         || model.isScanning
                         || model.isStateBusy
                         || model.isTransportBusy
@@ -3692,7 +3690,7 @@ private struct PlayerView: View {
             Button("PLAY") { model.play() }
                 .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(RustMusicButtonStyle(prominent: true))
-                .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isPlaying || model.isPaused || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                .disabled(model.selectedTrack == nil || !model.selectedTrackMatchesCurrentSearch || model.isScanning || model.isStateBusy || model.isTransportBusy)
                 .accessibilityLabel("Play")
                 .accessibilityIdentifier("transport-play")
             Button(model.isPaused ? "RESUME" : "PAUSE") { model.togglePause() }
