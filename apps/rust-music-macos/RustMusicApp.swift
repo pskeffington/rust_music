@@ -1389,7 +1389,9 @@ final class PlayerModel: ObservableObject {
     private var catalogTrackIDs: Set<Int> = []
     @Published var selectedIndex: Int? {
         didSet {
-            if oldValue != selectedIndex { playbackSnapshot = nil }
+            if oldValue != selectedIndex, !isPlaying, !isPaused {
+                playbackSnapshot = nil
+            }
         }
     }
     @Published var selectedTrackIDs: Set<Int> = []
@@ -1515,6 +1517,17 @@ final class PlayerModel: ObservableObject {
     var selectedTrack: CatalogTrack? {
         guard let selectedIndex else { return nil }
         return tracks.first(where: { $0.id == selectedIndex })
+    }
+
+    var nowPlayingTrack: CatalogTrack? {
+        let displayedIndex = PlaybackUIState.displayedTrackIndex(
+            isPlaying: isPlaying,
+            isPaused: isPaused,
+            snapshot: playbackSnapshot,
+            selectedIndex: selectedIndex
+        )
+        guard let displayedIndex else { return nil }
+        return tracks.first(where: { $0.id == displayedIndex })
     }
 
     var selectedTrackMatchesCurrentSearch: Bool {
@@ -2401,7 +2414,7 @@ final class PlayerModel: ObservableObject {
         switch response {
         case .view(let snapshot, let diagnostic):
             if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
-            if PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+            if PlaybackUIState.shouldClearProgress(snapshot: snapshot) {
                 playbackSnapshot = nil
             } else {
                 playbackSnapshot = snapshot
@@ -2514,7 +2527,7 @@ final class PlayerModel: ObservableObject {
         switch response {
         case .view(let snapshot, let diagnostic):
             if let diagnostic { audioQueueDiagnosticSummary = diagnostic }
-            if !PlaybackUIState.shouldClearProgress(snapshot: snapshot, selectedIndex: selectedIndex) {
+            if !PlaybackUIState.shouldClearProgress(snapshot: snapshot) {
                 playbackSnapshot = snapshot
             }
             let flags = PlaybackUIState.flags(for: snapshot.state)
@@ -2621,7 +2634,9 @@ final class PlayerModel: ObservableObject {
         let id: Int? = selected
         guard selectedIndex != id else { return }
         selectedIndex = id
-        if isPlaying || isPaused { stop() }
+        if !isPlaying, !isPaused, let track = selectedTrack {
+            status = "Selected \(track.title). Press Play to start output."
+        }
     }
 
     private func advanceQueueAfterEnd() {
@@ -2948,11 +2963,11 @@ private struct PlayerView: View {
                         .tracking(1.3)
                         .foregroundStyle(model.isPlaying ? RustMusicPalette.phosphor : RustMusicPalette.muted)
                     Spacer()
-                    Text(model.selectedTrack.map { String(format: "TRACK %03d", $0.id + 1) } ?? "NO TRACK")
+                    Text(model.nowPlayingTrack.map { String(format: "TRACK %03d", $0.id + 1) } ?? "NO TRACK")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                 }
-                Text(model.selectedTrack?.title ?? "Choose a track from your library")
+                Text(model.nowPlayingTrack?.title ?? "Choose a track from your library")
                     .font(.system(size: 23, weight: .semibold, design: .monospaced))
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
@@ -3048,7 +3063,7 @@ private struct PlayerView: View {
     }
 
     private var nowPlayingDetail: String {
-        guard let track = model.selectedTrack else {
+        guard let track = model.nowPlayingTrack else {
             return "Playback starts only after you press Play."
         }
         let creator = [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · ")

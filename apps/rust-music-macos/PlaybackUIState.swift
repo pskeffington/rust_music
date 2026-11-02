@@ -223,11 +223,22 @@ enum PlaybackUIState {
         (playing: state == 2, paused: state == 6)
     }
 
-    static func shouldClearProgress(snapshot: PackagePlaybackSnapshot, selectedIndex: Int?) -> Bool {
-        guard snapshot.state != 0, snapshot.state != 3, snapshot.state != 5,
-              let selectedIndex, let selected = UInt16(exactly: selectedIndex) else {
+    static func displayedTrackIndex(
+        isPlaying: Bool,
+        isPaused: Bool,
+        snapshot: PackagePlaybackSnapshot?,
+        selectedIndex: Int?
+    ) -> Int? {
+        if (isPlaying || isPaused), let playing = snapshot?.selected {
+            return Int(playing)
+        }
+        return selectedIndex
+    }
+
+    static func shouldClearProgress(snapshot: PackagePlaybackSnapshot) -> Bool {
+        guard ![0, 3, 5].contains(snapshot.state), snapshot.selected != nil else {
             return true
         }
-        return snapshot.selected != selected
+        return false
     }
 }
