@@ -1394,3 +1394,24 @@ until the rebuilt app can be launched from a normal application location and
 both window sizes are inspected. The intended live verification uses only the
 generated 40-track empty-WAVE metadata catalog; it does not establish audio
 playback, VoiceOver, or release readiness.
+
+### 2026-11-02 correction: MAC07-03 density control live verification
+
+The launch limitation above was specific to the command-line `open` and direct
+executable attempts. The Codex desktop app launcher successfully opened the
+same rebuilt candidate at source commit
+`c9c4c9eeffac2223673613a996ed33aa357ce6a0`. After explicitly loading the
+generated catalog of 40 empty-WAVE metadata fixtures, the row-density control
+rendered the full `STANDARD` value in the initial 1000×840 screenshot. After
+Window > Move & Resize > Top Left, the compact 1280×720 screenshot also showed
+the complete `STANDARD` label alongside search, browse, field, sort and track
+count controls. The accessibility tree reported all 40 rows and page status
+`1 through 40 of 40`; the visible viewport scrolled through the list. Playback
+remained stopped and no test fixture was played.
+
+This verifies the rebuilt density-label fix at the two observed window sizes
+and confirms that all 40 catalog rows remain available in the compact view.
+It does not test the minimum supported window frame, keyboard traversal in this
+run, VoiceOver speech, actual media, audio output or release readiness. The
+earlier launch limitation remains valid for direct launch from the shell; the
+desktop launcher is the working launch path. MAC07-03 remains in progress.
