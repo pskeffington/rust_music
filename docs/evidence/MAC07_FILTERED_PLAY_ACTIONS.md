@@ -179,3 +179,30 @@ focused playback/UI-state harness on Darwin arm64 / Apple Swift 6.3.3 (exit 0).
 The harness does not simulate a real two-root scan with an in-flight queue or
 playlist command. Live verification of successful root switch, cancellation,
 failure, and the new VoiceOver value remains pending because macOS is locked.
+
+
+## Exact PR-head app and offline-gate confirmation
+
+On 2026-11-01, a clean isolated checkout of PR #9 at exact source
+`4a8aa619de462f78c8817c34169c3289ba773744` ran
+`sh scripts/build-macos-app.sh` with exit code **0**. The native Rust release
+build, Swift catalog search/scaling, playlist selection, operator geometry,
+playback snapshot, catalog bounds, and process lifecycle/shutdown harnesses
+passed. Strict local app signature validation reported valid on disk and a
+satisfied designated requirement. The synthetic 250,000-track catalog
+harness measured search p95 **72.084 ms**, full-sort p95 **673.876 ms**, and
+peak process RSS **240,517,120 bytes**. These are harness measurements, not
+full-app memory, interactive UI latency, or playback-under-load evidence.
+
+The same clean checkout ran `sh scripts/offline-gate.sh` with exit code **0**:
+17 local crates, 32 path-only internal edges, zero registry/Git crates, and
+zero third-party system links. Formatting, warnings-denied Clippy, workspace
+tests, release build, and macOS feature tests completed; the native macOS
+audio crate emitted 17 unused diagnostic-field warnings. The Rust gate and UI
+build do not establish real playback or hardware acceptance.
+
+This confirms the committed PR source builds independently of the dirty local
+worktree. Live verification remains pending because the desktop is locked:
+the final selected-row disabled states, scan-status accessibility value, a
+real two-root scan with an in-flight state command, VoiceOver, and playback
+remain unverified in this exact checkout.
