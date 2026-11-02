@@ -511,3 +511,30 @@ left running.
 
 This is live accessibility-tree evidence only. VoiceOver speech and rotor
 behavior, persistence after relaunch, and playback remain unverified.
+
+## Bounded-page list position reset — PR #9 candidate
+
+The Library track and artist/album lists now receive a new SwiftUI identity only
+when the asynchronous filtered page is applied. The rows remain selected from
+the shared model selection set, while a completed query, sort, or page change
+recreates the native list at its first row. This addresses the case where a
+user changes pages while scrolled near the bottom of the previous page. The
+existing Rust Boy colors, row density, and list controls are unchanged.
+
+`sh scripts/build-macos-app.sh` exited **0** on the PR #9 candidate with this
+working-tree change. The app compiled, its local signature verified, and the
+included catalog/search, page bounds, playlist selection, operator geometry,
+playback snapshot, and process lifecycle harnesses passed. This source-level
+build does not exercise native list scroll position or prove that selection is
+retained by a live accessibility session. The desktop app currently open for
+operator sizing work was not disturbed, so live page-scroll and selection
+behavior remain unverified. VoiceOver speech/rotor and broader MAC07-03
+acceptance remain open.
+
+The final synthetic scale run reported 250,000-track title-index build
+**74.560 ms**, cached-sort p95 **35.180 ms**, narrow-search p95 **78.862 ms**,
+broad-search p95 **129.160 ms**, bounded 200-row page p95 **116.719 ms**,
+artist-group index plus first page **610.501 ms**, artist-query p95
+**228.527 ms**, searchable payload **18,500,000 bytes**, and test-process peak
+RSS **346,128,384 bytes**. These values come from the test process, not the
+interactive app's memory or UI latency.

@@ -1454,6 +1454,9 @@ final class PlayerModel: ObservableObject {
     }
     @Published private(set) var visibleTracks: [CatalogTrack] = []
     @Published private(set) var visibleTrackTotal = 0
+    // Recreate native result lists after a completed view refresh so a changed
+    // page or query opens at its first row while model-owned selection persists.
+    @Published private(set) var visibleResultGeneration: UInt64 = 0
     @Published private(set) var visibleBrowseGroups: [CatalogSearch.BrowseGroup] = []
     @Published private(set) var visibleBrowseGroupTotal = 0
     @Published private(set) var browseArtistFilterKey: String?
@@ -1704,6 +1707,7 @@ final class PlayerModel: ObservableObject {
                 self.visibleBrowseGroups = groupPage?.groups ?? []
                 self.visibleBrowseGroupTotal = groupPage?.totalMatches ?? 0
                 self.catalogPageOffset = trackPage?.offset ?? groupPage?.offset ?? 0
+                self.visibleResultGeneration &+= 1
             }
         }
     }
@@ -3409,6 +3413,7 @@ private struct PlayerView: View {
                         ) {
                             model.addSelectedTrackNext()
                         }
+                        .id(model.visibleResultGeneration)
                         .accessibilityIdentifier("library-track-list")
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
@@ -3452,6 +3457,7 @@ private struct PlayerView: View {
                             .disabled(model.isTransportBusy || model.isStateBusy)
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
                             .accessibilityHint("Select a row, then choose Browse Selected to see its tracks.")
+                            .id(model.visibleResultGeneration)
                             .accessibilityIdentifier("library-group-list")
 
                             Button(model.browseMode == .artists ? "BROWSE SELECTED ARTIST" : "BROWSE SELECTED ALBUM") {
