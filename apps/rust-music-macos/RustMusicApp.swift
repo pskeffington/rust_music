@@ -3337,20 +3337,34 @@ private struct PlayerView: View {
 
                 Group {
                     if let emptyState {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(emptyState.title)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .tracking(0.8)
-                                .foregroundStyle(RustMusicPalette.phosphor)
-                            Text(emptyState.detail)
-                                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                .foregroundStyle(RustMusicPalette.muted)
-                                .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(emptyState.title)
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .tracking(0.8)
+                                    .foregroundStyle(RustMusicPalette.phosphor)
+                                Text(emptyState.detail)
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(RustMusicPalette.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .accessibilityElement(children: .combine)
+
+                            if !model.searchText.isEmpty,
+                               !model.tracks.isEmpty,
+                               !model.isScanning,
+                               !model.isTransportBusy {
+                                Button("CLEAR SEARCH") {
+                                    model.searchText = ""
+                                    librarySearchIsFocused = true
+                                }
+                                .buttonStyle(RustMusicButtonStyle())
+                                .accessibilityLabel("Clear library search")
+                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(12)
                         .background(RustMusicPalette.display)
-                        .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("library-empty-state")
                     } else if model.browseMode == .tracks {
                         List(selection: Binding<Set<Int>>(

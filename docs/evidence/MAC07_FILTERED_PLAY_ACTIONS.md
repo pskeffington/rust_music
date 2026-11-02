@@ -658,3 +658,34 @@ This verifies the corrected copy alongside the hidden-target guard and its
 visible-selection recovery for the tested synthetic catalog. It does not
 verify playback, VoiceOver speech/rotor behavior, or compact minimum-frame
 interaction. Overall MAC07-03 remains in progress.
+
+## Clear search from the no-results state — PR #9 candidate
+
+When a query produces no Library results, a Rust Boy-styled `CLEAR SEARCH`
+button now appears beneath the empty-state message. It is only present when a
+loaded, idle catalog has a nonempty query; activating it clears the query and
+returns focus to the Search field. The button remains separate from the
+combined empty-state text so assistive technology can expose it as an action.
+
+`sh scripts/build-macos-app.sh` completed the app build, strict local signature
+validation, and its catalog/search and scale, playlist-selection,
+operator-window geometry, playback-snapshot, catalog-bounds, process lifecycle,
+and shutdown harnesses. At 250,000 synthetic tracks, title-index build was
+73.749 ms, cached-sort p95 33.830 ms, narrow-search p95 81.089 ms,
+broad-search p95 128.725 ms, bounded 200-row page p95 121.702 ms,
+artist-group index plus first page 604.916 ms, artist-query p95 228.076 ms,
+and catalog-test-process peak RSS 330,973,184 bytes. These figures are
+harness measurements, not full-app memory or interactive UI latency.
+
+Live macOS accessibility interaction explicitly loaded three generated
+metadata-only FLAC entries with no audio frames. Setting a query with zero
+matches exposed a `Clear library search` button in the accessibility tree.
+Activating it emptied the Search field, restored all three track rows, and left
+keyboard focus in Search. The existing selection remained on Alpha Song; no
+transport or queue action occurred, and playback remained stopped with no
+output snapshot. The isolated app and fixture were closed and removed.
+
+This verifies the no-results recovery control for this synthetic catalog. It
+does not verify VoiceOver speech/rotor behavior, full keyboard traversal,
+playback, or compact minimum-frame behavior. Overall MAC07-03 remains in
+progress.
