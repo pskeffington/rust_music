@@ -1393,7 +1393,10 @@ private final class CatalogViewCancellation: @unchecked Sendable {
 final class PlayerModel: ObservableObject {
     @Published var libraryRoot: URL?
     @Published var tracks: [CatalogTrack] = [] {
-        didSet { refreshVisibleTracks() }
+        didSet {
+            catalogRevision &+= 1
+            refreshVisibleTracks()
+        }
     }
     @Published var selectedIndex: Int? {
         didSet {
@@ -1446,6 +1449,8 @@ final class PlayerModel: ObservableObject {
     private let packageQueue = DispatchQueue(label: "dev.rustmusic.package-process")
     private let catalogViewQueue = DispatchQueue(label: "dev.rustmusic.catalog-view", qos: .userInitiated)
     private var catalogViewGeneration: UInt64 = 0
+    private var catalogRevision: UInt64 = 0
+    private let catalogSearchCache = CatalogSearchViewCache()
     private var catalogViewCancellation: CatalogViewCancellation?
     nonisolated(unsafe) private var packageClient: PackageProcessClient?
     nonisolated(unsafe) private var packageRootPath: String?
@@ -1591,11 +1596,18 @@ final class PlayerModel: ObservableObject {
         let cancellation = CatalogViewCancellation()
         catalogViewCancellation = cancellation
         let catalog = tracks
+        let revision = catalogRevision
         let query = CatalogSearch.boundedQuery(searchText)
         let order = sortOrder
+        let searchCache = catalogSearchCache
         catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             guard !cancellation.isCancelled else { return }
-            let result = CatalogSearch.visibleTracks(in: catalog, matching: query, sortedBy: order)
+            let result = searchCache.visibleTracks(
+                in: catalog,
+                revision: revision,
+                matching: query,
+                sortedBy: order
+            )
             DispatchQueue.main.async {
                 guard let self, self.catalogViewGeneration == generation else { return }
                 self.visibleTracks = result

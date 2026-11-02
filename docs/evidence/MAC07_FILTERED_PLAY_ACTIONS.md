@@ -206,3 +206,42 @@ worktree. Live verification remains pending because the desktop is locked:
 the final selected-row disabled states, scan-status accessibility value, a
 real two-root scan with an in-flight state command, VoiceOver, and playback
 remain unverified in this exact checkout.
+
+## Cached catalog order indexes
+
+The Library view now keeps a catalog-revision-scoped search index on its
+serial background queue. Title, artist, and album order indexes are built
+lazily and reused across searches. Selective search results (up to 1,024 rows)
+are sorted directly; broader results use a bounded bitmap when stable track
+IDs map to catalog offsets, preserving the cached order without a full sort.
+The index is discarded when the active catalog revision changes. No runtime
+dependency, IPC change, or artwork path was added.
+
+`sh scripts/build-macos-app.sh` exited **0** on the candidate based on
+`d2a87766aa695a6f2637a111abfb3ae24198e658`; catalog, playlist, window
+geometry, playback snapshot, catalog-bound, and process lifecycle harnesses
+passed. The app signature verified on disk and met its designated requirement.
+`sh scripts/offline-gate.sh` also exited **0**: 17 local crates, 32 path-only
+edges, no registry/Git crates or third-party system links; format, Clippy,
+workspace tests, release build, and macOS feature checks passed. Existing
+unused AudioQueue diagnostic warnings remain.
+
+The catalog harness used 21 warm samples for cached-sort and narrow-search
+p50/p95, and five samples for broad-search p50/p95. Results by catalog size:
+
+| Tracks | Title-index build | Cached sort p95 | Narrow-search p95 | Broad-search p95 |
+| ---: | ---: | ---: | ---: | ---: |
+| 2,000 | 0.265 ms | 0.052 ms | 0.593 ms | 0.736 ms |
+| 20,000 | 2.865 ms | 0.442 ms | 5.865 ms | 7.850 ms |
+| 100,000 | 22.650 ms | 9.983 ms | 29.110 ms | 44.401 ms |
+| 250,000 | 66.656 ms | 25.769 ms | 72.424 ms | 116.084 ms |
+
+The catalog harness process peak RSS was **204,914,688 bytes**. In the
+250,000-track run, the same harness's linear-filter reference measured narrow
+search p95 **90.884 ms**; this is one synthetic run, not an interactive UI
+latency guarantee. The previous exact-head full-sort p95 was 673.876 ms; the
+new cached sort is a different operation (warm full-row materialization from
+cached order), so these timings should not be treated as a strict A/B trial.
+
+Live search responsiveness, real 250,000-track import, memory on a tagged
+library, and concurrent playback under scanning/search remain unverified.

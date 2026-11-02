@@ -71,22 +71,7 @@ enum CatalogSearch {
         matching searchText: String,
         sortedBy order: SortOrder = .title
     ) -> [CatalogTrack] {
-        let filtered: [CatalogTrack]
-        if let queryBytes = queryBytes(for: searchText) {
-            filtered = tracks.filter { $0.searchableBytes.range(of: queryBytes) != nil }
-        } else {
-            filtered = tracks
-        }
-        return filtered.sorted { left, right in
-            let leftKey: String
-            let rightKey: String
-            switch order {
-            case .title: leftKey = left.titleSortKey; rightKey = right.titleSortKey
-            case .artist: leftKey = left.artistSortKey; rightKey = right.artistSortKey
-            case .album: leftKey = left.albumSortKey; rightKey = right.albumSortKey
-            }
-            return leftKey == rightKey ? left.id < right.id : leftKey < rightKey
-        }
+        CatalogSearchIndex(tracks: tracks).visibleTracks(matching: searchText, sortedBy: order)
     }
 
     static func matches(_ track: CatalogTrack, matching searchText: String) -> Bool {
@@ -103,7 +88,7 @@ enum CatalogSearch {
         return matches(track, matching: searchText)
     }
 
-    private static func queryBytes(for searchText: String) -> Data? {
+    static func queryBytes(for searchText: String) -> Data? {
         let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return nil }
         return Data(CatalogTextNormalizer.fold(query).utf8)
@@ -121,6 +106,112 @@ enum CatalogSearch {
             byteCount += scalarBytes
         }
         return bounded
+    }
+}
+
+/// Catalog-lifetime sort indexes. Queries filter an already ordered index, so
+/// typing does not sort the full matching catalog again. Lazily builds each
+/// requested order and keeps deterministic ID tie-breaking.
+final class CatalogSearchIndex {
+    private let tracks: [CatalogTrack]
+    private let trackIDsMatchSourceOffsets: Bool
+    private var titleOrder: [Int]?
+    private var artistOrder: [Int]?
+    private var albumOrder: [Int]?
+
+    init(tracks: [CatalogTrack]) {
+        self.tracks = tracks
+        trackIDsMatchSourceOffsets = tracks.enumerated().allSatisfy { $0.offset == $0.element.id }
+    }
+
+    func visibleTracks(matching searchText: String, sortedBy order: CatalogSearch.SortOrder = .title) -> [CatalogTrack] {
+        let queryBytes = CatalogSearch.queryBytes(for: searchText)
+        guard let queryBytes else {
+            return sortedIndices(for: order).map { tracks[$0] }
+        }
+
+        // For ordinary, selective queries, sorting a small match list is
+        // faster than walking the entire sorted index. Broad queries switch
+        // to a compact bitmap so result ordering still comes from the cache.
+        let smallMatchLimit = 1_024
+        var matchingTracks = tracks.filter {
+            $0.searchableBytes.range(of: queryBytes) != nil
+        }
+        if matchingTracks.count <= smallMatchLimit || !trackIDsMatchSourceOffsets {
+            matchingTracks.sort { comesBefore($0, $1, by: order) }
+            return matchingTracks
+        }
+
+        let wordCount = tracks.count / 64 + (tracks.count.isMultiple(of: 64) ? 0 : 1)
+        var matchingBits = [UInt64](repeating: 0, count: wordCount)
+        for track in matchingTracks {
+            matchingBits[track.id >> 6] |= UInt64(1) << UInt64(track.id & 63)
+        }
+        let matchingCount = matchingTracks.count
+        matchingTracks.removeAll(keepingCapacity: false)
+
+        let indices = sortedIndices(for: order)
+        var result: [CatalogTrack] = []
+        result.reserveCapacity(matchingCount)
+        for index in indices where matchingBits[index >> 6] & (UInt64(1) << UInt64(index & 63)) != 0 {
+            result.append(tracks[index])
+        }
+        return result
+    }
+
+    private func sortedIndices(for order: CatalogSearch.SortOrder) -> [Int] {
+        switch order {
+        case .title:
+            if titleOrder == nil { titleOrder = makeSortedIndices(order) }
+            return titleOrder ?? []
+        case .artist:
+            if artistOrder == nil { artistOrder = makeSortedIndices(order) }
+            return artistOrder ?? []
+        case .album:
+            if albumOrder == nil { albumOrder = makeSortedIndices(order) }
+            return albumOrder ?? []
+        }
+    }
+
+    private func makeSortedIndices(_ order: CatalogSearch.SortOrder) -> [Int] {
+        var indices = Array(tracks.indices)
+        indices.sort { comesBefore($0, $1, by: order) }
+        return indices
+    }
+
+    private func comesBefore(_ leftIndex: Int, _ rightIndex: Int, by order: CatalogSearch.SortOrder) -> Bool {
+        comesBefore(tracks[leftIndex], tracks[rightIndex], by: order)
+    }
+
+    private func comesBefore(_ left: CatalogTrack, _ right: CatalogTrack, by order: CatalogSearch.SortOrder) -> Bool {
+        let leftKey: String
+        let rightKey: String
+        switch order {
+        case .title: leftKey = left.titleSortKey; rightKey = right.titleSortKey
+        case .artist: leftKey = left.artistSortKey; rightKey = right.artistSortKey
+        case .album: leftKey = left.albumSortKey; rightKey = right.albumSortKey
+        }
+        return leftKey == rightKey ? left.id < right.id : leftKey < rightKey
+    }
+}
+
+/// Owned exclusively by the serial catalog-view queue. Rebuilds only when the
+/// active catalog revision changes; debounce cancellations can reuse a build.
+final class CatalogSearchViewCache: @unchecked Sendable {
+    private var revision: UInt64?
+    private var index: CatalogSearchIndex?
+
+    func visibleTracks(
+        in tracks: [CatalogTrack],
+        revision requestedRevision: UInt64,
+        matching searchText: String,
+        sortedBy order: CatalogSearch.SortOrder
+    ) -> [CatalogTrack] {
+        if revision != requestedRevision {
+            index = CatalogSearchIndex(tracks: tracks)
+            revision = requestedRevision
+        }
+        return index?.visibleTracks(matching: searchText, sortedBy: order) ?? []
     }
 }
 

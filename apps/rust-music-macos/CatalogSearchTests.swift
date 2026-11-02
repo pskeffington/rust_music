@@ -76,10 +76,28 @@ struct CatalogSearchTests {
             CatalogTrack(id: 0, container: "flac", title: "alpha", artist: "Able", album: "Three", relativePath: "a.flac"),
             CatalogTrack(id: 1, container: "flac", title: "Alpha", artist: "Able", album: "One", relativePath: "c.flac")
         ]
-        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "").map(\.id) == [0, 1, 2])
-        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "Able", sortedBy: .artist).map(\.id) == [0, 1])
-        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "", sortedBy: .album).map(\.id) == [1, 0, 2])
-        precondition(CatalogSearch.visibleTracks(in: sortTracks, matching: "Beta", sortedBy: .album).map(\.id) == [2])
+        let sortIndex = CatalogSearchIndex(tracks: sortTracks)
+        precondition(sortIndex.visibleTracks(matching: "").map(\.id) == [0, 1, 2])
+        precondition(sortIndex.visibleTracks(matching: "Able", sortedBy: .artist).map(\.id) == [0, 1])
+        precondition(sortIndex.visibleTracks(matching: "", sortedBy: .album).map(\.id) == [1, 0, 2])
+        precondition(sortIndex.visibleTracks(matching: "Beta", sortedBy: .album).map(\.id) == [2])
+
+        let viewCache = CatalogSearchViewCache()
+        precondition(viewCache.visibleTracks(
+            in: sortTracks,
+            revision: 1,
+            matching: "",
+            sortedBy: .title
+        ).map(\.id) == [0, 1, 2])
+        let replacementCatalog = [
+            CatalogTrack(id: 9, container: "flac", title: "New", artist: "Artist", album: "New", relativePath: "new.flac")
+        ]
+        precondition(viewCache.visibleTracks(
+            in: replacementCatalog,
+            revision: 2,
+            matching: "",
+            sortedBy: .title
+        ).map(\.id) == [9], "catalog revision must discard indexes from the previous root")
 
         let tracks = (0..<20_000).map { index in
             let title = String(format: "Track %05d", index)
@@ -151,17 +169,20 @@ struct CatalogSearchTests {
 
         // Measure the exact production filter with a warmed 20k in-memory catalog.
         // This is a microbenchmark only: no UI/accessibility overhead or pass threshold.
-        _ = CatalogSearch.visibleTracks(in: tracks, matching: lastQuery)
+        let searchIndex = CatalogSearchIndex(tracks: tracks)
+        _ = searchIndex.visibleTracks(matching: lastQuery)
         var durations: [UInt64] = []
         durations.reserveCapacity(101)
         for _ in 0..<101 {
             let start = DispatchTime.now().uptimeNanoseconds
-            let result = CatalogSearch.visibleTracks(in: tracks, matching: lastQuery)
+            let result = searchIndex.visibleTracks(matching: lastQuery)
             let elapsed = DispatchTime.now().uptimeNanoseconds - start
             precondition(result.count == 1 && result[0].id == 19_999)
             durations.append(elapsed)
         }
         durations.sort()
+        let broadResult = searchIndex.visibleTracks(matching: "synthetic artist")
+        precondition(broadResult.count == 20_000 && broadResult.first?.id == 0 && broadResult.last?.id == 19_999)
         let p50 = Double(durations[(durations.count - 1) * 50 / 100]) / 1_000
         let p95 = Double(durations[(durations.count - 1) * 95 / 100]) / 1_000
         print(String(format:
@@ -188,7 +209,9 @@ struct CatalogSearchTests {
 
     private static func scaleProfile(count: Int) -> String {
         let tracks = (0..<count).map { index in
-            let title = String(format: "Track %06d", index)
+            // Keep persistent IDs aligned with catalog offsets while making
+            // title order nontrivial, like a scanned path-ordered library.
+            let title = String(format: "Track %06d", (index * 7_919) % count)
             return CatalogTrack(
                 id: index,
                 container: "wave",
@@ -200,41 +223,105 @@ struct CatalogSearchTests {
         }
         let targetID = count - 1
         let query = String(format: "track %06d", targetID)
-        _ = CatalogSearch.visibleTracks(in: tracks, matching: query)
+        let target = tracks.first(where: { $0.title == String(format: "Track %06d", targetID) })
+        precondition(target != nil)
+        let index = CatalogSearchIndex(tracks: tracks)
+        let indexBuildStart = DispatchTime.now().uptimeNanoseconds
+        let sortedTracks = index.visibleTracks(matching: "", sortedBy: .title)
+        let indexBuildMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - indexBuildStart) / 1_000_000
+        precondition(
+            sortedTracks.count == count
+                && sortedTracks.first?.title == "Track 000000"
+                && sortedTracks.last?.title == String(format: "Track %06d", targetID)
+        )
 
-        var durations: [UInt64] = []
-        durations.reserveCapacity(21)
+        var sortDurations: [UInt64] = []
+        sortDurations.reserveCapacity(21)
         for _ in 0..<21 {
             let start = DispatchTime.now().uptimeNanoseconds
-            let result = CatalogSearch.visibleTracks(in: tracks, matching: query)
-            durations.append(DispatchTime.now().uptimeNanoseconds - start)
-            precondition(result.count == 1 && result[0].id == targetID)
-        }
-        durations.sort()
-        let p50 = Double(durations[10]) / 1_000
-        let p95 = Double(durations[19]) / 1_000
-
-        let unsortedTracks = (0..<count).map { tracks[($0 * 7_919) % count] }
-        var sortDurations: [UInt64] = []
-        sortDurations.reserveCapacity(5)
-        for _ in 0..<5 {
-            let start = DispatchTime.now().uptimeNanoseconds
-            let result = CatalogSearch.visibleTracks(in: unsortedTracks, matching: "")
+            let result = index.visibleTracks(matching: "", sortedBy: .title)
             sortDurations.append(DispatchTime.now().uptimeNanoseconds - start)
-            precondition(result.count == count && result.first?.id == 0 && result.last?.id == targetID)
+            precondition(
+                result.count == count
+                    && result.first?.title == "Track 000000"
+                    && result.last?.title == String(format: "Track %06d", targetID)
+            )
         }
         sortDurations.sort()
-        let sortP50 = Double(sortDurations[2]) / 1_000_000
-        let sortP95 = Double(sortDurations[4]) / 1_000_000
+        let sortP50 = Double(sortDurations[10]) / 1_000_000
+        let sortP95 = Double(sortDurations[19]) / 1_000_000
+
+        var searchDurations: [UInt64] = []
+        searchDurations.reserveCapacity(21)
+        for _ in 0..<21 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = index.visibleTracks(matching: query, sortedBy: .title)
+            searchDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(result.count == 1 && result[0].title == target?.title)
+        }
+        searchDurations.sort()
+        let searchP50 = Double(searchDurations[10]) / 1_000_000
+        let searchP95 = Double(searchDurations[19]) / 1_000_000
+        var linearSearchDurations: [UInt64] = []
+        linearSearchDurations.reserveCapacity(5)
+        for _ in 0..<5 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = linearVisibleTracks(in: tracks, matching: query, sortedBy: .title)
+            linearSearchDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(result.count == 1 && result[0].title == target?.title)
+        }
+        linearSearchDurations.sort()
+        let linearSearchP95 = Double(linearSearchDurations[4]) / 1_000_000
+        var broadSearchDurations: [UInt64] = []
+        broadSearchDurations.reserveCapacity(5)
+        for _ in 0..<5 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = index.visibleTracks(matching: "synthetic artist", sortedBy: .title)
+            broadSearchDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(
+                result.count == count
+                    && result.first?.title == "Track 000000"
+                    && result.last?.title == String(format: "Track %06d", targetID)
+            )
+        }
+        broadSearchDurations.sort()
+        let broadSearchP50 = Double(broadSearchDurations[2]) / 1_000_000
+        let broadSearchP95 = Double(broadSearchDurations[4]) / 1_000_000
         let indexPayloadBytes = tracks.reduce(0) { $0 + $1.searchableBytes.count }
         return String(format:
-            "PASS: synthetic search scale n=%d; last-item p50=%.3fµs p95=%.3fµs; full-sort p50=%.3fms p95=%.3fms; cached-index payload=%d bytes",
+            "PASS: synthetic catalog scale n=%d; title-index-build=%.3fms; cached-sort p50=%.3fms p95=%.3fms; narrow-search p50=%.3fms p95=%.3fms linear-reference-p95=%.3fms; broad-search p50=%.3fms p95=%.3fms; searchable payload=%d bytes",
             count,
-            p50,
-            p95,
+            indexBuildMilliseconds,
             sortP50,
             sortP95,
+            searchP50,
+            searchP95,
+            linearSearchP95,
+            broadSearchP50,
+            broadSearchP95,
             indexPayloadBytes
         )
+    }
+
+    private static func linearVisibleTracks(
+        in tracks: [CatalogTrack],
+        matching searchText: String,
+        sortedBy order: CatalogSearch.SortOrder
+    ) -> [CatalogTrack] {
+        let queryBytes = CatalogSearch.queryBytes(for: searchText)
+        let filtered = tracks.filter { track in
+            guard let queryBytes else { return true }
+            return track.searchableBytes.range(of: queryBytes) != nil
+        }
+        return filtered.sorted { left, right in
+            let leftKey: String
+            let rightKey: String
+            switch order {
+            case .title: leftKey = left.titleSortKey; rightKey = right.titleSortKey
+            case .artist: leftKey = left.artistSortKey; rightKey = right.artistSortKey
+            case .album: leftKey = left.albumSortKey; rightKey = right.albumSortKey
+            }
+            return leftKey == rightKey ? left.id < right.id : leftKey < rightKey
+        }
     }
 }
