@@ -70,6 +70,10 @@ enum CatalogSearch {
         let id: String
         let name: String
         let trackCount: Int
+        let searchKey: String
+        let detail: String?
+        let artistFilterKey: String?
+        let albumFilterKey: String?
     }
 
     struct BrowsePage {
@@ -263,6 +267,7 @@ final class CatalogSearchIndex {
     private var albumOrder: [Int]?
     private var artistGroups: [CatalogSearch.BrowseGroup]?
     private var albumGroups: [CatalogSearch.BrowseGroup]?
+    private var foldedArtistKeys: [String]?
 
     init(tracks: [CatalogTrack]) {
         self.tracks = tracks
@@ -319,6 +324,8 @@ final class CatalogSearchIndex {
         matching searchText: String,
         sortedBy order: CatalogSearch.SortOrder = .title,
         in scope: CatalogSearch.SearchScope = .all,
+        withinArtistKey: String? = nil,
+        withinAlbumKey: String? = nil,
         offset requestedOffset: Int,
         limit requestedLimit: Int = CatalogSearch.maximumPageSize
     ) -> CatalogSearch.Page {
@@ -327,12 +334,19 @@ final class CatalogSearchIndex {
         let queryBytes = scope == .all ? CatalogSearch.queryBytes(for: searchText) : nil
         let scopedQueryIsEmpty = scope == .all || CatalogSearch.queryText(for: searchText) == nil
         let indices = sortedIndices(for: order)
+        let artistKeys = withinArtistKey == nil ? nil : cachedArtistBrowseKeys()
+        func matchesBrowseFilters(at index: Int) -> Bool {
+            if let withinArtistKey, artistKeys?[index] != withinArtistKey { return false }
+            guard let withinAlbumKey else { return true }
+            return CatalogTextNormalizer.fold(Self.albumName(tracks[index].album)) == withinAlbumKey
+        }
         guard let queryBytes else {
-            if !scopedQueryIsEmpty {
+            if !scopedQueryIsEmpty || withinArtistKey != nil {
                 var totalMatches = 0
                 var pageTracks: [CatalogTrack] = []
                 pageTracks.reserveCapacity(limit)
-                for index in indices where CatalogSearch.matches(tracks[index], matching: searchText, in: scope) {
+                for index in indices where CatalogSearch.matches(tracks[index], matching: searchText, in: scope)
+                    && matchesBrowseFilters(at: index) {
                     if totalMatches >= offset, pageTracks.count < limit { pageTracks.append(tracks[index]) }
                     totalMatches += 1
                 }
@@ -356,7 +370,8 @@ final class CatalogSearchIndex {
         var totalMatches = 0
         var pageTracks: [CatalogTrack] = []
         pageTracks.reserveCapacity(limit)
-        for index in indices where tracks[index].searchableBytes.range(of: queryBytes) != nil {
+        for index in indices where tracks[index].searchableBytes.range(of: queryBytes) != nil
+            && matchesBrowseFilters(at: index) {
             if totalMatches >= offset, pageTracks.count < limit {
                 pageTracks.append(tracks[index])
             }
@@ -398,7 +413,7 @@ final class CatalogSearchIndex {
         var totalMatches = 0
         var pageGroups: [CatalogSearch.BrowseGroup] = []
         pageGroups.reserveCapacity(limit)
-        for group in groups where group.id.range(of: query) != nil {
+        for group in groups where group.searchKey.range(of: query) != nil {
             if totalMatches >= offset, pageGroups.count < limit { pageGroups.append(group) }
             totalMatches += 1
         }
@@ -415,26 +430,45 @@ final class CatalogSearchIndex {
         case .tracks:
             return []
         case .artists:
-            if artistGroups == nil { artistGroups = makeBrowseGroups(for: .artist) }
+            if artistGroups == nil { artistGroups = makeArtistGroups() }
             return artistGroups ?? []
         case .albums:
-            if albumGroups == nil { albumGroups = makeBrowseGroups(for: .album) }
+            if albumGroups == nil { albumGroups = makeAlbumGroups() }
             return albumGroups ?? []
         }
     }
 
-    private func makeBrowseGroups(for scope: CatalogSearch.SearchScope) -> [CatalogSearch.BrowseGroup] {
+    private static func artistName(_ rawValue: String) -> String {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? "Unknown Artist" : value
+    }
+
+    private static func albumName(_ rawValue: String) -> String {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? "Unknown Album" : value
+    }
+
+    private static func artistBrowseKey(_ rawValue: String) -> String {
+        CatalogTextNormalizer.fold(artistName(rawValue))
+    }
+
+    private func cachedArtistBrowseKeys() -> [String] {
+        if foldedArtistKeys == nil {
+            foldedArtistKeys = tracks.map { Self.artistBrowseKey($0.artist) }
+        }
+        return foldedArtistKeys ?? []
+    }
+
+    private func makeArtistGroups() -> [CatalogSearch.BrowseGroup] {
         struct Accumulator {
             var name: String
             var count: Int
         }
         var values: [String: Accumulator] = [:]
-        for track in tracks {
-            let rawValue = scope == .artist ? track.artist : track.album
-            let name = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? (scope == .artist ? "Unknown Artist" : "Unknown Album")
-                : rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let key = CatalogTextNormalizer.fold(name)
+        let artistKeys = cachedArtistBrowseKeys()
+        for (index, track) in tracks.enumerated() {
+            let name = Self.artistName(track.artist)
+            let key = artistKeys[index]
             if var value = values[key] {
                 value.count += 1
                 values[key] = value
@@ -444,8 +478,57 @@ final class CatalogSearchIndex {
         }
         return values.map { pair in
             let (key, value) = pair
-            return CatalogSearch.BrowseGroup(id: key, name: value.name, trackCount: value.count)
+            return CatalogSearch.BrowseGroup(
+                id: key,
+                name: value.name,
+                trackCount: value.count,
+                searchKey: key,
+                detail: nil,
+                artistFilterKey: key,
+                albumFilterKey: nil
+            )
         }.sorted { $0.id < $1.id }
+    }
+
+    private func makeAlbumGroups() -> [CatalogSearch.BrowseGroup] {
+        struct Accumulator {
+            var album: String
+            var artist: String
+            var artistKey: String
+            var count: Int
+        }
+        var values: [String: Accumulator] = [:]
+        let artistKeys = cachedArtistBrowseKeys()
+        for (index, track) in tracks.enumerated() {
+            let album = Self.albumName(track.album)
+            let albumKey = CatalogTextNormalizer.fold(album)
+            let artist = Self.artistName(track.artist)
+            let artistKey = artistKeys[index]
+            let id = "\(artistKey.utf8.count):\(artistKey)\(albumKey.utf8.count):\(albumKey)"
+            if var value = values[id] {
+                value.count += 1
+                values[id] = value
+            } else {
+                values[id] = Accumulator(album: album, artist: artist, artistKey: artistKey, count: 1)
+            }
+        }
+        return values.map { pair in
+            let (id, value) = pair
+            return CatalogSearch.BrowseGroup(
+                id: id,
+                name: value.album,
+                trackCount: value.count,
+                searchKey: CatalogTextNormalizer.fold(value.album + " " + value.artist),
+                detail: value.artist,
+                artistFilterKey: value.artistKey,
+                albumFilterKey: CatalogTextNormalizer.fold(value.album)
+            )
+        }.sorted {
+            let leftArtist = $0.artistFilterKey ?? ""
+            let rightArtist = $1.artistFilterKey ?? ""
+            if leftArtist != rightArtist { return leftArtist < rightArtist }
+            return CatalogTextNormalizer.fold($0.name) < CatalogTextNormalizer.fold($1.name)
+        }
     }
 
     private func sortedIndices(for order: CatalogSearch.SortOrder) -> [Int] {
@@ -510,6 +593,8 @@ final class CatalogSearchViewCache: @unchecked Sendable {
         matching searchText: String,
         sortedBy order: CatalogSearch.SortOrder,
         in scope: CatalogSearch.SearchScope = .all,
+        withinArtistKey: String? = nil,
+        withinAlbumKey: String? = nil,
         offset: Int,
         limit: Int = CatalogSearch.maximumPageSize
     ) -> CatalogSearch.Page {
@@ -521,6 +606,8 @@ final class CatalogSearchViewCache: @unchecked Sendable {
             matching: searchText,
             sortedBy: order,
             in: scope,
+            withinArtistKey: withinArtistKey,
+            withinAlbumKey: withinAlbumKey,
             offset: offset,
             limit: limit
         ) ?? CatalogSearch.Page(tracks: [], totalMatches: 0, offset: 0, pageSize: limit)

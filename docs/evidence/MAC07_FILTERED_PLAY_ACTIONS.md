@@ -428,3 +428,40 @@ The active desktop session was not changed. Live artist/album browsing,
 selection-to-track behavior, preference persistence, toolbar/layout fit,
 VoiceOver, 250,000-track import, and playback during scanning/search remain
 unverified.
+
+## Same-title album disambiguation — PR #9 candidate
+
+Album groups are now keyed by both normalized artist and album metadata. Rows
+show the artist under the album name, and searching album groups matches both
+fields. Choosing an Artist or Album opens Tracks with explicit folded artist
+and album identity filters; search then narrows within that selection. The
+Library displays the active filters and offers CLEAR BROWSE FILTERS. Blank
+artist or album tags retain Unknown Artist / Unknown Album labels and map back
+to tracks with empty metadata. This prevents same-titled releases by different
+artists from merging or opening as one combined track set.
+
+Regression coverage verifies two same-titled albums remain separate, case
+variants for the same artist/title merge, album-group search matches artist
+details, opening the selected album filters its track page to the matching
+artist and album, and blank artist/album groups map to blank-tag tracks.
+`sh scripts/build-macos-app.sh`
+exited **0**; the catalog, playlist, operator-window geometry, playback
+snapshot, catalog-bound, process lifecycle, and shutdown harnesses passed, and
+strict bundle signature validation succeeded. `sh scripts/offline-gate.sh`
+exited **0** with 17 local crates, 32 path-only internal edges, zero
+registry/Git crates, zero third-party system links, and three approved OS
+framework links. The build emitted 17 existing unused AudioQueue diagnostic
+warnings.
+
+Artist and album group indexes cache normalized search keys; the album track
+constraint reuses per-track folded artist keys. In the final 250,000-track
+synthetic unique-artist run, artist-group index build plus first page measured
+**624.376 ms**, artist-query p95 **230.627 ms**, and process peak RSS
+**334,462,976 bytes**. The previous uncached artist query p95 was **624.586
+ms** at **263,077,888 bytes** peak RSS. These separate harness runs suggest
+faster repeated group matching at the cost of cached-key memory; they are not
+a controlled A/B or full-app memory/interactive UI measurements.
+Real imports remain limited to 20,000 tracks. The app currently running on the
+desktop was left untouched, so live same-title album navigation, filter
+clearing, persistence, VoiceOver, layout fit, and playback under search remain
+unverified.

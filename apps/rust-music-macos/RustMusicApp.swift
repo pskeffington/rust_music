@@ -1400,6 +1400,10 @@ final class PlayerModel: ObservableObject {
             catalogRevision &+= 1
             catalogPageOffset = 0
             selectedBrowseGroupID = nil
+            browseArtistFilterKey = nil
+            browseArtistFilterName = nil
+            browseAlbumFilterKey = nil
+            browseAlbumFilterName = nil
             refreshVisibleTracks()
         }
     }
@@ -1438,6 +1442,12 @@ final class PlayerModel: ObservableObject {
                 catalogPageOffset = 0
                 selectedBrowseGroupID = nil
                 selectedTrackIDs = []
+                if browseMode != .tracks {
+                    browseArtistFilterKey = nil
+                    browseArtistFilterName = nil
+                    browseAlbumFilterKey = nil
+                    browseAlbumFilterName = nil
+                }
             }
             refreshVisibleTracks()
         }
@@ -1446,6 +1456,10 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var visibleTrackTotal = 0
     @Published private(set) var visibleBrowseGroups: [CatalogSearch.BrowseGroup] = []
     @Published private(set) var visibleBrowseGroupTotal = 0
+    @Published private(set) var browseArtistFilterKey: String?
+    @Published private(set) var browseArtistFilterName: String?
+    @Published private(set) var browseAlbumFilterKey: String?
+    @Published private(set) var browseAlbumFilterName: String?
     @Published private(set) var catalogPageOffset = 0
     @Published var selectedBrowseGroupID: String?
     let catalogPageSize = CatalogSearch.maximumPageSize
@@ -1651,6 +1665,8 @@ final class PlayerModel: ObservableObject {
         let order = sortOrder
         let scope = searchScope
         let mode = browseMode
+        let artistFilterKey = browseArtistFilterKey
+        let albumFilterKey = browseAlbumFilterKey
         let offset = catalogPageOffset
         let searchCache = catalogSearchCache
         catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
@@ -1664,6 +1680,8 @@ final class PlayerModel: ObservableObject {
                     matching: query,
                     sortedBy: order,
                     in: scope,
+                    withinArtistKey: artistFilterKey,
+                    withinAlbumKey: albumFilterKey,
                     offset: offset,
                     limit: CatalogSearch.maximumPageSize
                 )
@@ -1705,12 +1723,24 @@ final class PlayerModel: ObservableObject {
 
     func openSelectedBrowseGroup() {
         guard let group = visibleBrowseGroups.first(where: { $0.id == selectedBrowseGroupID }),
-              let scope = browseMode.groupSearchScope else { return }
-        searchText = group.name
-        searchScope = scope
+              browseMode.groupSearchScope != nil else { return }
+        browseArtistFilterKey = group.artistFilterKey
+        browseArtistFilterName = browseMode == .artists ? group.name : group.detail
+        browseAlbumFilterKey = group.albumFilterKey
+        browseAlbumFilterName = browseMode == .albums ? group.name : nil
+        searchText = ""
+        searchScope = .all
         selectedTrackIDs = []
         browseMode = .tracks
         selectedBrowseGroupID = nil
+    }
+
+    func clearBrowseGroupFilters() {
+        browseArtistFilterKey = nil
+        browseArtistFilterName = nil
+        browseAlbumFilterKey = nil
+        browseAlbumFilterName = nil
+        refreshVisibleTracks()
     }
 
     private func runStateCommand(
@@ -3276,6 +3306,23 @@ private struct PlayerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                if model.browseMode == .tracks,
+                   model.browseArtistFilterName != nil || model.browseAlbumFilterName != nil {
+                    HStack(spacing: 8) {
+                        Text([
+                            model.browseArtistFilterName.map { "ARTIST · \($0.uppercased())" },
+                            model.browseAlbumFilterName.map { "ALBUM · \($0.uppercased())" }
+                        ].compactMap { $0 }.joined(separator: " · "))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(RustMusicPalette.muted)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Button("CLEAR BROWSE FILTERS") { model.clearBrowseGroupFilters() }
+                            .accessibilityLabel("Clear artist and album filters")
+                    }
+                    .accessibilityIdentifier("library-group-track-filters")
+                }
+
                 if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {
                     Text("CURRENT TRACK IS OUTSIDE THIS PAGE OR SEARCH · SELECT IT TO PLAY")
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
@@ -3371,9 +3418,17 @@ private struct PlayerView: View {
                             )) {
                                 ForEach(visibleGroups) { group in
                                     HStack(spacing: 8) {
-                                        Text(group.name)
-                                            .font(.system(size: rowDensity.titleFontSize, weight: .semibold, design: .monospaced))
-                                            .lineLimit(1)
+                                        VStack(alignment: .leading, spacing: rowDensity.textSpacing) {
+                                            Text(group.name)
+                                                .font(.system(size: rowDensity.titleFontSize, weight: .semibold, design: .monospaced))
+                                                .lineLimit(1)
+                                            if let detail = group.detail {
+                                                Text(detail)
+                                                    .font(.system(size: rowDensity.metadataFontSize, weight: .regular, design: .monospaced))
+                                                    .foregroundStyle(RustMusicPalette.muted)
+                                                    .lineLimit(1)
+                                            }
+                                        }
                                         Spacer(minLength: 4)
                                         Text("\(group.trackCount) TRACKS")
                                             .font(.system(size: rowDensity.metadataFontSize, weight: .regular, design: .monospaced))
@@ -3383,7 +3438,7 @@ private struct PlayerView: View {
                                     .padding(.vertical, rowDensity.verticalPadding)
                                     .tag(group.id)
                                     .listRowBackground(RustMusicPalette.display)
-                                    .accessibilityLabel("\(group.name), \(group.trackCount) tracks")
+                                    .accessibilityLabel([group.name, group.detail, "\(group.trackCount) tracks"].compactMap { $0 }.joined(separator: ", "))
                                     .onTapGesture(count: 2) {
                                         model.selectedBrowseGroupID = group.id
                                         model.openSelectedBrowseGroup()

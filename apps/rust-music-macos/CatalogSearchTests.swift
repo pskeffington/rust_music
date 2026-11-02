@@ -178,6 +178,33 @@ struct CatalogSearchTests {
             searchedAlbums.groups.map(\.name) == ["Three"] && searchedAlbums.totalMatches == 1,
             "album browsing searches normalized album names"
         )
+        let sameTitleAlbumIndex = CatalogSearchIndex(tracks: [
+            CatalogTrack(id: 0, container: "flac", title: "First", artist: "Artist One", album: "Same Title", relativePath: "one-1.flac"),
+            CatalogTrack(id: 1, container: "flac", title: "Second", artist: "Artist One", album: "Same Title", relativePath: "one-2.flac"),
+            CatalogTrack(id: 2, container: "flac", title: "Third", artist: "Artist Two", album: "Same Title", relativePath: "two.flac"),
+            CatalogTrack(id: 3, container: "flac", title: "Fourth", artist: "artist one", album: "same title", relativePath: "one-3.flac")
+        ])
+        let sameTitleAlbums = sameTitleAlbumIndex.browsePage(for: .albums, matching: "same title", offset: 0)
+        precondition(
+            sameTitleAlbums.totalMatches == 2
+                && sameTitleAlbums.groups.map(\.detail) == ["Artist One", "Artist Two"]
+                && sameTitleAlbums.groups.map(\.trackCount) == [3, 1]
+                && sameTitleAlbums.groups[0].id != sameTitleAlbums.groups[1].id,
+            "same-titled albums stay distinct by normalized artist while case variants merge"
+        )
+        let artistLimitedAlbumPage = sameTitleAlbumIndex.page(
+            matching: "",
+            withinArtistKey: "artist two",
+            withinAlbumKey: "same title",
+            offset: 0
+        )
+        precondition(
+            artistLimitedAlbumPage.tracks.map(\.id) == [2]
+                && artistLimitedAlbumPage.totalMatches == 1,
+            "opening an album group constrains its track page to the group artist"
+        )
+        let artistSearchAlbum = sameTitleAlbumIndex.browsePage(for: .albums, matching: "Artist Two", offset: 0)
+        precondition(artistSearchAlbum.groups.map(\.detail) == ["Artist Two"])
         let unknownTagGroups = CatalogSearchIndex(tracks: [
             CatalogTrack(id: 0, container: "flac", title: "A", artist: "Björk", album: "", relativePath: "a.flac"),
             CatalogTrack(id: 1, container: "flac", title: "B", artist: "björk", album: "Unknown Album", relativePath: "b.flac"),
@@ -193,7 +220,23 @@ struct CatalogSearchTests {
             "artist group keys use canonical case-folded metadata"
         )
         let unknownAlbums = unknownTagGroups.browsePage(for: .albums, matching: "unknown", offset: 0)
-        precondition(unknownAlbums.groups.count == 1 && unknownAlbums.groups[0].trackCount == 3)
+        precondition(
+            unknownAlbums.groups.count == 2
+                && unknownAlbums.groups.map(\.trackCount).sorted() == [1, 2],
+            "unknown albums are grouped separately by artist"
+        )
+        let unknownAlbumGroup = unknownAlbums.groups.first { $0.detail == "Björk" }
+        precondition(unknownAlbumGroup?.albumFilterKey == "unknown album")
+        let unknownArtistAndAlbumPage = unknownTagGroups.page(
+            matching: "",
+            withinArtistKey: "unknown artist",
+            withinAlbumKey: "unknown album",
+            offset: 0
+        )
+        precondition(
+            unknownArtistAndAlbumPage.tracks.map(\.id) == [2],
+            "opening missing-tag artist and album groups finds tracks with blank metadata"
+        )
         let unknownArtists = unknownTagGroups.browsePage(for: .artists, matching: "unknown", offset: 0)
         precondition(unknownArtists.groups.count == 1 && unknownArtists.groups[0].trackCount == 1)
         let boundedGroupPage = CatalogSearchIndex(tracks: (0..<1_000).map { index in
