@@ -17,6 +17,8 @@ enum OperatorWindowLayout {
 
     static func applyMinimumSize(for name: String, to window: NSWindow) {
         guard let minimumSize = minimumFrames[name] else { return }
+        // Constrain the outer AppKit frame here; a SwiftUI content-frame
+        // minimum would add title-bar height to the requested window minimum.
         window.minSize = minimumSize
     }
 
