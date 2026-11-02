@@ -1712,7 +1712,7 @@ final class PlayerModel: ObservableObject {
     }
 
     func moveCatalogPage(by direction: Int) {
-        guard direction != 0, !isTransportBusy, !isStateBusy else { return }
+        guard direction != 0 else { return }
         let navigation = CatalogPageNavigation(
             totalItems: browseMode == .tracks ? visibleTrackTotal : visibleBrowseGroupTotal,
             offset: catalogPageOffset,
@@ -3494,13 +3494,13 @@ private struct PlayerView: View {
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
                             .background(RustMusicPalette.display)
-                            .disabled(model.isTransportBusy || model.isStateBusy)
+                            // Group selection and browsing only update local catalog view state.
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
                             .accessibilityHint(model.browseMode == .artists
                                 ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
                                 : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
                             .conditionalAccessibilityAction(
-                                model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
+                                model.selectedBrowseGroupID != nil,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
                             ) {
                                 model.openSelectedBrowseGroup()
@@ -3512,7 +3512,7 @@ private struct PlayerView: View {
                                 model.openSelectedBrowseGroup()
                             }
                             .keyboardShortcut(.return, modifiers: [])
-                            .disabled(model.selectedBrowseGroupID == nil || model.isTransportBusy || model.isStateBusy)
+                            .disabled(model.selectedBrowseGroupID == nil)
                             .accessibilityIdentifier("library-open-selected-group")
                         }
                     }
@@ -3521,7 +3521,7 @@ private struct PlayerView: View {
 
                 HStack(spacing: 8) {
                     Button("PREV PAGE") { model.moveCatalogPage(by: -1) }
-                        .disabled(pageNavigation.adjacentOffset(forward: false) == nil || model.isStateBusy || model.isTransportBusy)
+                        .disabled(pageNavigation.adjacentOffset(forward: false) == nil)
                     Text("PAGE \(pageNavigation.currentPage)/\(pageNavigation.pageCount) · \(pageNavigation.firstItem)–\(pageNavigation.lastItem) OF \(pageNavigation.totalItems)")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
@@ -3530,7 +3530,7 @@ private struct PlayerView: View {
                         .accessibilityLabel("Library page \(pageNavigation.currentPage) of \(pageNavigation.pageCount), \(resultName) \(pageNavigation.firstItem) through \(pageNavigation.lastItem) of \(pageNavigation.totalItems)")
                         .accessibilityIdentifier("library-page-status")
                     Button("NEXT PAGE") { model.moveCatalogPage(by: 1) }
-                        .disabled(pageNavigation.adjacentOffset(forward: true) == nil || model.isStateBusy || model.isTransportBusy)
+                        .disabled(pageNavigation.adjacentOffset(forward: true) == nil)
                 }
 
                 HStack(spacing: 8) {
