@@ -3146,7 +3146,7 @@ private struct PlayerView: View {
         TextField(searchPlaceholder, text: $model.searchText)
             .modifier(RustMusicTextFieldStyle())
             .focused($librarySearchIsFocused)
-            .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
+            .disabled(model.tracks.isEmpty)
             .accessibilityLabel(searchAccessibilityLabel)
     }
 
