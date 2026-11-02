@@ -1368,3 +1368,46 @@ passed the full offline gate across 17 local crates and 32 path-only internal
 edges, with zero registry/Git crates; all 36 native macOS AudioQueue tests
 passed. This does not close hardware playback, VoiceOver, private-corpus, or
 acoustic acceptance.
+
+### 2026-11-02 MAC07-03 hidden multi-selection enqueue and current candidate gates
+
+Candidate source is based on `main` commit
+`cf83cf22dee8ffba0e58e32fe83039c2acde733f` (working branch
+`codex/mac07-compact-window-acceptance`, prior committed UI adjustment
+`8cab45e`). The source adds a text-only Library selection summary that reports
+selected rows hidden by the current search/page and clarifies that bulk actions
+use the entire selection. It does not alter Rust Boy styling or start playback.
+
+`sh scripts/build-macos-app.sh` exited **0** on this candidate. Embedded
+synthetic catalog checks passed at 2,000, 20,000, 100,000 and 250,000 tracks;
+the 250k harness reported index build 88.010 ms, cached-sort p95 36.468 ms,
+narrow-search p95 80.742 ms, broad-search p95 140.639 ms, bounded 200-row
+broad-page p95 176.984 ms, artist-group index plus page 666.024 ms,
+artist-group narrow-query p95 233.989 ms, and process peak RSS 327,794,688
+bytes. These are synthetic core-harness metrics, not interactive UI latency or
+full application memory. The bundle's local signature was valid on disk and
+satisfied its designated requirement. The build emitted 17 dead-code warnings
+for optional AudioQueue meter and siphon-tap diagnostics in
+`crates/rust-music-native/src/macos.rs`; that audio-backend-owned crate was not
+modified in this UI pass.
+
+The rebuilt app explicitly loaded a generated three-entry metadata-only
+catalog (FLAC signatures and tags, no audio frames). Shift selection retained
+tracks 01 and 02 while search displayed only track 03. The UI summary reported
+`2 SELECTED · 2 OUTSIDE PAGE/SEARCH · BULK USE ALL 2`; Play and Play Next were
+disabled while Enqueue Selected remained enabled. Activating Enqueue Selected
+made Playlist Editor show exactly `PLAY QUEUE · 2`, with Selection Track 01
+and Selection Track 02. Playback stayed at Ready / No Track with no output
+snapshot. The queue was cleared to `PLAY QUEUE · 0`; the app was quit and the
+exact three-file generated fixture was removed. This verifies hidden-selection
+feedback and bulk enqueue state only, not audio playback.
+
+`sh scripts/offline-gate.sh` exited **0** across 17 local crates and 32
+path-only internal edges; all 36 native AudioQueue tests passed. `git diff
+--check`, `python3 scripts/check_roadmap_index.py`, and JSON parsing for both
+roadmap and MAC07 indexes passed. VoiceOver work was skipped at the operator's
+direction. MAC07-03 remains in progress: VoiceOver speech, direct live window
+resizing, and the exact 520×360 AppKit-point minimum remain unverified.
+Private-corpus parity, route-context diagnosis, physical output/device recovery,
+and full release acceptance also remain open; this build and offline gate do
+not establish production readiness.

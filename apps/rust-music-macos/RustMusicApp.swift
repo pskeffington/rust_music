@@ -1547,6 +1547,13 @@ final class PlayerModel: ObservableObject {
         return visibleTracks.contains(where: { $0.id == selectedTrack.id })
     }
 
+    var selectedTrackCountOutsideLibraryView: Int {
+        CatalogSearch.selectedTrackCountOutsideView(
+            selectedTrackIDs,
+            visibleTrackIDs: Set(visibleTracks.map(\.id))
+        )
+    }
+
     var selectedTrackIsActionableInLibrary: Bool {
         guard browseMode == .tracks,
               let selectedTrack,
@@ -3325,6 +3332,22 @@ private struct PlayerView: View {
                             .accessibilityLabel("Clear artist and album filters")
                     }
                     .accessibilityIdentifier("library-group-track-filters")
+                }
+
+                if model.browseMode == .tracks, !model.selectedTrackIDs.isEmpty {
+                    let selectedCount = model.selectedTrackIDs.count
+                    let outsideViewCount = model.selectedTrackCountOutsideLibraryView
+                    let selectionSummary = outsideViewCount == 0
+                        ? "\(selectedCount) SELECTED · BULK ACTIONS USE ALL SELECTED TRACKS"
+                        : "\(selectedCount) SELECTED · \(outsideViewCount) OUTSIDE PAGE/SEARCH · BULK USE ALL \(selectedCount)"
+                    Text(selectionSummary)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Library selection")
+                        .accessibilityValue(selectionSummary)
+                        .accessibilityIdentifier("library-selection-summary")
                 }
 
                 if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {
