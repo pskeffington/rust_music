@@ -50,6 +50,35 @@ struct CatalogTrack: Identifiable, Equatable {
 enum CatalogSearch {
     static let maximumPageSize = 200
 
+    enum BrowseMode: String, CaseIterable, Equatable, Identifiable {
+        case tracks
+        case artists
+        case albums
+
+        var id: String { rawValue }
+        var label: String { rawValue.uppercased() }
+        var groupSearchScope: SearchScope? {
+            switch self {
+            case .tracks: return nil
+            case .artists: return .artist
+            case .albums: return .album
+            }
+        }
+    }
+
+    struct BrowseGroup: Identifiable, Equatable {
+        let id: String
+        let name: String
+        let trackCount: Int
+    }
+
+    struct BrowsePage {
+        let groups: [BrowseGroup]
+        let totalMatches: Int
+        let offset: Int
+        let pageSize: Int
+    }
+
     struct Page {
         let tracks: [CatalogTrack]
         let totalMatches: Int
@@ -232,6 +261,8 @@ final class CatalogSearchIndex {
     private var titleOrder: [Int]?
     private var artistOrder: [Int]?
     private var albumOrder: [Int]?
+    private var artistGroups: [CatalogSearch.BrowseGroup]?
+    private var albumGroups: [CatalogSearch.BrowseGroup]?
 
     init(tracks: [CatalogTrack]) {
         self.tracks = tracks
@@ -339,6 +370,84 @@ final class CatalogSearchIndex {
         )
     }
 
+    /// Builds a sorted, deduplicated Artist or Album index once, then returns
+    /// a bounded page. Missing tags appear under a clear fallback label.
+    func browsePage(
+        for mode: CatalogSearch.BrowseMode,
+        matching searchText: String,
+        offset requestedOffset: Int,
+        limit requestedLimit: Int = CatalogSearch.maximumPageSize
+    ) -> CatalogSearch.BrowsePage {
+        guard mode != .tracks else {
+            return CatalogSearch.BrowsePage(groups: [], totalMatches: 0, offset: 0, pageSize: 0)
+        }
+        let limit = min(max(requestedLimit, 1), CatalogSearch.maximumPageSize)
+        let offset = max(requestedOffset, 0)
+        let groups = browseGroups(for: mode)
+        guard let query = CatalogSearch.queryText(for: searchText) else {
+            let start = min(offset, groups.count)
+            let end = min(start + limit, groups.count)
+            return CatalogSearch.BrowsePage(
+                groups: Array(groups[start..<end]),
+                totalMatches: groups.count,
+                offset: start,
+                pageSize: limit
+            )
+        }
+
+        var totalMatches = 0
+        var pageGroups: [CatalogSearch.BrowseGroup] = []
+        pageGroups.reserveCapacity(limit)
+        for group in groups where group.id.range(of: query) != nil {
+            if totalMatches >= offset, pageGroups.count < limit { pageGroups.append(group) }
+            totalMatches += 1
+        }
+        return CatalogSearch.BrowsePage(
+            groups: pageGroups,
+            totalMatches: totalMatches,
+            offset: min(offset, totalMatches),
+            pageSize: limit
+        )
+    }
+
+    private func browseGroups(for mode: CatalogSearch.BrowseMode) -> [CatalogSearch.BrowseGroup] {
+        switch mode {
+        case .tracks:
+            return []
+        case .artists:
+            if artistGroups == nil { artistGroups = makeBrowseGroups(for: .artist) }
+            return artistGroups ?? []
+        case .albums:
+            if albumGroups == nil { albumGroups = makeBrowseGroups(for: .album) }
+            return albumGroups ?? []
+        }
+    }
+
+    private func makeBrowseGroups(for scope: CatalogSearch.SearchScope) -> [CatalogSearch.BrowseGroup] {
+        struct Accumulator {
+            var name: String
+            var count: Int
+        }
+        var values: [String: Accumulator] = [:]
+        for track in tracks {
+            let rawValue = scope == .artist ? track.artist : track.album
+            let name = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? (scope == .artist ? "Unknown Artist" : "Unknown Album")
+                : rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = CatalogTextNormalizer.fold(name)
+            if var value = values[key] {
+                value.count += 1
+                values[key] = value
+            } else {
+                values[key] = Accumulator(name: name, count: 1)
+            }
+        }
+        return values.map { pair in
+            let (key, value) = pair
+            return CatalogSearch.BrowseGroup(id: key, name: value.name, trackCount: value.count)
+        }.sorted { $0.id < $1.id }
+    }
+
     private func sortedIndices(for order: CatalogSearch.SortOrder) -> [Int] {
         switch order {
         case .title:
@@ -415,6 +524,22 @@ final class CatalogSearchViewCache: @unchecked Sendable {
             offset: offset,
             limit: limit
         ) ?? CatalogSearch.Page(tracks: [], totalMatches: 0, offset: 0, pageSize: limit)
+    }
+
+    func browsePage(
+        in tracks: [CatalogTrack],
+        revision requestedRevision: UInt64,
+        for mode: CatalogSearch.BrowseMode,
+        matching searchText: String,
+        offset: Int,
+        limit: Int = CatalogSearch.maximumPageSize
+    ) -> CatalogSearch.BrowsePage {
+        if revision != requestedRevision {
+            index = CatalogSearchIndex(tracks: tracks)
+            revision = requestedRevision
+        }
+        return index?.browsePage(for: mode, matching: searchText, offset: offset, limit: limit)
+            ?? CatalogSearch.BrowsePage(groups: [], totalMatches: 0, offset: 0, pageSize: limit)
     }
 }
 

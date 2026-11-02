@@ -934,10 +934,13 @@ private struct RustMusicCommands: Commands {
             Divider()
             Button("Sort Library by Title") { model.sortOrder = .title }
                 .keyboardShortcut("1", modifiers: [.command, .option])
+                .disabled(model.browseMode != .tracks)
             Button("Sort Library by Artist") { model.sortOrder = .artist }
                 .keyboardShortcut("2", modifiers: [.command, .option])
+                .disabled(model.browseMode != .tracks)
             Button("Sort Library by Album") { model.sortOrder = .album }
                 .keyboardShortcut("3", modifiers: [.command, .option])
+                .disabled(model.browseMode != .tracks)
         }
         CommandMenu("Playback") {
             Button("Play / Pause") {
@@ -1396,6 +1399,7 @@ final class PlayerModel: ObservableObject {
         didSet {
             catalogRevision &+= 1
             catalogPageOffset = 0
+            selectedBrowseGroupID = nil
             refreshVisibleTracks()
         }
     }
@@ -1427,9 +1431,23 @@ final class PlayerModel: ObservableObject {
             refreshVisibleTracks()
         }
     }
+    @Published var browseMode: CatalogSearch.BrowseMode {
+        didSet {
+            UserDefaults.standard.set(browseMode.rawValue, forKey: "RustMusic.catalogBrowseMode")
+            if oldValue != browseMode {
+                catalogPageOffset = 0
+                selectedBrowseGroupID = nil
+                selectedTrackIDs = []
+            }
+            refreshVisibleTracks()
+        }
+    }
     @Published private(set) var visibleTracks: [CatalogTrack] = []
     @Published private(set) var visibleTrackTotal = 0
+    @Published private(set) var visibleBrowseGroups: [CatalogSearch.BrowseGroup] = []
+    @Published private(set) var visibleBrowseGroupTotal = 0
     @Published private(set) var catalogPageOffset = 0
+    @Published var selectedBrowseGroupID: String?
     let catalogPageSize = CatalogSearch.maximumPageSize
     @Published var status = "Choose a local library folder."
     @Published var isPlaying = false
@@ -1485,6 +1503,9 @@ final class PlayerModel: ObservableObject {
         searchScope = CatalogSearch.SearchScope(
             rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogSearchScope") ?? "all"
         ) ?? .all
+        browseMode = CatalogSearch.BrowseMode(
+            rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogBrowseMode") ?? "tracks"
+        ) ?? .tracks
         selectedOutputDeviceUID = UserDefaults.standard.string(forKey: "RustMusic.outputDeviceUID") ?? ""
         RustMusicPlayerRegistry.register(self)
         refreshOutputDevices()
@@ -1510,7 +1531,9 @@ final class PlayerModel: ObservableObject {
     }
 
     var selectedTrackIsActionableInLibrary: Bool {
-        guard let selectedTrack, visibleTracks.contains(where: { $0.id == selectedTrack.id }) else {
+        guard browseMode == .tracks,
+              let selectedTrack,
+              visibleTracks.contains(where: { $0.id == selectedTrack.id }) else {
             return false
         }
         return CatalogSearch.isActionableSelectedTrack(
@@ -1627,24 +1650,42 @@ final class PlayerModel: ObservableObject {
         let query = CatalogSearch.boundedQuery(searchText)
         let order = sortOrder
         let scope = searchScope
+        let mode = browseMode
         let offset = catalogPageOffset
         let searchCache = catalogSearchCache
         catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             guard !cancellation.isCancelled else { return }
-            let page = searchCache.page(
-                in: catalog,
-                revision: revision,
-                matching: query,
-                sortedBy: order,
-                in: scope,
-                offset: offset,
-                limit: CatalogSearch.maximumPageSize
-            )
+            let trackPage: CatalogSearch.Page?
+            let groupPage: CatalogSearch.BrowsePage?
+            if mode == .tracks {
+                trackPage = searchCache.page(
+                    in: catalog,
+                    revision: revision,
+                    matching: query,
+                    sortedBy: order,
+                    in: scope,
+                    offset: offset,
+                    limit: CatalogSearch.maximumPageSize
+                )
+                groupPage = nil
+            } else {
+                trackPage = nil
+                groupPage = searchCache.browsePage(
+                    in: catalog,
+                    revision: revision,
+                    for: mode,
+                    matching: query,
+                    offset: offset,
+                    limit: CatalogSearch.maximumPageSize
+                )
+            }
             DispatchQueue.main.async {
                 guard let self, self.catalogViewGeneration == generation else { return }
-                self.visibleTracks = page.tracks
-                self.visibleTrackTotal = page.totalMatches
-                self.catalogPageOffset = page.offset
+                self.visibleTracks = trackPage?.tracks ?? []
+                self.visibleTrackTotal = trackPage?.totalMatches ?? 0
+                self.visibleBrowseGroups = groupPage?.groups ?? []
+                self.visibleBrowseGroupTotal = groupPage?.totalMatches ?? 0
+                self.catalogPageOffset = trackPage?.offset ?? groupPage?.offset ?? 0
             }
         }
     }
@@ -1652,14 +1693,24 @@ final class PlayerModel: ObservableObject {
     func moveCatalogPage(by direction: Int) {
         guard direction != 0, !isTransportBusy, !isStateBusy else { return }
         let navigation = CatalogPageNavigation(
-            totalItems: visibleTrackTotal,
+            totalItems: browseMode == .tracks ? visibleTrackTotal : visibleBrowseGroupTotal,
             offset: catalogPageOffset,
-            visibleItemCount: visibleTracks.count,
+            visibleItemCount: browseMode == .tracks ? visibleTracks.count : visibleBrowseGroups.count,
             pageSize: catalogPageSize
         )
         guard let nextOffset = navigation.adjacentOffset(forward: direction > 0) else { return }
         catalogPageOffset = nextOffset
         refreshVisibleTracks()
+    }
+
+    func openSelectedBrowseGroup() {
+        guard let group = visibleBrowseGroups.first(where: { $0.id == selectedBrowseGroupID }),
+              let scope = browseMode.groupSearchScope else { return }
+        searchText = group.name
+        searchScope = scope
+        selectedTrackIDs = []
+        browseMode = .tracks
+        selectedBrowseGroupID = nil
     }
 
     private func runStateCommand(
@@ -3034,11 +3085,41 @@ private struct PlayerView: View {
     }
 
     private var librarySearchField: some View {
-        TextField("SEARCH LIBRARY", text: $model.searchText)
+        TextField(searchPlaceholder, text: $model.searchText)
             .modifier(RustMusicTextFieldStyle())
             .focused($librarySearchIsFocused)
             .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
-            .accessibilityLabel("Search library")
+            .accessibilityLabel(searchAccessibilityLabel)
+    }
+
+    private var searchPlaceholder: String {
+        switch model.browseMode {
+        case .tracks: return "SEARCH LIBRARY"
+        case .artists: return "SEARCH ARTISTS"
+        case .albums: return "SEARCH ALBUMS"
+        }
+    }
+
+    private var searchAccessibilityLabel: String {
+        switch model.browseMode {
+        case .tracks: return "Search library tracks"
+        case .artists: return "Search artists"
+        case .albums: return "Search albums"
+        }
+    }
+
+    private var libraryBrowseModePicker: some View {
+        Picker("BROWSE", selection: $model.browseMode) {
+            ForEach(CatalogSearch.BrowseMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 94)
+        .layoutPriority(1)
+        .accessibilityLabel("Browse library by")
+        .accessibilityHint("Choose tracks, artists, or albums.")
+        .accessibilityIdentifier("library-browse-mode")
     }
 
     private var librarySearchScopePicker: some View {
@@ -3084,9 +3165,10 @@ private struct PlayerView: View {
     }
 
     private var libraryTrackCountLabel: some View {
-        Text(model.isScanning
-            ? "SCANNING · \(model.visibleTrackTotal) PRIOR RESULTS"
-            : "\(model.visibleTrackTotal) TRACKS")
+        let count = model.browseMode == .tracks ? model.visibleTrackTotal : model.visibleBrowseGroupTotal
+        return Text(model.isScanning
+            ? "SCANNING · \(count) PRIOR \(model.browseMode.label)"
+            : "\(count) \(model.browseMode.label)")
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .foregroundStyle(RustMusicPalette.muted)
             .fixedSize()
@@ -3094,11 +3176,15 @@ private struct PlayerView: View {
 
     private var libraryPanel: some View {
         let visibleTracks = model.visibleTracks
+        let visibleGroups = model.visibleBrowseGroups
         let rowDensity = LibraryRowDensity(rawValue: libraryRowDensityRawValue) ?? .standard
+        let visibleResultCount = model.browseMode == .tracks ? visibleTracks.count : visibleGroups.count
+        let totalResultCount = model.browseMode == .tracks ? model.visibleTrackTotal : model.visibleBrowseGroupTotal
+        let resultName = model.browseMode.label.lowercased()
         let pageNavigation = CatalogPageNavigation(
-            totalItems: model.visibleTrackTotal,
+            totalItems: totalResultCount,
             offset: model.catalogPageOffset,
-            visibleItemCount: visibleTracks.count,
+            visibleItemCount: visibleResultCount,
             pageSize: model.catalogPageSize
         )
         let emptyState: (title: String, detail: String)?
@@ -3122,17 +3208,19 @@ private struct PlayerView: View {
                 title: "NO LOSSLESS TRACKS FOUND",
                 detail: "Choose LOAD LIBRARY to select another local folder."
             )
-        } else if model.isScanning && visibleTracks.isEmpty {
+        } else if model.isScanning && visibleResultCount == 0 {
             emptyState = (
                 title: "NO MATCHES",
-                detail: "No current tracks match. A folder scan is in progress; the previous catalog remains active."
+                detail: "No current \(resultName) match. A folder scan is in progress; the previous catalog remains active."
             )
-        } else if visibleTracks.isEmpty {
+        } else if visibleResultCount == 0 {
             emptyState = (
                 title: "NO MATCHES",
-                detail: model.searchScope == .all
-                    ? "Try a different title, artist, album, or path."
-                    : "Try a different \(model.searchScope.label.lowercased())."
+                detail: model.browseMode == .tracks
+                    ? (model.searchScope == .all
+                        ? "Try a different title, artist, album, or path."
+                        : "Try a different \(model.searchScope.label.lowercased()).")
+                    : "Try a different \(resultName) name."
             )
         } else {
             emptyState = nil
@@ -3143,17 +3231,25 @@ private struct PlayerView: View {
                     HStack(spacing: 8) {
                         librarySearchField
                             .frame(minWidth: 145)
-                        librarySearchScopePicker
-                        librarySortPicker
+                        libraryBrowseModePicker
+                        if model.browseMode == .tracks {
+                            librarySearchScopePicker
+                        }
+                        if model.browseMode == .tracks { librarySortPicker }
                         libraryDensityPicker
                         libraryTrackCountLabel
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        librarySearchField
-                            .frame(maxWidth: .infinity)
                         HStack(spacing: 8) {
-                            librarySearchScopePicker
-                            librarySortPicker
+                            librarySearchField
+                                .frame(maxWidth: .infinity)
+                            libraryBrowseModePicker
+                        }
+                        HStack(spacing: 8) {
+                            if model.browseMode == .tracks {
+                                librarySearchScopePicker
+                                librarySortPicker
+                            }
                             libraryDensityPicker
                             Spacer(minLength: 0)
                             libraryTrackCountLabel
@@ -3205,7 +3301,7 @@ private struct PlayerView: View {
                         .background(RustMusicPalette.display)
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("library-empty-state")
-                    } else {
+                    } else if model.browseMode == .tracks {
                         List(selection: Binding<Set<Int>>(
                             get: { model.selectedTrackIDs },
                             set: { model.selectTracksManually($0) }
@@ -3267,6 +3363,47 @@ private struct PlayerView: View {
                             model.addSelectedTrackNext()
                         }
                         .accessibilityIdentifier("library-track-list")
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            List(selection: Binding<String?>(
+                                get: { model.selectedBrowseGroupID },
+                                set: { model.selectedBrowseGroupID = $0 }
+                            )) {
+                                ForEach(visibleGroups) { group in
+                                    HStack(spacing: 8) {
+                                        Text(group.name)
+                                            .font(.system(size: rowDensity.titleFontSize, weight: .semibold, design: .monospaced))
+                                            .lineLimit(1)
+                                        Spacer(minLength: 4)
+                                        Text("\(group.trackCount) TRACKS")
+                                            .font(.system(size: rowDensity.metadataFontSize, weight: .regular, design: .monospaced))
+                                            .foregroundStyle(RustMusicPalette.muted)
+                                            .fixedSize()
+                                    }
+                                    .padding(.vertical, rowDensity.verticalPadding)
+                                    .tag(group.id)
+                                    .listRowBackground(RustMusicPalette.display)
+                                    .accessibilityLabel("\(group.name), \(group.trackCount) tracks")
+                                    .onTapGesture(count: 2) {
+                                        model.selectedBrowseGroupID = group.id
+                                        model.openSelectedBrowseGroup()
+                                    }
+                                }
+                            }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
+                            .background(RustMusicPalette.display)
+                            .disabled(model.isTransportBusy || model.isStateBusy)
+                            .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
+                            .accessibilityHint("Select a row, then choose Browse Selected to see its tracks.")
+                            .accessibilityIdentifier("library-group-list")
+
+                            Button(model.browseMode == .artists ? "BROWSE SELECTED ARTIST" : "BROWSE SELECTED ALBUM") {
+                                model.openSelectedBrowseGroup()
+                            }
+                            .disabled(model.selectedBrowseGroupID == nil || model.isTransportBusy || model.isStateBusy)
+                            .accessibilityIdentifier("library-open-selected-group")
+                        }
                     }
                 }
                 .frame(minHeight: 96, maxHeight: .infinity)
@@ -3279,7 +3416,7 @@ private struct PlayerView: View {
                         .foregroundStyle(RustMusicPalette.muted)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                        .accessibilityLabel("Library page \(pageNavigation.currentPage) of \(pageNavigation.pageCount), tracks \(pageNavigation.firstItem) through \(pageNavigation.lastItem) of \(pageNavigation.totalItems)")
+                        .accessibilityLabel("Library page \(pageNavigation.currentPage) of \(pageNavigation.pageCount), \(resultName) \(pageNavigation.firstItem) through \(pageNavigation.lastItem) of \(pageNavigation.totalItems)")
                         .accessibilityIdentifier("library-page-status")
                     Button("NEXT PAGE") { model.moveCatalogPage(by: 1) }
                         .disabled(pageNavigation.adjacentOffset(forward: true) == nil || model.isStateBusy || model.isTransportBusy)
@@ -3292,7 +3429,7 @@ private struct PlayerView: View {
                     Button("ENQUEUE SELECTED · \(model.selectedTrackIDs.count)") {
                         model.addSelectionToQueue()
                     }
-                    .disabled(model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
+                    .disabled(model.browseMode != .tracks || model.selectedTrackIDs.isEmpty || model.isStateBusy || model.isTransportBusy)
                     Button("PLAY NEXT") { model.addSelectedTrackNext() }
                         .disabled(!model.selectedTrackIsActionableInLibrary || model.isStateBusy || model.isTransportBusy)
                 }

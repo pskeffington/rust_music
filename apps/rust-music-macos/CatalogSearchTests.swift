@@ -164,6 +164,54 @@ struct CatalogSearchTests {
         precondition(sortIndex.visibleTracks(matching: "", sortedBy: .album).map(\.id) == [1, 0, 2])
         precondition(sortIndex.visibleTracks(matching: "Beta", sortedBy: .album).map(\.id) == [2])
 
+        let artistGroups = sortIndex.browsePage(for: .artists, matching: "", offset: 0, limit: 20)
+        precondition(
+            artistGroups.groups.map(\.name) == ["Able", "Zulu"]
+                && artistGroups.groups.map(\.trackCount) == [2, 1]
+                && artistGroups.totalMatches == 2,
+            "artist browsing deduplicates names and reports track counts"
+        )
+        let nextArtistGroup = sortIndex.browsePage(for: .artists, matching: "", offset: 1, limit: 1)
+        precondition(nextArtistGroup.groups.map(\.name) == ["Zulu"] && nextArtistGroup.totalMatches == 2)
+        let searchedAlbums = sortIndex.browsePage(for: .albums, matching: "thr", offset: 0, limit: 20)
+        precondition(
+            searchedAlbums.groups.map(\.name) == ["Three"] && searchedAlbums.totalMatches == 1,
+            "album browsing searches normalized album names"
+        )
+        let unknownTagGroups = CatalogSearchIndex(tracks: [
+            CatalogTrack(id: 0, container: "flac", title: "A", artist: "Björk", album: "", relativePath: "a.flac"),
+            CatalogTrack(id: 1, container: "flac", title: "B", artist: "björk", album: "Unknown Album", relativePath: "b.flac"),
+            CatalogTrack(id: 2, container: "flac", title: "C", artist: "", album: "", relativePath: "c.flac")
+        ])
+        let normalizedArtistGroups = unknownTagGroups.browsePage(for: .artists, matching: "jÓNSI", offset: 0)
+        precondition(normalizedArtistGroups.groups.isEmpty)
+        let deduplicatedArtists = unknownTagGroups.browsePage(for: .artists, matching: "bjÖRK", offset: 0)
+        precondition(
+            deduplicatedArtists.groups.count == 1
+                && deduplicatedArtists.groups[0].trackCount == 2
+                && deduplicatedArtists.groups[0].name == "Björk",
+            "artist group keys use canonical case-folded metadata"
+        )
+        let unknownAlbums = unknownTagGroups.browsePage(for: .albums, matching: "unknown", offset: 0)
+        precondition(unknownAlbums.groups.count == 1 && unknownAlbums.groups[0].trackCount == 3)
+        let unknownArtists = unknownTagGroups.browsePage(for: .artists, matching: "unknown", offset: 0)
+        precondition(unknownArtists.groups.count == 1 && unknownArtists.groups[0].trackCount == 1)
+        let boundedGroupPage = CatalogSearchIndex(tracks: (0..<1_000).map { index in
+            CatalogTrack(
+                id: index,
+                container: "flac",
+                title: "Track \(index)",
+                artist: "Artist \(index)",
+                album: "Album \(index)",
+                relativePath: "\(index).flac"
+            )
+        }).browsePage(for: .artists, matching: "", offset: 0, limit: 10_000)
+        precondition(
+            boundedGroupPage.groups.count == CatalogSearch.maximumPageSize
+                && boundedGroupPage.totalMatches == 1_000,
+            "artist and album browser pages obey the existing 200-row bound"
+        )
+
         let viewCache = CatalogSearchViewCache()
         precondition(viewCache.visibleTracks(
             in: sortTracks,
@@ -221,6 +269,14 @@ struct CatalogSearchTests {
             offset: 0,
             limit: 5
         ).tracks.map(\.id) == [2], "the view cache must pass through field scope")
+        precondition(pageCache.browsePage(
+            in: replacementCatalog,
+            revision: 12,
+            for: .artists,
+            matching: "Artist",
+            offset: 0,
+            limit: 5
+        ).groups.map(\.name) == ["Artist"], "the view cache must invalidate grouped indexes by catalog revision")
 
         let tracks = (0..<20_000).map { index in
             let title = String(format: "Track %05d", index)
@@ -349,7 +405,7 @@ struct CatalogSearchTests {
                 id: index,
                 container: "wave",
                 title: title,
-                artist: "Synthetic Artist",
+                artist: String(format: "Synthetic Artist %06d", index),
                 album: "Scale Profile",
                 relativePath: "folder/\(title).wav"
             )
@@ -414,6 +470,33 @@ struct CatalogSearchTests {
         }
         pageDurations.sort()
         let broadPageP95 = Double(pageDurations[19]) / 1_000_000
+        let artistIndexStart = DispatchTime.now().uptimeNanoseconds
+        let artistGroups = index.browsePage(
+            for: .artists,
+            matching: "",
+            offset: count / 2,
+            limit: 10_000
+        )
+        let artistIndexMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - artistIndexStart) / 1_000_000
+        precondition(
+            artistGroups.totalMatches == count
+                && artistGroups.groups.count == min(CatalogSearch.maximumPageSize, count - count / 2),
+            "artist browsing must index all groups while returning no more than 200 rows"
+        )
+        let artistQuery = String(format: "synthetic artist %06d", count - 1)
+        var artistSearchDurations: [UInt64] = []
+        artistSearchDurations.reserveCapacity(5)
+        for _ in 0..<5 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let page = index.browsePage(for: .artists, matching: artistQuery, offset: 0)
+            artistSearchDurations.append(DispatchTime.now().uptimeNanoseconds - start)
+            precondition(
+                page.totalMatches == 1 && page.groups.first?.name == String(format: "Synthetic Artist %06d", count - 1),
+                "artist query must find its matching group and remain bounded"
+            )
+        }
+        artistSearchDurations.sort()
+        let artistSearchP95 = Double(artistSearchDurations[4]) / 1_000_000
         var linearSearchDurations: [UInt64] = []
         linearSearchDurations.reserveCapacity(5)
         for _ in 0..<5 {
@@ -441,7 +524,7 @@ struct CatalogSearchTests {
         let broadSearchP95 = Double(broadSearchDurations[4]) / 1_000_000
         let indexPayloadBytes = tracks.reduce(0) { $0 + $1.searchableBytes.count }
         return String(format:
-            "PASS: synthetic catalog scale n=%d; title-index-build=%.3fms; cached-sort p50=%.3fms p95=%.3fms; narrow-search p50=%.3fms p95=%.3fms linear-reference-p95=%.3fms; broad-search p50=%.3fms p95=%.3fms; bounded-200-row broad-page p95=%.3fms; searchable payload=%d bytes",
+            "PASS: synthetic catalog scale n=%d; title-index-build=%.3fms; cached-sort p50=%.3fms p95=%.3fms; narrow-search p50=%.3fms p95=%.3fms linear-reference-p95=%.3fms; broad-search p50=%.3fms p95=%.3fms; bounded-200-row broad-page p95=%.3fms; artist-groups=%d index+page=%.3fms narrow-query-p95=%.3fms; searchable payload=%d bytes",
             count,
             indexBuildMilliseconds,
             sortP50,
@@ -452,6 +535,9 @@ struct CatalogSearchTests {
             broadSearchP50,
             broadSearchP95,
             broadPageP95,
+            artistGroups.totalMatches,
+            artistIndexMilliseconds,
+            artistSearchP95,
             indexPayloadBytes
         )
     }

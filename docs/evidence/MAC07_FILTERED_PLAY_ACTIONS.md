@@ -393,3 +393,38 @@ workspace offline checks and tests completed successfully.
 The active app session was left untouched. The scope menu's live filtering and
 persistence, the adaptive toolbar breakpoint and focus, and VoiceOver remain
 unverified. This is build and harness evidence only, not UI acceptance.
+
+## Artist and Album browsing — isolated PR #9 candidate
+
+The Media Library now offers TRACKS, ARTISTS, and ALBUMS browse modes. Artist
+and Album views deduplicate names using the existing Unicode-folded metadata
+normalizer, sort groups by normalized name, count tracks, and place blank tags
+under Unknown Artist / Unknown Album. Search filters group names; results use
+the same bounded 200-row pages and background catalog-view queue. Selecting a
+group and choosing BROWSE SELECTED ARTIST/ALBUM opens the track view scoped to
+that name. Browse mode persists with TRACKS as the default. Track sort commands
+are disabled in group views. Rust Boy styling and the no-artwork policy are
+unchanged.
+
+`sh scripts/build-macos-app.sh` exited **0** for this candidate. The UI
+harnesses passed, including browse grouping, case/Unicode matching, unknown-tag
+fallback, group counts, page bounds, and catalog-revision cache replacement.
+Strict app signature validation passed. `sh scripts/offline-gate.sh` exited
+**0**: 17 local crates, 32 path-only internal edges, no registry/Git crates,
+and no third-party system links. The gate reports 17 existing unused native
+AudioQueue diagnostic warnings.
+
+The synthetic catalog harness created one unique artist per track to exercise
+high-cardinality browse indexes. Group-index build plus first bounded page
+took 4.148 ms / 42.414 ms / 245.381 ms / 630.646 ms at 2,000 / 20,000 /
+100,000 / 250,000 tracks. Narrow artist-name query p95 was 1.787 ms / 19.062
+ms / 93.378 ms / 225.323 ms. Catalog-harness process peak RSS at 250,000 was
+273,285,120 bytes; searchable metadata payload was 18.5 MB. These measurements
+are synthetic algorithm-harness results, not full-app memory, interactive UI
+latency, real import timing, or playback-under-load evidence. The current
+scanner/IPC catalog limit remains 20,000 tracks.
+
+The active desktop session was not changed. Live artist/album browsing,
+selection-to-track behavior, preference persistence, toolbar/layout fit,
+VoiceOver, 250,000-track import, and playback during scanning/search remain
+unverified.
