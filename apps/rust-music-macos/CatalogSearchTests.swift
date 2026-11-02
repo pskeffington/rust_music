@@ -127,6 +127,14 @@ struct CatalogSearchTests {
             ),
             "a selected row hidden by search must not remain actionable"
         )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView([0, 1, 2, 9], visibleTrackIDs: [0, 2, 3]) == 2,
+            "selection feedback must count rows hidden by search or pagination without dropping them"
+        )
+        precondition(
+            CatalogSearch.selectedTrackCountOutsideView([0, 2], visibleTrackIDs: [0, 2, 3]) == 0,
+            "selection feedback must report zero when every selected row is visible"
+        )
         let selectionAfterFirstPage = CatalogSearch.mergingPageSelection(
             [0, 201],
             visibleTrackIDs: [0, 1, 2],

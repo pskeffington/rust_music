@@ -178,6 +178,16 @@ enum CatalogSearch {
             .union(proposedVisibleSelection.intersection(visibleTrackIDs))
     }
 
+    static func selectedTrackCountOutsideView(
+        _ selectedTrackIDs: Set<Int>,
+        visibleTrackIDs: Set<Int>
+    ) -> Int {
+        let selectedVisibleCount = visibleTrackIDs.reduce(into: 0) { count, id in
+            if selectedTrackIDs.contains(id) { count += 1 }
+        }
+        return selectedTrackIDs.count - selectedVisibleCount
+    }
+
     static func queryBytes(for searchText: String) -> Data? {
         guard let query = queryText(for: searchText) else { return nil }
         return Data(query.utf8)

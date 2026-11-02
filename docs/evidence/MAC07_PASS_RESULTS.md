@@ -1326,3 +1326,40 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 MAC07-03 cross-page selection feedback
+
+The Library now reports the total number of selected tracks, how many are
+outside the current page or search, and that bulk actions use the complete
+selection. This preserves intentional cross-page multi-selection while making
+the scope of Enqueue Selected explicit. The play target guard remains separate:
+Play Selected and Play Next stay disabled when the selected target is hidden by
+the active search.
+
+`sh scripts/build-macos-app.sh` exited **0** from base `cf83cf2` with this
+working change. The catalog-search harness passed the new all-visible and
+partly-hidden selection-count cases. The build also ran the existing catalog
+scale harness at 2,000, 20,000, 100,000, and 250,000 synthetic tracks and
+strict local app signature validation. Its 250,000-track catalog process peak
+RSS was **340,672,512 bytes**; these synthetic in-memory results are not
+full-app memory or end-to-end latency. A subsequent build after a wording-only
+singular/plural correction also exited **0**; its catalog process peak RSS was
+**342,589,440 bytes**.
+
+In the rebuilt isolated app, three generated 44-byte empty-WAVE metadata
+fixtures were loaded explicitly. Command-click selected two rows; a search
+showing only the third row produced the visible summary `2 TRACKS SELECTED · 2
+OUTSIDE THIS PAGE OR SEARCH · BULK ACTIONS USE ALL 2`. Play Selected and Play
+Next were disabled, while Enqueue Selected remained available with count 2.
+Invoking it placed exactly the two selected hidden rows into the queue, which
+was then cleared. The Player stayed stopped; no playback occurred. The app and
+generated fixture were removed. This verifies the selection summary and bulk
+action scope in one live generated-data session; it does not verify audio,
+VoiceOver, minimum-frame layout, or selections during a live 250,000-track
+import. MAC07-03 and RM-029 remain in progress.
+
+`sh scripts/offline-gate.sh` exited **0** on the implementation branch: 17
+workspace-local crates, 32 path-only internal edges, no registry/Git crates,
+and no third-party system links. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, JSON parsing, and `git diff --check`
+also exited **0**.
