@@ -1326,3 +1326,21 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 MAC07-03 operator-window routing and Arrange check
+
+On the isolated rebuilt candidate from `01a160d`, the native Window menu
+listed Player, Playlist Editor, Media Library, and Equalizer. Choosing each
+Show action brought the corresponding named window to the foreground. The
+Playlist Editor exposed its queue and playlist controls; Media Library
+exposed the selected synthetic result; and Equalizer continued to explain
+that no verified DSP processor was connected, with all ten bands disabled.
+
+Invoking Arrange Operator Windows from the in-window WINDOWS menu returned
+focus to Player after the arrangement settled. Player showed the loaded
+synthetic track in Ready state, `Not started; duration unknown`, zero
+progress, and no output snapshot. The queue remained empty. No audio frames
+were emitted and no playback or queue action was invoked. This is live window
+routing/focus and stopped-state evidence for this candidate; it does not
+measure AppKit-point frames, verify saved positions across restart, prove
+VoiceOver rotor navigation or audible playback, or close MAC07-03.
