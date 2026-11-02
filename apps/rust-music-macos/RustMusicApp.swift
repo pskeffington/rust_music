@@ -1395,6 +1395,10 @@ private final class CatalogViewCancellation: @unchecked Sendable {
 @MainActor
 final class PlayerModel: ObservableObject {
     @Published var libraryRoot: URL?
+    @Published private(set) var savedLibraryLocationPaths: [String] = []
+    var savedLibraryLocationLabels: [String: String] {
+        libraryLocationRegistry.displayLabels(activePath: libraryRoot?.standardizedFileURL.path)
+    }
     @Published var tracks: [CatalogTrack] = [] {
         didSet {
             catalogRevision &+= 1
@@ -1510,10 +1514,15 @@ final class PlayerModel: ObservableObject {
     private var snapshotPollInFlightGeneration: UInt64?
     private var pendingStateReload = DeferredStateReload()
     private var libraryStateRevision = LibraryStateRevision()
+    private var libraryLocationRegistry = LibraryLocationRegistry()
     private let shutdownGate = ShutdownCompletionGate()
     private let transientChildOperations = DispatchGroup()
 
     init() {
+        libraryLocationRegistry = LibraryLocationRegistry(
+            storedPaths: UserDefaults.standard.stringArray(forKey: "RustMusic.libraryLocationPaths") ?? []
+        )
+        savedLibraryLocationPaths = libraryLocationRegistry.paths
         sortOrder = CatalogSearch.SortOrder(
             rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogSortOrder") ?? "title"
         ) ?? .title
@@ -2192,6 +2201,20 @@ final class PlayerModel: ObservableObject {
         loadLibrary(at: url)
     }
 
+    func loadSavedLibraryLocation(_ path: String) {
+        guard libraryLocationRegistry.paths.contains(path),
+              let normalized = LibraryLocationRegistry.normalizedAbsolutePath(path) else { return }
+        loadLibrary(at: URL(fileURLWithPath: normalized, isDirectory: true))
+    }
+
+    func forgetSavedLibraryLocation(_ path: String) {
+        guard !isScanning, !isStateBusy, !isTransportBusy,
+              libraryLocationRegistry.remove(path) else { return }
+        savedLibraryLocationPaths = libraryLocationRegistry.paths
+        UserDefaults.standard.set(savedLibraryLocationPaths, forKey: "RustMusic.libraryLocationPaths")
+        status = "Saved location forgotten. Its files and root-scoped queue and playlists were not changed."
+    }
+
     func cancelScan() {
         guard let scanProcess, scanProcess.isRunning else { return }
         scanCancellationRequested = true
@@ -2281,10 +2304,12 @@ final class PlayerModel: ObservableObject {
                 self.audioQueueDiagnosticSummary = nil
                 self.libraryStateRevision.advance()
                 self.libraryRoot = root
+                let locationNotice = self.rememberLibraryLocation(root)
                 self.tracks = tracks
                 self.selectedIndex = tracks.first?.id
                 self.selectedTrackIDs = tracks.first.map { Set([$0.id]) } ?? []
-                self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
+                self.status = locationNotice.map { "Loaded \(tracks.count) tracks. \($0)" }
+                    ?? "Loaded \(tracks.count) tracks. Playback is stopped."
                 self.reloadPersistentState()
             case .failure(let failure):
                 self.libraryScanNotice = wasCancelled
@@ -2294,6 +2319,19 @@ final class PlayerModel: ObservableObject {
                     ? "Library scan canceled; the previous catalog is preserved."
                     : failure.message
             }
+        }
+    }
+
+    private func rememberLibraryLocation(_ root: URL) -> String? {
+        switch libraryLocationRegistry.add(root) {
+        case .added, .alreadySaved:
+            savedLibraryLocationPaths = libraryLocationRegistry.paths
+            UserDefaults.standard.set(savedLibraryLocationPaths, forKey: "RustMusic.libraryLocationPaths")
+            return nil
+        case .limitReached:
+            return "Saved-location limit (\(LibraryLocationRegistry.maximumLocations)) is full; this location remains active for this session."
+        case .invalid:
+            return "This location could not be saved and remains active for this session."
         }
     }
 
@@ -3198,6 +3236,40 @@ private struct PlayerView: View {
         .accessibilityIdentifier("library-row-density")
     }
 
+    private var libraryLocationsMenu: some View {
+        let activePath = model.libraryRoot?.standardizedFileURL.path
+        let displayLabels = model.savedLibraryLocationLabels
+        return Menu {
+            if model.savedLibraryLocationPaths.isEmpty {
+                Text("No saved locations yet")
+            } else {
+                ForEach(model.savedLibraryLocationPaths, id: \.self) { path in
+                    let name = displayLabels[path] ?? URL(fileURLWithPath: path).lastPathComponent
+                    Menu(name) {
+                        Button("Load This Location") {
+                            model.loadSavedLibraryLocation(path)
+                        }
+                        .disabled(path == activePath || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                        Button("Forget Saved Location") {
+                            model.forgetSavedLibraryLocation(path)
+                        }
+                        .disabled(path == activePath || model.isScanning || model.isStateBusy || model.isTransportBusy)
+                    }
+                }
+                Divider()
+            }
+            Button("ADD LOCATION…") { model.chooseLibrary() }
+                .disabled(model.isScanning || model.isStateBusy || model.isTransportBusy)
+        } label: {
+            Text("LOCATIONS · \(model.savedLibraryLocationPaths.count)")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(RustMusicPalette.phosphor)
+        }
+        .accessibilityLabel("Saved library locations")
+        .accessibilityHint("Saved locations are not scanned at startup. Choose a location to scan it explicitly. Queue and playlist state stays separate for each folder.")
+        .accessibilityIdentifier("library-locations-menu")
+    }
+
     private var libraryTrackCountLabel: some View {
         let count = model.browseMode == .tracks ? model.visibleTrackTotal : model.visibleBrowseGroupTotal
         return Text(model.isScanning
@@ -3520,7 +3592,17 @@ private struct PlayerView: View {
                 }
             }
         } label: {
-            Text("LIBRARY")
+            HStack(spacing: 8) {
+                Text("LIBRARY")
+                Spacer(minLength: 4)
+                if let root = model.libraryRoot {
+                    Text(root.lastPathComponent.uppercased())
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .lineLimit(1)
+                }
+                libraryLocationsMenu
+            }
         }
         .groupBoxStyle(RustMusicGroupBoxStyle())
     }

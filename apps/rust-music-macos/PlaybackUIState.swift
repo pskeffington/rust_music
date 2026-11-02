@@ -76,6 +76,110 @@ struct DeferredStateReload {
     }
 }
 
+struct LibraryLocationRegistry: Equatable {
+    static let maximumLocations = 32
+
+    enum AddResult: Equatable {
+        case added
+        case alreadySaved
+        case limitReached
+        case invalid
+    }
+
+    private(set) var paths: [String]
+
+    init(storedPaths: [String] = []) {
+        var unique: [String] = []
+        for path in storedPaths {
+            guard let normalized = Self.normalizedAbsolutePath(path),
+                  !unique.contains(normalized) else { continue }
+            guard unique.count < Self.maximumLocations else { break }
+            unique.append(normalized)
+        }
+        paths = unique
+    }
+
+    mutating func add(_ url: URL) -> AddResult {
+        guard url.isFileURL,
+              let path = Self.normalizedAbsolutePath(url.path) else { return .invalid }
+        guard !paths.contains(path) else { return .alreadySaved }
+        guard paths.count < Self.maximumLocations else { return .limitReached }
+        paths.append(path)
+        return .added
+    }
+
+    mutating func remove(_ path: String) -> Bool {
+        guard let normalized = Self.normalizedAbsolutePath(path),
+              let index = paths.firstIndex(of: normalized) else { return false }
+        paths.remove(at: index)
+        return true
+    }
+
+    /// Returns concise folder labels, adding parent context only when saved
+    /// locations share the same final component. It performs no filesystem IO.
+    func displayLabels(activePath: String? = nil) -> [String: String] {
+        let components = Dictionary(uniqueKeysWithValues: paths.map { path in
+            (path, URL(fileURLWithPath: path).pathComponents.filter { $0 != "/" })
+        })
+        let basenameCounts = Dictionary(grouping: paths) {
+            components[$0]?.last?.localizedLowercase ?? ""
+        }.mapValues(\.count)
+
+        var baseLabels: [String: String] = [:]
+        for path in paths {
+            guard let parts = components[path], let basename = parts.last else {
+                baseLabels[path] = path
+                continue
+            }
+            let collision = basenameCounts[basename.localizedLowercase, default: 0] > 1
+            guard collision else {
+                baseLabels[path] = basename
+                continue
+            }
+
+            var context: [String] = [basename]
+            if parts.count > 1 {
+                for ancestor in parts.dropLast().reversed() {
+                    context.insert(ancestor, at: 0)
+                    let peers = paths.filter { other in
+                        guard other != path, let otherParts = components[other] else { return false }
+                        return otherParts.suffix(context.count).map(\.localizedLowercase)
+                            == context.map(\.localizedLowercase)
+                    }
+                    if peers.isEmpty { break }
+                }
+            }
+            baseLabels[path] = context.joined(separator: " ▸ ")
+        }
+
+        var labels = Dictionary(uniqueKeysWithValues: paths.map { path in
+            let label = baseLabels[path] ?? path
+            return (path, path == activePath ? "ACTIVE · \(label)" : label)
+        })
+        let collisions = Dictionary(grouping: paths) { labels[$0] ?? $0 }
+            .values
+            .filter { $0.count > 1 }
+        for collidingPaths in collisions {
+            for path in collidingPaths {
+                let fullPathLabel = path == activePath ? "ACTIVE · \(path)" : path
+                labels[path] = fullPathLabel
+            }
+        }
+        return labels
+    }
+
+    static func normalizedAbsolutePath(_ path: String) -> String? {
+        guard !path.isEmpty,
+              path.utf8.count <= 4096,
+              path.hasPrefix("/"),
+              !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+            return nil
+        }
+        return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path
+    }
+
+}
+
 struct PackagePlaybackSnapshot: Equatable {
     let state: UInt8
     let selected: UInt16?
