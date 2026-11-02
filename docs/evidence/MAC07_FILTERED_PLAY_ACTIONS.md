@@ -557,3 +557,39 @@ This live macOS accessibility-tree check confirms the page-change scroll reset
 and preservation of a selection across pages for a 400-row synthetic catalog.
 It is not a VoiceOver speech/rotor check, playback test, compact-minimum-size
 test, or 250,000-track live UI test. Overall MAC07-03 remains in progress.
+
+## Selected artist and album accessibility actions — PR #9 candidate
+
+The first live check placed a named Browse action on each artist/album row, but
+macOS did not expose that row-level custom action in the accessibility tree.
+The implementation was moved to the corresponding list, where the named
+action is conditionally available only when a group is selected and the model
+is idle. The selection hint describes both the visible button and matching
+accessibility action.
+
+`sh scripts/build-macos-app.sh` exited **0** for this candidate. Its local
+signature and included catalog scale, playlist selection, operator geometry,
+playback snapshot, catalog bounds, and process lifecycle/shutdown harnesses
+passed. The final 250,000-track synthetic run measured title-index build
+103.837 ms, cached-sort p95 45.853 ms, narrow-search p95 92.132 ms,
+broad-search p95 159.424 ms, bounded 200-row page p95 192.107 ms,
+artist-group index plus first page 762.528 ms, and artist-query p95 269.070
+ms. Searchable payload was 18,500,000 bytes and catalog harness peak RSS was
+295,026,688 bytes. These are harness results, not interactive UI latency or
+full-app memory.
+
+Live macOS accessibility-API interaction used an explicitly loaded temporary
+catalog of two generated metadata-only FLAC entries with no audio frames. In
+ARTISTS mode, selecting Artist A exposed `Browse Selected Artist` as a
+secondary action on the Library artists list. Invoking it switched to TRACKS
+and showed exactly Alpha Song / Artist A. In ALBUMS mode, selecting the first
+`Twin Album, Artist A` row exposed `Browse Selected Album`; invoking it showed
+Alpha Song with the artist and album filters. Repeating on
+`Twin Album, Artist B` showed exactly Beta Song / Artist B / Twin Album. The
+player stayed Ready/stopped with no output snapshot; no playback or queue
+action occurred. The temporary candidate and catalog were closed/removed.
+
+This verifies action exposure and destination filtering through the macOS
+accessibility API. It does not verify VoiceOver speech or rotor behavior,
+physical playback, persistence, or other MAC07-03 gates. Overall MAC07-03
+remains in progress.

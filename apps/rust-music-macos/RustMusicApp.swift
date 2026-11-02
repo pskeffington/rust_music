@@ -3456,7 +3456,13 @@ private struct PlayerView: View {
                             .background(RustMusicPalette.display)
                             .disabled(model.isTransportBusy || model.isStateBusy)
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
-                            .accessibilityHint("Select a row, then choose Browse Selected to see its tracks.")
+                            .accessibilityHint("Select a row, then use Browse Selected or the list's matching accessibility action to see its tracks.")
+                            .conditionalAccessibilityAction(
+                                model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
+                                named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
+                            ) {
+                                model.openSelectedBrowseGroup()
+                            }
                             .id(model.visibleResultGeneration)
                             .accessibilityIdentifier("library-group-list")
 
