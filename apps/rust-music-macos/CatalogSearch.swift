@@ -75,26 +75,65 @@ enum CatalogSearch {
         }
     }
 
+    enum SearchScope: String, CaseIterable, Equatable, Identifiable {
+        case all
+        case title
+        case artist
+        case album
+
+        var id: String { rawValue }
+        var label: String { rawValue.uppercased() }
+
+        init?(rawValue: String) {
+            switch rawValue {
+            case "all": self = .all
+            case "title": self = .title
+            case "artist": self = .artist
+            case "album": self = .album
+            default: return nil
+            }
+        }
+    }
+
     static func visibleTracks(
         in tracks: [CatalogTrack],
         matching searchText: String,
-        sortedBy order: SortOrder = .title
+        sortedBy order: SortOrder = .title,
+        in scope: SearchScope = .all
     ) -> [CatalogTrack] {
-        CatalogSearchIndex(tracks: tracks).visibleTracks(matching: searchText, sortedBy: order)
+        CatalogSearchIndex(tracks: tracks).visibleTracks(matching: searchText, sortedBy: order, in: scope)
     }
 
-    static func matches(_ track: CatalogTrack, matching searchText: String) -> Bool {
-        guard let queryBytes = queryBytes(for: searchText) else { return true }
-        return track.searchableBytes.range(of: queryBytes) != nil
+    static func matches(
+        _ track: CatalogTrack,
+        matching searchText: String,
+        in scope: SearchScope = .all
+    ) -> Bool {
+        switch scope {
+        case .all:
+            guard let queryBytes = queryBytes(for: searchText) else { return true }
+            return track.searchableBytes.range(of: queryBytes) != nil
+        case .title, .artist, .album:
+            guard let query = queryText(for: searchText) else { return true }
+            let key: String
+            switch scope {
+            case .title: key = track.titleSortKey
+            case .artist: key = track.artistSortKey
+            case .album: key = track.albumSortKey
+            case .all: return true
+            }
+            return key.range(of: query) != nil
+        }
     }
 
     static func isActionableSelectedTrack(
         _ track: CatalogTrack?,
         selectedTrackIDs: Set<Int>,
-        matching searchText: String
+        matching searchText: String,
+        in scope: SearchScope = .all
     ) -> Bool {
         guard let track, selectedTrackIDs.contains(track.id) else { return false }
-        return matches(track, matching: searchText)
+        return matches(track, matching: searchText, in: scope)
     }
 
     static func mergingPageSelection(
@@ -107,9 +146,14 @@ enum CatalogSearch {
     }
 
     static func queryBytes(for searchText: String) -> Data? {
+        guard let query = queryText(for: searchText) else { return nil }
+        return Data(query.utf8)
+    }
+
+    static func queryText(for searchText: String) -> String? {
         let query = boundedQuery(searchText).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return nil }
-        return Data(CatalogTextNormalizer.fold(query).utf8)
+        return CatalogTextNormalizer.fold(query)
     }
 
     static func boundedQuery(_ text: String) -> String {
@@ -194,7 +238,15 @@ final class CatalogSearchIndex {
         trackIDsMatchSourceOffsets = tracks.enumerated().allSatisfy { $0.offset == $0.element.id }
     }
 
-    func visibleTracks(matching searchText: String, sortedBy order: CatalogSearch.SortOrder = .title) -> [CatalogTrack] {
+    func visibleTracks(
+        matching searchText: String,
+        sortedBy order: CatalogSearch.SortOrder = .title,
+        in scope: CatalogSearch.SearchScope = .all
+    ) -> [CatalogTrack] {
+        guard scope == .all else {
+            return tracks.filter { CatalogSearch.matches($0, matching: searchText, in: scope) }
+                .sorted { comesBefore($0, $1, by: order) }
+        }
         let queryBytes = CatalogSearch.queryBytes(for: searchText)
         guard let queryBytes else {
             return sortedIndices(for: order).map { tracks[$0] }
@@ -235,14 +287,31 @@ final class CatalogSearchIndex {
     func page(
         matching searchText: String,
         sortedBy order: CatalogSearch.SortOrder = .title,
+        in scope: CatalogSearch.SearchScope = .all,
         offset requestedOffset: Int,
         limit requestedLimit: Int = CatalogSearch.maximumPageSize
     ) -> CatalogSearch.Page {
         let limit = min(max(requestedLimit, 1), CatalogSearch.maximumPageSize)
         let offset = max(requestedOffset, 0)
-        let queryBytes = CatalogSearch.queryBytes(for: searchText)
+        let queryBytes = scope == .all ? CatalogSearch.queryBytes(for: searchText) : nil
+        let scopedQueryIsEmpty = scope == .all || CatalogSearch.queryText(for: searchText) == nil
         let indices = sortedIndices(for: order)
         guard let queryBytes else {
+            if !scopedQueryIsEmpty {
+                var totalMatches = 0
+                var pageTracks: [CatalogTrack] = []
+                pageTracks.reserveCapacity(limit)
+                for index in indices where CatalogSearch.matches(tracks[index], matching: searchText, in: scope) {
+                    if totalMatches >= offset, pageTracks.count < limit { pageTracks.append(tracks[index]) }
+                    totalMatches += 1
+                }
+                return CatalogSearch.Page(
+                    tracks: pageTracks,
+                    totalMatches: totalMatches,
+                    offset: min(offset, totalMatches),
+                    pageSize: limit
+                )
+            }
             let start = min(offset, tracks.count)
             let end = min(start + limit, tracks.count)
             return CatalogSearch.Page(
@@ -316,13 +385,14 @@ final class CatalogSearchViewCache: @unchecked Sendable {
         in tracks: [CatalogTrack],
         revision requestedRevision: UInt64,
         matching searchText: String,
-        sortedBy order: CatalogSearch.SortOrder
+        sortedBy order: CatalogSearch.SortOrder,
+        in scope: CatalogSearch.SearchScope = .all
     ) -> [CatalogTrack] {
         if revision != requestedRevision {
             index = CatalogSearchIndex(tracks: tracks)
             revision = requestedRevision
         }
-        return index?.visibleTracks(matching: searchText, sortedBy: order) ?? []
+        return index?.visibleTracks(matching: searchText, sortedBy: order, in: scope) ?? []
     }
 
     func page(
@@ -330,6 +400,7 @@ final class CatalogSearchViewCache: @unchecked Sendable {
         revision requestedRevision: UInt64,
         matching searchText: String,
         sortedBy order: CatalogSearch.SortOrder,
+        in scope: CatalogSearch.SearchScope = .all,
         offset: Int,
         limit: Int = CatalogSearch.maximumPageSize
     ) -> CatalogSearch.Page {
@@ -340,6 +411,7 @@ final class CatalogSearchViewCache: @unchecked Sendable {
         return index?.page(
             matching: searchText,
             sortedBy: order,
+            in: scope,
             offset: offset,
             limit: limit
         ) ?? CatalogSearch.Page(tracks: [], totalMatches: 0, offset: 0, pageSize: limit)

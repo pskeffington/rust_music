@@ -1420,6 +1420,13 @@ final class PlayerModel: ObservableObject {
             refreshVisibleTracks()
         }
     }
+    @Published var searchScope: CatalogSearch.SearchScope {
+        didSet {
+            UserDefaults.standard.set(searchScope.rawValue, forKey: "RustMusic.catalogSearchScope")
+            if oldValue != searchScope { catalogPageOffset = 0 }
+            refreshVisibleTracks()
+        }
+    }
     @Published private(set) var visibleTracks: [CatalogTrack] = []
     @Published private(set) var visibleTrackTotal = 0
     @Published private(set) var catalogPageOffset = 0
@@ -1475,6 +1482,9 @@ final class PlayerModel: ObservableObject {
         sortOrder = CatalogSearch.SortOrder(
             rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogSortOrder") ?? "title"
         ) ?? .title
+        searchScope = CatalogSearch.SearchScope(
+            rawValue: UserDefaults.standard.string(forKey: "RustMusic.catalogSearchScope") ?? "all"
+        ) ?? .all
         selectedOutputDeviceUID = UserDefaults.standard.string(forKey: "RustMusic.outputDeviceUID") ?? ""
         RustMusicPlayerRegistry.register(self)
         refreshOutputDevices()
@@ -1491,7 +1501,7 @@ final class PlayerModel: ObservableObject {
 
     var selectedTrackMatchesCurrentSearch: Bool {
         guard let selectedTrack else { return false }
-        return CatalogSearch.matches(selectedTrack, matching: searchText)
+        return CatalogSearch.matches(selectedTrack, matching: searchText, in: searchScope)
     }
 
     var selectedTrackIsVisibleOnCurrentLibraryPage: Bool {
@@ -1506,7 +1516,8 @@ final class PlayerModel: ObservableObject {
         return CatalogSearch.isActionableSelectedTrack(
             selectedTrack,
             selectedTrackIDs: selectedTrackIDs,
-            matching: searchText
+            matching: searchText,
+            in: searchScope
         )
     }
 
@@ -1615,6 +1626,7 @@ final class PlayerModel: ObservableObject {
         let revision = catalogRevision
         let query = CatalogSearch.boundedQuery(searchText)
         let order = sortOrder
+        let scope = searchScope
         let offset = catalogPageOffset
         let searchCache = catalogSearchCache
         catalogViewQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
@@ -1624,6 +1636,7 @@ final class PlayerModel: ObservableObject {
                 revision: revision,
                 matching: query,
                 sortedBy: order,
+                in: scope,
                 offset: offset,
                 limit: CatalogSearch.maximumPageSize
             )
@@ -3021,11 +3034,25 @@ private struct PlayerView: View {
     }
 
     private var librarySearchField: some View {
-        TextField("SEARCH TITLE, ARTIST, ALBUM OR PATH", text: $model.searchText)
+        TextField("SEARCH LIBRARY", text: $model.searchText)
             .modifier(RustMusicTextFieldStyle())
             .focused($librarySearchIsFocused)
             .disabled(model.tracks.isEmpty || model.isScanning || model.isTransportBusy)
-            .accessibilityLabel("Search library by title, artist, album, or path")
+            .accessibilityLabel("Search library")
+    }
+
+    private var librarySearchScopePicker: some View {
+        Picker("IN", selection: $model.searchScope) {
+            ForEach(CatalogSearch.SearchScope.allCases) { scope in
+                Text(scope.label).tag(scope)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 86)
+        .layoutPriority(1)
+        .accessibilityLabel("Search library in")
+        .accessibilityHint("Choose all fields, title, artist, or album.")
+        .accessibilityIdentifier("library-search-scope")
     }
 
     private var librarySortPicker: some View {
@@ -3103,7 +3130,9 @@ private struct PlayerView: View {
         } else if visibleTracks.isEmpty {
             emptyState = (
                 title: "NO MATCHES",
-                detail: "Try a different title, artist, album, or path."
+                detail: model.searchScope == .all
+                    ? "Try a different title, artist, album, or path."
+                    : "Try a different \(model.searchScope.label.lowercased())."
             )
         } else {
             emptyState = nil
@@ -3114,6 +3143,7 @@ private struct PlayerView: View {
                     HStack(spacing: 8) {
                         librarySearchField
                             .frame(minWidth: 145)
+                        librarySearchScopePicker
                         librarySortPicker
                         libraryDensityPicker
                         libraryTrackCountLabel
@@ -3122,6 +3152,7 @@ private struct PlayerView: View {
                         librarySearchField
                             .frame(maxWidth: .infinity)
                         HStack(spacing: 8) {
+                            librarySearchScopePicker
                             librarySortPicker
                             libraryDensityPicker
                             Spacer(minLength: 0)

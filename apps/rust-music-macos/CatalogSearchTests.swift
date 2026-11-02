@@ -81,6 +81,10 @@ struct CatalogSearchTests {
         )
         precondition(CatalogSearch.matches(unicodeTrack, matching: " "))
         precondition(!CatalogSearch.matches(unicodeTrack, matching: "not-present"))
+        precondition(CatalogSearch.matches(unicodeTrack, matching: "JÓNSI", in: .artist))
+        precondition(CatalogSearch.matches(unicodeTrack, matching: "o\u{0308}ST", in: .album))
+        precondition(!CatalogSearch.matches(unicodeTrack, matching: "jÓNSI", in: .title))
+        precondition(CatalogSearch.matches(unicodeTrack, matching: " ", in: .title))
         precondition(
             LibraryScanPresentation.message(isScanning: true, retainedTrackCount: 3)
                 == "Scanning a folder. The previous catalog stays active; queue and playlist changes apply to it until this scan completes or is canceled."
@@ -95,6 +99,18 @@ struct CatalogSearchTests {
             ),
             "selected-track actions require a selected row that remains visible in search"
         )
+        precondition(CatalogSearch.isActionableSelectedTrack(
+            unicodeTrack,
+            selectedTrackIDs: [unicodeTrack.id],
+            matching: "Jónsi",
+            in: .artist
+        ))
+        precondition(!CatalogSearch.isActionableSelectedTrack(
+            unicodeTrack,
+            selectedTrackIDs: [unicodeTrack.id],
+            matching: "Jónsi",
+            in: .album
+        ), "selected-track actions must honor the active field scope")
         precondition(
             !CatalogSearch.isActionableSelectedTrack(
                 unicodeTrack,
@@ -142,6 +158,9 @@ struct CatalogSearchTests {
         let sortIndex = CatalogSearchIndex(tracks: sortTracks)
         precondition(sortIndex.visibleTracks(matching: "").map(\.id) == [0, 1, 2])
         precondition(sortIndex.visibleTracks(matching: "Able", sortedBy: .artist).map(\.id) == [0, 1])
+        precondition(sortIndex.visibleTracks(matching: "Able", in: .title).isEmpty)
+        precondition(sortIndex.visibleTracks(matching: "Able", sortedBy: .title, in: .artist).map(\.id) == [0, 1])
+        precondition(sortIndex.visibleTracks(matching: "Three", in: .album).map(\.id) == [0])
         precondition(sortIndex.visibleTracks(matching: "", sortedBy: .album).map(\.id) == [1, 0, 2])
         precondition(sortIndex.visibleTracks(matching: "Beta", sortedBy: .album).map(\.id) == [2])
 
@@ -167,6 +186,13 @@ struct CatalogSearchTests {
         precondition(sortedPage.tracks.map(\.id) == [1] && sortedPage.totalMatches == 3 && sortedPage.offset == 1)
         let filteredPage = pageIndex.page(matching: "Able", sortedBy: .artist, offset: 1, limit: 200)
         precondition(filteredPage.tracks.map(\.id) == [1] && filteredPage.totalMatches == 2)
+        let scopedPage = pageIndex.page(matching: "Able", sortedBy: .title, in: .artist, offset: 1, limit: 1)
+        precondition(
+            scopedPage.tracks.map(\.id) == [1] && scopedPage.totalMatches == 2 && scopedPage.offset == 1,
+            "field-scoped pagination must filter, sort, and count consistently"
+        )
+        let titleDoesNotMatchArtist = pageIndex.page(matching: "Able", in: .title, offset: 0, limit: 5)
+        precondition(titleDoesNotMatchArtist.tracks.isEmpty && titleDoesNotMatchArtist.totalMatches == 0)
         let beyondEndPage = pageIndex.page(matching: "Beta", sortedBy: .album, offset: 10, limit: 1)
         precondition(beyondEndPage.tracks.isEmpty && beyondEndPage.totalMatches == 1 && beyondEndPage.offset == 1)
         let pageCache = CatalogSearchViewCache()
@@ -186,6 +212,15 @@ struct CatalogSearchTests {
             offset: 0,
             limit: 2
         ).tracks.map(\.id) == [9], "page cache must invalidate on catalog revision changes")
+        precondition(pageCache.page(
+            in: sortTracks,
+            revision: 11,
+            matching: "Zulu",
+            sortedBy: .artist,
+            in: .artist,
+            offset: 0,
+            limit: 5
+        ).tracks.map(\.id) == [2], "the view cache must pass through field scope")
 
         let tracks = (0..<20_000).map { index in
             let title = String(format: "Track %05d", index)

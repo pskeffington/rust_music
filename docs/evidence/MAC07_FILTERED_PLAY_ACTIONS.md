@@ -361,3 +361,35 @@ tracks.
 The Mac remains locked. The breakpoint, focus behavior across the two toolbar
 arrangements, compact-window fit, and VoiceOver traversal have not been
 verified live.
+
+## Field-scoped Library search
+
+On PR base `77d755c129e8f2e287db9e698bfd2e3d0c34f1e2`, the Library search now
+supports ALL, TITLE, ARTIST, and ALBUM scopes. ALL remains the default; the
+choice is persisted. Scoped queries reuse the existing folded metadata keys,
+remain on the catalog-view queue, retain bounded page materialization, and
+apply to the selected-track visibility guard. The adaptive toolbar places the
+scope control with the search field when the full row fits and in the second
+row at narrower widths. Rust Boy colors, control styles, and row typography
+are unchanged. No Cargo manifest or dependency changed.
+
+Regression coverage includes case and canonical Unicode matching, excluding
+matches found only in another field, result ordering and pagination, cache
+scope forwarding, blank queries, and selected-track actionability under the
+active scope. `sh scripts/build-macos-app.sh` exited **0** on this candidate
+working tree; the catalog, page navigation, playlist selection, window
+geometry, playback snapshot, catalog-bound, process lifecycle, and shutdown
+harnesses passed. Strict app signature verification passed. The synthetic
+250,000-row all-fields broad-page p95 was **124.757 ms** and catalog-harness
+peak RSS was **204,996,608 bytes**. This run did not measure scoped-query
+latency separately, full-app memory, SwiftUI layout, or real import performance;
+the import protocol remains capped at 20,000 tracks.
+
+`sh scripts/offline-gate.sh` then exited **0**. Its dependency audit reported
+17 workspace crates, 32 path-only internal edges, zero registry/Git crates,
+zero third-party system links, and three approved OS framework links. The
+workspace offline checks and tests completed successfully.
+
+The active app session was left untouched. The scope menu's live filtering and
+persistence, the adaptive toolbar breakpoint and focus, and VoiceOver remain
+unverified. This is build and harness evidence only, not UI acceptance.
