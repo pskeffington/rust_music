@@ -1326,3 +1326,134 @@ Screenshot pixels are not AppKit points. This verifies scrolling and search
 at this one tiled size only; compact minimum-frame behavior, larger catalogs,
 keyboard selection during filtering, VoiceOver, and overall MAC07-03
 acceptance remain open.
+
+### 2026-11-02 MAC07-03 cross-page selection feedback
+
+The Library now reports the total number of selected tracks, how many are
+outside the current page or search, and that bulk actions use the complete
+selection. This preserves intentional cross-page multi-selection while making
+the scope of Enqueue Selected explicit. The play target guard remains separate:
+Play Selected and Play Next stay disabled when the selected target is hidden by
+the active search.
+
+Implementation source commit: `48b20aa0f102f084c0a8489b1d7ad867eb59665d`,
+based on merged main `cf83cf22dee8ffba0e58e32fe83039c2acde733f`.
+`sh scripts/build-macos-app.sh` exited **0** with this source. The
+catalog-search harness passed the new all-visible and
+partly-hidden selection-count cases. The build also ran the existing catalog
+scale harness at 2,000, 20,000, 100,000, and 250,000 synthetic tracks and
+strict local app signature validation. Its 250,000-track catalog process peak
+RSS was **340,672,512 bytes**; these synthetic in-memory results are not
+full-app memory or end-to-end latency. A subsequent build after a wording-only
+singular/plural correction also exited **0**; its catalog process peak RSS was
+**342,589,440 bytes**.
+
+In the rebuilt isolated app, three generated 44-byte empty-WAVE metadata
+fixtures were loaded explicitly. Command-click selected two rows; a search
+showing only the third row produced the visible summary `2 TRACKS SELECTED · 2
+OUTSIDE THIS PAGE OR SEARCH · BULK ACTIONS USE ALL 2`. Play Selected and Play
+Next were disabled, while Enqueue Selected remained available with count 2.
+Invoking it placed exactly the two selected hidden rows into the queue, which
+was then cleared. The Player stayed stopped; no playback occurred. The app and
+generated fixture were removed. This verifies the selection summary and bulk
+action scope in one live generated-data session; it does not verify audio,
+VoiceOver, minimum-frame layout, or selections during a live 250,000-track
+import. MAC07-03 and RM-029 remain in progress.
+
+`sh scripts/offline-gate.sh` exited **0** on the implementation branch: 17
+workspace-local crates, 32 path-only internal edges, no registry/Git crates,
+and no third-party system links. `python3 scripts/check_roadmap_index.py`,
+`python3 scripts/check_literature.py`, JSON parsing, and `git diff --check`
+also exited **0**.
+
+### 2026-11-02 MAC07-03 row-density label sizing investigation
+
+The isolated live Library window with a generated 40-track metadata catalog
+showed the row-density menu label truncated to `STA...` while the accessibility
+value remained `STANDARD`. The control frame in `RustMusicApp.swift` was widened
+from 86 to 160 points to retain the full menu label and allow `ViewThatFits` to
+select its two-row toolbar layout at narrower widths. No palette, typography,
+or other Rust Boy styling changed.
+
+`sh scripts/build-macos-app.sh` exited **0** after the source change. It passed
+the catalog/search, playlist-selection, window-geometry, playback-snapshot,
+catalog-validation, build-path guard, strict ad-hoc signature, and process
+lifecycle checks. The included synthetic catalog run completed at 2,000,
+20,000, 100,000, and 250,000 tracks; at 250,000 it reported 103.947 ms
+title-index build, 44.144 ms cached-sort p50, 68.233 ms cached-sort p95,
+143.704 ms narrow-search p50, 340.931 ms narrow-search p95, 392.387 ms
+bounded 200-row broad-page p95, and 1,388.895 ms artist-group index plus page.
+These are harness measurements, not full-app latency or memory claims.
+
+The rebuilt bundle passed `codesign --verify --deep --strict`; however,
+Launch Services refused to open the app from the isolated `/private/tmp`
+worktree with `kLSNoExecutableErr`, and direct executable launch exited 134.
+Thus the post-change rendered label, compact/expanded geometry, and app startup
+are **not verified**. No synthetic fixtures were played. Keep MAC07-03 open
+until the rebuilt app can be launched from a normal application location and
+both window sizes are inspected. The intended live verification uses only the
+generated 40-track empty-WAVE metadata catalog; it does not establish audio
+playback, VoiceOver, or release readiness.
+
+### 2026-11-02 correction: MAC07-03 density control live verification
+
+The launch limitation above was specific to the command-line `open` and direct
+executable attempts. The Codex desktop app launcher successfully opened the
+same rebuilt candidate at source commit
+`c9c4c9eeffac2223673613a996ed33aa357ce6a0`. After explicitly loading the
+generated catalog of 40 empty-WAVE metadata fixtures, the row-density control
+rendered the full `STANDARD` value in the initial 1000×840 screenshot. After
+Window > Move & Resize > Top Left, the compact 1280×720 screenshot also showed
+the complete `STANDARD` label alongside search, browse, field, sort and track
+count controls. The accessibility tree reported all 40 rows and page status
+`1 through 40 of 40`; the visible viewport scrolled through the list. Playback
+remained stopped and no test fixture was played.
+
+This verifies the rebuilt density-label fix at the two observed window sizes
+and confirms that all 40 catalog rows remain available in the compact view.
+It does not test the minimum supported window frame, keyboard traversal in this
+run, VoiceOver speech, actual media, audio output or release readiness. The
+earlier launch limitation remains valid for direct launch from the shell; the
+desktop launcher is the working launch path. MAC07-03 remains in progress.
+
+In the same candidate session, the ROWS menu exposed the complete `COMPACT`
+and `STANDARD` choices. Selecting `COMPACT` changed the AX value and rendered
+the compact rows while preserving the `40 TRACKS` count and `1–40 of 40` page
+status. `STANDARD` was selected again before ending the QA session. No track
+was played and no persistent user setting was left changed by this check.
+
+### 2026-11-02 exact-head MAC07-03 validation
+
+At source commit `ba1a6cc8756399bace8d6533041aa63fef07785a` on
+`codex/mac07-ui-acceptance`, the primary-agent run of
+`sh scripts/build-macos-app.sh` exited **0**. The local bundle signature
+passed strict verification and the included harnesses passed. The synthetic
+250,000-track catalog run reported index build **77.541 ms**, cached-sort p95
+**33.679 ms**, narrow-search p95 **81.062 ms**, broad-search p95 **133.707 ms**,
+bounded 200-row page p95 **121.971 ms**, artist-group index plus page
+**627.846 ms**, artist-group narrow-query p95 **223.909 ms**, and
+harness-process peak RSS **340,246,528 bytes**. The run also covered 2,000,
+20,000, and 100,000 tracks. These are synthetic catalog harness measurements,
+not interactive UI latency or full-app memory.
+
+`sh scripts/offline-gate.sh` exited **0** with 17 workspace crates, 32
+path-only internal edges, zero registry/Git dependencies, and 36 native macOS
+tests passing. `python3 scripts/check_roadmap_index.py` exited **0**;
+`python3 -m unittest discover -s tests -v` passed **8 tests**; JSON parsing
+and `git diff --check` passed. The build emitted 17 unused AudioQueue
+diagnostic warnings in `rust-music-native`; sink cleanup belongs to the
+separate `audio_backend` scope.
+
+The test-time app source tree was clean. No live 250,000-track UI,
+playback-under-load, DAC, or private-corpus test was run. VoiceOver testing is
+skipped at the user's direction. MAC07-03 remains in progress; this evidence
+does not establish release readiness.
+
+### 2026-11-02 documentation and ref-validator follow-up
+
+After the documentation and ref-validator updates, `python3
+scripts/check_roadmap_index.py` exited **0**, and
+`python3 -m unittest discover -s tests -v` passed **11/11 tests**. JSON
+parsing and `git diff --check` passed. The documentation worktree is dirty;
+the product source remains unchanged. The exact-head validation above retains
+the original 8-test result observed at commit `ba1a6cc`.

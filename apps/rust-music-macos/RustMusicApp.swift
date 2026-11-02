@@ -1547,6 +1547,13 @@ final class PlayerModel: ObservableObject {
         return visibleTracks.contains(where: { $0.id == selectedTrack.id })
     }
 
+    var selectedTrackCountOutsideLibraryView: Int {
+        CatalogSearch.selectedTrackCountOutsideView(
+            selectedTrackIDs,
+            visibleTrackIDs: Set(visibleTracks.map(\.id))
+        )
+    }
+
     var selectedTrackIsActionableInLibrary: Bool {
         guard browseMode == .tracks,
               let selectedTrack,
@@ -3191,7 +3198,7 @@ private struct PlayerView: View {
             }
         }
         .pickerStyle(.menu)
-        .frame(width: 86)
+        .frame(width: 160)
         .layoutPriority(1)
         .accessibilityLabel("Library row density")
         .accessibilityHint("Compact fits more tracks in the list. Standard keeps the original row spacing.")
@@ -3325,6 +3332,23 @@ private struct PlayerView: View {
                             .accessibilityLabel("Clear artist and album filters")
                     }
                     .accessibilityIdentifier("library-group-track-filters")
+                }
+
+                if model.browseMode == .tracks, !model.selectedTrackIDs.isEmpty {
+                    let outsideViewCount = model.selectedTrackCountOutsideLibraryView
+                    let selectedCount = model.selectedTrackIDs.count
+                    let trackLabel = selectedCount == 1 ? "TRACK" : "TRACKS"
+                    let selectionSummary = outsideViewCount == 0
+                        ? "\(selectedCount) \(trackLabel) SELECTED · BULK ACTIONS USE ALL SELECTED TRACKS"
+                        : "\(selectedCount) \(trackLabel) SELECTED · \(outsideViewCount) OUTSIDE THIS PAGE OR SEARCH · BULK ACTIONS USE ALL \(selectedCount)"
+                    Text(selectionSummary)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(RustMusicPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Library selection")
+                        .accessibilityValue(selectionSummary)
+                        .accessibilityIdentifier("library-selection-summary")
                 }
 
                 if model.selectedTrack != nil && (!model.selectedTrackMatchesCurrentSearch || !model.selectedTrackIsVisibleOnCurrentLibraryPage) {

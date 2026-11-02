@@ -15,9 +15,9 @@ All runtime codecs are ours. All Cargo dependencies are local workspace paths. N
 | Develop with Codex | [Agent instructions](AGENTS.md) and [agent routing](docs/CODEX_AGENT_MAP.md) |
 | Inspect the prior merge evidence | [PR #1 record](docs/PR1_MERGE_READINESS.md) |
 
-**Source of truth:** the checked-out code and measured validation evidence take precedence over dated handoffs. Historical draft-PR instructions are not current merge policy. `main` and `build/native-codecs-g0` were identical at `deb6f879` on 2026-10-31.
+**Source of truth:** the checked-out code and measured validation evidence take precedence over dated handoffs. Historical draft-PR instructions are not current merge policy. At the 2026-11-02 reference snapshot, integrated `main` is `cf83cf2`, and active MAC-07 UI acceptance source is `ba1a6cc` on `codex/mac07-ui-acceptance`.
 
-## Active development notice — 2026-11-01: debugging the audio stream
+## Active development notice — 2026-11-02: MAC-07 audio and UI acceptance
 
 **Current status: audio-stream debugging in progress (MAC-07).** The latest dated evidence records operator-confirmed audible real-FLAC playback and a multi-file queue transition in the rebuilt macOS GUI. Same-file CLI/server route behavior from the engineering shell, jitter, device recovery, and broader acceptance remain unresolved. Earlier reports of GUI silence are historical; see the dated evidence rather than treating them as the latest state.
 
@@ -27,9 +27,9 @@ For implementation scope and evidence, see [MAC-07 roadmap](docs/ROADMAP.md) and
 
 
 
-The merged implementation and latest local macOS app build are on [`main` at `e8e5ff8`](https://github.com/pskeffington/rust_music/commit/e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b); PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The pushed `main` commit descends from that merge commit. The native macOS bundle compiled and launched successfully; library loading and audible output have been exercised. This is an engineering checkpoint, **not a production release**.
+PR [#1 is closed and merged](https://github.com/pskeffington/rust_music/pull/1) at `f8052f2`. The verified `main` reference for this snapshot is [`cf83cf2`](https://github.com/pskeffington/rust_music/commit/cf83cf22dee8ffba0e58e32fe83039c2acde733f); the active MAC-07 UI candidate is `ba1a6cc` on `codex/mac07-ui-acceptance`. The native macOS bundle compiled and its local signature verified at that candidate source. This is an engineering checkpoint, **not a production release**.
 
-The complete offline Rust gate passed at `de94d07`. Private FLAC, WAV, AIFF, ALAC and WavPack evidence is retained without rerunning or committing private media. Physical DAC/device-error recovery, live Rust Boy Music/Radio/TV focus, panel hardware, distribution signing/notarization, and representative app performance acceptance remain open. See the [macOS v1.0 acceptance ledger](docs/CODEX_MACOS_V1_DELIVERABLE.md), [release evidence and integration record](docs/PR1_MERGE_READINESS.md), and [current roadmap](docs/ROADMAP.md).
+The offline Rust gate passed at exact source head `ba1a6cc` on 2026-11-02; see the [MAC07 validation ledger](docs/evidence/MAC07_PASS_RESULTS.md) for build and gate details. Private FLAC, WAV, AIFF, ALAC and WavPack evidence is retained without rerunning or committing private media. Physical DAC/device-error recovery, live Rust Boy Music/Radio/TV focus, panel hardware, distribution signing/notarization, and representative app performance acceptance remain open. See the [macOS v1.0 acceptance ledger](docs/CODEX_MACOS_V1_DELIVERABLE.md), [release evidence and integration record](docs/PR1_MERGE_READINESS.md), and [current roadmap](docs/ROADMAP.md).
 
 The desktop UI is a text-only native app presented inside the Rust Boy/Pip-Boy wrapper theme. The visual reference guides layout and color; it does not authorize artwork, image extraction/caching, or visualizers. The fixed embedded display remains a 1,024-byte monochrome text/control frame.
 
