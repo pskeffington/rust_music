@@ -3435,7 +3435,8 @@ private struct PlayerView: View {
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(RustMusicPalette.display)
-                        .disabled(model.isTransportBusy || model.isStateBusy)
+                        // Browsing is local UI state; keep track selection responsive
+                        // while transport or persistent queue commands are in flight.
                         .accessibilityLabel("Library tracks")
                         .accessibilityHint("Use Command-click or Shift-click to select multiple tracks. Press Tab to move to Search; use the Library menu for keyboard Play, Enqueue, Play Next, and Add to Selected Playlist actions, or open a track's context menu for row actions.")
                         .conditionalAccessibilityAction(
