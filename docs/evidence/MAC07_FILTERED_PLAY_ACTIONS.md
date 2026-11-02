@@ -709,3 +709,14 @@ The exact 520×360 default-size edit was only in the QA build and was reverted
 before the source checkout was left clean. No production default window size
 was changed. Direct corner resizing, true minimum-frame behavior, VoiceOver,
 and two-size layout acceptance remain open.
+
+## Selected artist accessibility action invocation
+
+On 2026-11-02, a rebuilt isolated candidate explicitly loaded two generated
+metadata-only FLAC entries (no audio frames). Selecting Artist A exposed the
+`Browse Selected Artist` secondary accessibility action on the artist list.
+Invoking that named native accessibility action changed Browse to TRACKS,
+showed the `ARTIST · ARTIST A` filter, and displayed only `Alpha Song` by
+Artist A. No playback or queue operation was invoked. This confirms native
+accessibility action exposure and destination behavior. It does not verify
+VoiceOver speech output or rotor navigation.
