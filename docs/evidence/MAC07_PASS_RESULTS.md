@@ -1590,3 +1590,14 @@ Player was brought to the front. No files were loaded and playback remained
 stopped. This narrows the live-resize verification gap to the CUA display/input
 coordinate path; it says nothing about whether the native window minimum
 behaves correctly during an actual user drag.
+
+### 2026-11-02 exact-head local release diagnostics
+
+On source commit `23dcba272a4eccb3814f98153130309dc4279e88` (`codex/mac07-compact-window-acceptance`), the current local release checks were rerun on macOS 26.5.2 (build 25F84), Rust 1.99.1, Cargo 1.99.1, and Swift 6.3.3:
+
+- `sh scripts/offline-gate.sh` exited **0**. It audited 17 local crates, 32 path-only internal edges, zero registry/Git crates, and zero third-party system links; all 36 native AudioQueue tests passed, including simulated invalid-device recovery and diagnostic-session reset coverage.
+- `sh scripts/build-macos-app.sh` exited **0**. It passed 18 symlink-path guards, catalog/UI/IPC/lifecycle harnesses, local app signature validation, and synthetic 2k/20k/100k/250k catalog profiles. At 250k, index construction was 80.621 ms, cached-sort p95 34.465 ms, narrow-search p95 81.062 ms, broad-search p95 136.287 ms, bounded 200-row page p95 132.530 ms, artist-group index plus page 663.754 ms, artist-group narrow-query p95 238.558 ms, and harness process peak RSS 336,887,808 bytes. These synthetic harness measurements are not interactive UI or representative-media qualification.
+- `python3 scripts/check_roadmap_index.py`, `python3 scripts/check_literature.py`, and `git diff --check` each exited **0**. The roadmap validator reported 16 gates, 30 tasks, six Codex agents, eight shared-path locks, and three blocked tasks.
+- PR #13 diagnostics for this exact head returned no check runs, status checks, or annotations. This is an empty CI result, not a CI pass.
+
+The local compiler/build diagnostic warnings are clear for these commands. This does not complete MAC07 release acceptance: the private six-track parity corpus is unavailable; same-file CLI output-route parity, live 520×360-point resize, operator playback/transport confirmation on the current candidate, physical device recovery, DAC/panel/focus hardware checks, distribution signing/notarization, and the dependent A/B/UX acceptance remain open or unrun. VoiceOver was skipped at the operator's direction. No production-readiness claim is made.
