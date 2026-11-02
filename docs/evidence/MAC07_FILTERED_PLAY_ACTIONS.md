@@ -168,7 +168,8 @@ The model now advances a library-state revision on every successful catalog
 switch, discards state-command responses from older revisions, and defers the
 active-root refresh until state and transport operations are idle. Unit
 coverage checks revision invalidation and deferred-refresh readiness while
-state or transport is busy. `sh scripts/build-macos-app.sh` exited 0 with all
+state or transport is busy, then confirms the one-shot idle drain cannot be
+consumed twice. `sh scripts/build-macos-app.sh` exited 0 with all
 macOS UI harnesses and strict bundle signature validation passing. At 250,000
 synthetic tracks the catalog harness reported search p95 72.548 ms, full-sort
 p95 690.596 ms, and peak process RSS 225,230,848 bytes.
