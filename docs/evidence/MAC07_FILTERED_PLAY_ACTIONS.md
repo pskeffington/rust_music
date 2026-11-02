@@ -138,3 +138,43 @@ interaction; no unlock bypass was attempted. The rebuilt app's final disabled
 states remain unverified, and the app's post-lock process/window state is
 unknown. Before the attempt, the last observed UI was Player / Ready with one
 metadata-only fixture, stopped playback, and no output snapshot.
+
+
+## Retained-catalog scan status clarity
+
+The source keeps the previous `libraryRoot` and catalog active while a new
+folder scan runs; queue and playlist state commands continue to target that
+retained catalog until the scan completes or is canceled. The Library showed
+that prior results remained active, but did not say which catalog queue and
+playlist edits affected. The scan banner now states that directly and exposes
+the named accessibility value `Library scan status` with identifier
+`library-scan-status`.
+
+Focused regression checks confirm that the message appears only while scanning
+with a retained catalog. The subsequent `sh scripts/build-macos-app.sh` exited
+0; all macOS UI harnesses passed and strict bundle signature verification
+succeeded. Live text/AX verification and scan cancel/failure interaction remain
+unverified because macOS is locked.
+
+## In-flight state command across a successful scan
+
+A source review found that a queue or playlist command started while the
+retained catalog was active could finish after a successful scan switched the
+library root. Its response could overwrite the new catalog's visible
+queue/playlist state, while the attempted refresh could be dropped because
+another state command was still busy.
+
+The model now advances a library-state revision on every successful catalog
+switch, discards state-command responses from older revisions, and defers the
+active-root refresh until state and transport operations are idle. Unit
+coverage checks revision invalidation and deferred-refresh readiness while
+state or transport is busy. `sh scripts/build-macos-app.sh` exited 0 with all
+macOS UI harnesses and strict bundle signature validation passing. At 250,000
+synthetic tracks the catalog harness reported search p95 72.548 ms, full-sort
+p95 690.596 ms, and peak process RSS 225,230,848 bytes.
+
+Independent gate review passed the revision/deferred-refresh source flow and
+focused playback/UI-state harness on Darwin arm64 / Apple Swift 6.3.3 (exit 0).
+The harness does not simulate a real two-root scan with an in-flight queue or
+playlist command. Live verification of successful root switch, cancellation,
+failure, and the new VoiceOver value remains pending because macOS is locked.
