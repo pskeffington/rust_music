@@ -31,6 +31,12 @@ struct CatalogSearchTests {
         precondition(CatalogSearch.matches(unicodeTrack, matching: " "))
         precondition(!CatalogSearch.matches(unicodeTrack, matching: "not-present"))
         precondition(
+            LibraryScanPresentation.message(isScanning: true, retainedTrackCount: 3)
+                == "Scanning a folder. The previous catalog stays active; queue and playlist changes apply to it until this scan completes or is canceled."
+        )
+        precondition(LibraryScanPresentation.message(isScanning: true, retainedTrackCount: 0) == nil)
+        precondition(LibraryScanPresentation.message(isScanning: false, retainedTrackCount: 3) == nil)
+        precondition(
             CatalogSearch.isActionableSelectedTrack(
                 unicodeTrack,
                 selectedTrackIDs: [unicodeTrack.id],
