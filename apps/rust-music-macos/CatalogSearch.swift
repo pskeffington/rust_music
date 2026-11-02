@@ -123,3 +123,10 @@ enum CatalogSearch {
         return bounded
     }
 }
+
+enum LibraryScanPresentation {
+    static func message(isScanning: Bool, retainedTrackCount: Int) -> String? {
+        guard isScanning, retainedTrackCount > 0 else { return nil }
+        return "Scanning a folder. The previous catalog stays active; queue and playlist changes apply to it until this scan completes or is canceled."
+    }
+}
