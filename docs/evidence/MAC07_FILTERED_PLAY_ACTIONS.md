@@ -300,3 +300,20 @@ latency, or playback-under-load results.
 The desktop availability check reports macOS locked and requires manual
 unlock. The paging controls, compact-window fit, cross-page selection in the
 live app, and VoiceOver page-status speech therefore remain unverified.
+
+## Pagination status and boundary behavior
+
+The page counter, visible item range, and previous/next enabled state now use
+one `CatalogPageNavigation` value shared by the Library controls and the
+underlying page-move action. Regression cases cover an empty catalog, a middle
+page, a one-item final page, and an `Int.max` requested offset. This prevents
+the on-screen range and page buttons from independently calculating different
+boundaries.
+
+The follow-up `sh scripts/build-macos-app.sh` exited **0** on the PR branch
+after that change. All included macOS UI harnesses and strict signature checks
+passed; the roadmap validator and `git diff --check` also passed. In this
+repeat synthetic run the 250,000-row broad-page p95 was **107.707 ms** and
+process peak RSS was **204,963,840 bytes**. Imported libraries remain capped
+at 20,000 tracks. Live page control and VoiceOver behavior remain unverified
+because macOS is locked.

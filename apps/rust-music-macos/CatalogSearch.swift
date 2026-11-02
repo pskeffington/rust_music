@@ -127,6 +127,46 @@ enum CatalogSearch {
     }
 }
 
+struct CatalogPageNavigation: Equatable {
+    let totalItems: Int
+    let offset: Int
+    let visibleItemCount: Int
+    let pageSize: Int
+
+    init(totalItems: Int, offset: Int, visibleItemCount: Int, pageSize: Int = CatalogSearch.maximumPageSize) {
+        self.totalItems = max(totalItems, 0)
+        self.pageSize = max(pageSize, 1)
+        self.offset = self.totalItems == 0 ? 0 : min(max(offset, 0), self.totalItems - 1)
+        self.visibleItemCount = min(max(visibleItemCount, 0), max(self.totalItems - self.offset, 0))
+    }
+
+    var pageCount: Int {
+        totalItems == 0 ? 1 : 1 + (totalItems - 1) / pageSize
+    }
+
+    var currentPage: Int {
+        min(offset / pageSize + 1, pageCount)
+    }
+
+    var firstItem: Int {
+        visibleItemCount == 0 ? 0 : offset + 1
+    }
+
+    var lastItem: Int {
+        offset + visibleItemCount
+    }
+
+    func adjacentOffset(forward: Bool) -> Int? {
+        let pageIndex = offset / pageSize
+        if forward {
+            guard pageIndex < pageCount - 1 else { return nil }
+            return (pageIndex + 1) * pageSize
+        }
+        guard pageIndex > 0 else { return nil }
+        return (pageIndex - 1) * pageSize
+    }
+}
+
 /// Catalog-lifetime sort indexes. Queries filter an already ordered index, so
 /// typing does not sort the full matching catalog again. Lazily builds each
 /// requested order and keeps deterministic ID tie-breaking.

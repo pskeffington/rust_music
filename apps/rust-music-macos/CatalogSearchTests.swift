@@ -13,6 +13,41 @@ private struct UnindexedCatalogTrack {
 @main
 struct CatalogSearchTests {
     static func main() {
+        let emptyNavigation = CatalogPageNavigation(totalItems: 0, offset: 0, visibleItemCount: 0)
+        precondition(
+            emptyNavigation.pageCount == 1
+                && emptyNavigation.currentPage == 1
+                && emptyNavigation.firstItem == 0
+                && emptyNavigation.lastItem == 0
+                && emptyNavigation.adjacentOffset(forward: false) == nil
+                && emptyNavigation.adjacentOffset(forward: true) == nil,
+            "an empty result set presents one inert page"
+        )
+        let middleNavigation = CatalogPageNavigation(totalItems: 401, offset: 200, visibleItemCount: 200)
+        precondition(
+            middleNavigation.pageCount == 3
+                && middleNavigation.currentPage == 2
+                && middleNavigation.firstItem == 201
+                && middleNavigation.lastItem == 400
+                && middleNavigation.adjacentOffset(forward: false) == 0
+                && middleNavigation.adjacentOffset(forward: true) == 400
+        )
+        let lastNavigation = CatalogPageNavigation(totalItems: 401, offset: 400, visibleItemCount: 1)
+        precondition(
+            lastNavigation.currentPage == 3
+                && lastNavigation.firstItem == 401
+                && lastNavigation.lastItem == 401
+                && lastNavigation.adjacentOffset(forward: false) == 200
+                && lastNavigation.adjacentOffset(forward: true) == nil
+        )
+        let clampedNavigation = CatalogPageNavigation(totalItems: 401, offset: .max, visibleItemCount: 200)
+        precondition(
+            clampedNavigation.offset == 400
+                && clampedNavigation.lastItem == 401
+                && clampedNavigation.adjacentOffset(forward: true) == nil,
+            "out-of-range offsets must not overflow page counters"
+        )
+
         let unicodeTrack = CatalogTrack(
             id: 0,
             container: "flac",

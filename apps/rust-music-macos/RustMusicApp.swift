@@ -1638,11 +1638,14 @@ final class PlayerModel: ObservableObject {
 
     func moveCatalogPage(by direction: Int) {
         guard direction != 0, !isTransportBusy, !isStateBusy else { return }
-        let pageCount = max(1, (visibleTrackTotal + catalogPageSize - 1) / catalogPageSize)
-        let currentPage = catalogPageOffset / catalogPageSize
-        let nextPage = min(max(currentPage + direction, 0), pageCount - 1)
-        guard nextPage != currentPage else { return }
-        catalogPageOffset = nextPage * catalogPageSize
+        let navigation = CatalogPageNavigation(
+            totalItems: visibleTrackTotal,
+            offset: catalogPageOffset,
+            visibleItemCount: visibleTracks.count,
+            pageSize: catalogPageSize
+        )
+        guard let nextOffset = navigation.adjacentOffset(forward: direction > 0) else { return }
+        catalogPageOffset = nextOffset
         refreshVisibleTracks()
     }
 
@@ -3018,6 +3021,12 @@ private struct PlayerView: View {
 
     private var libraryPanel: some View {
         let visibleTracks = model.visibleTracks
+        let pageNavigation = CatalogPageNavigation(
+            totalItems: model.visibleTrackTotal,
+            offset: model.catalogPageOffset,
+            visibleItemCount: visibleTracks.count,
+            pageSize: model.catalogPageSize
+        )
         let emptyState: (title: String, detail: String)?
         if model.isScanning && model.tracks.isEmpty {
             emptyState = (
@@ -3189,22 +3198,18 @@ private struct PlayerView: View {
                 }
                 .frame(minHeight: 96, maxHeight: .infinity)
 
-                let pageCount = max(1, (model.visibleTrackTotal + model.catalogPageSize - 1) / model.catalogPageSize)
-                let currentPage = min(model.catalogPageOffset / model.catalogPageSize + 1, pageCount)
-                let firstTrack = model.visibleTrackTotal == 0 ? 0 : model.catalogPageOffset + 1
-                let lastTrack = min(model.catalogPageOffset + visibleTracks.count, model.visibleTrackTotal)
                 HStack(spacing: 8) {
                     Button("PREV PAGE") { model.moveCatalogPage(by: -1) }
-                        .disabled(model.catalogPageOffset == 0 || model.isStateBusy || model.isTransportBusy)
-                    Text("PAGE \(currentPage)/\(pageCount) · \(firstTrack)–\(lastTrack) OF \(model.visibleTrackTotal)")
+                        .disabled(pageNavigation.adjacentOffset(forward: false) == nil || model.isStateBusy || model.isTransportBusy)
+                    Text("PAGE \(pageNavigation.currentPage)/\(pageNavigation.pageCount) · \(pageNavigation.firstItem)–\(pageNavigation.lastItem) OF \(pageNavigation.totalItems)")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(RustMusicPalette.muted)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                        .accessibilityLabel("Library page \(currentPage) of \(pageCount), tracks \(firstTrack) through \(lastTrack) of \(model.visibleTrackTotal)")
+                        .accessibilityLabel("Library page \(pageNavigation.currentPage) of \(pageNavigation.pageCount), tracks \(pageNavigation.firstItem) through \(pageNavigation.lastItem) of \(pageNavigation.totalItems)")
                         .accessibilityIdentifier("library-page-status")
                     Button("NEXT PAGE") { model.moveCatalogPage(by: 1) }
-                        .disabled(lastTrack >= model.visibleTrackTotal || model.isStateBusy || model.isTransportBusy)
+                        .disabled(pageNavigation.adjacentOffset(forward: true) == nil || model.isStateBusy || model.isTransportBusy)
                 }
 
                 HStack(spacing: 8) {
