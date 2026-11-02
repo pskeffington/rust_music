@@ -2160,7 +2160,13 @@ final class PlayerModel: ObservableObject {
                 }
                 return
             }
-            if let current = queue.current,
+            if PlaybackUIState.shouldApplyQueueResultSelection(
+                isPlaying: isPlaying,
+                isPaused: isPaused,
+                reflectQueueSelection: reflectQueueSelection,
+                continuePlayback: continuePlayback
+            ),
+               let current = queue.current,
                let entry = queue.entries.first(where: { $0.index == current }),
                let track = tracks.first(where: { $0.relativePath == entry.relativePath }) {
                 let selectionChanged = selectedIndex != track.id

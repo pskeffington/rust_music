@@ -223,6 +223,17 @@ enum PlaybackUIState {
         !isPlaying && !isPaused
     }
 
+    static func shouldApplyQueueResultSelection(
+        isPlaying: Bool,
+        isPaused: Bool,
+        reflectQueueSelection: Bool,
+        continuePlayback: Bool
+    ) -> Bool {
+        reflectQueueSelection
+            || continuePlayback
+            || shouldReflectQueueSelection(isPlaying: isPlaying, isPaused: isPaused)
+    }
+
     static func flags(for state: UInt8) -> (playing: Bool, paused: Bool) {
         (playing: state == 2, paused: state == 6)
     }

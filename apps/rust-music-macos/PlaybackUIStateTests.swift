@@ -75,6 +75,42 @@ struct PlaybackUIStateTests {
         precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: true, isPaused: false))
         precondition(!PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: true))
         precondition(PlaybackUIState.shouldReflectQueueSelection(isPlaying: false, isPaused: false))
+        precondition(!PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "ordinary queue refreshes must preserve an independent Library selection during playback")
+        precondition(!PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: true,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "ordinary queue refreshes must preserve an independent Library selection while paused")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: false
+        ), "when stopped, the queue current entry remains the play target")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: true,
+            continuePlayback: false
+        ), "explicit queue selection must be reflected during playback")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: false,
+            isPaused: true,
+            reflectQueueSelection: true,
+            continuePlayback: false
+        ), "explicit queue selection must be reflected while paused")
+        precondition(PlaybackUIState.shouldApplyQueueResultSelection(
+            isPlaying: true,
+            isPaused: false,
+            reflectQueueSelection: false,
+            continuePlayback: true
+        ), "Next/Previous continuation must reflect its new queue target")
         precondition(!PlaybackUIState.flags(for: 6).playing)
         precondition(PlaybackUIState.flags(for: 6).paused)
         for terminalState: UInt8 in [3, 4, 5] {
