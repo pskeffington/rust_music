@@ -1407,6 +1407,7 @@ final class PlayerModel: ObservableObject {
             refreshVisibleTracks()
         }
     }
+    private var catalogTrackIDs: Set<Int> = []
     @Published var selectedIndex: Int? {
         didSet {
             if oldValue != selectedIndex { playbackSnapshot = nil }
@@ -1550,6 +1551,7 @@ final class PlayerModel: ObservableObject {
     var selectedTrackCountOutsideLibraryView: Int {
         CatalogSearch.selectedTrackCountOutsideView(
             selectedTrackIDs,
+            catalogTrackIDs: catalogTrackIDs,
             visibleTrackIDs: Set(visibleTracks.map(\.id))
         )
     }
@@ -2262,7 +2264,7 @@ final class PlayerModel: ObservableObject {
                     outputFailure = "Could not read Rust Music catalog output: \(error.localizedDescription)"
                 }
                 process.waitUntilExit()
-                let result: Result<[CatalogTrack], RustMusicFailure>
+                let result: Result<ParsedCatalog, RustMusicFailure>
                 if let outputFailure {
                     result = .failure(RustMusicFailure(message: outputFailure))
                 } else if process.terminationStatus == 0 {
@@ -2283,15 +2285,16 @@ final class PlayerModel: ObservableObject {
             let wasCancelled = self.scanCancellationRequested
             self.scanCancellationRequested = false
             switch result {
-            case .success(let tracks):
+            case .success(let catalog):
                 self.libraryScanNotice = nil
                 self.audioQueueDiagnosticSummary = nil
                 self.libraryStateRevision.advance()
                 self.libraryRoot = root
-                self.tracks = tracks
-                self.selectedIndex = tracks.first?.id
-                self.selectedTrackIDs = tracks.first.map { Set([$0.id]) } ?? []
-                self.status = "Loaded \(tracks.count) tracks. Playback is stopped."
+                self.catalogTrackIDs = catalog.trackIDs
+                self.tracks = catalog.tracks
+                self.selectedIndex = catalog.tracks.first?.id
+                self.selectedTrackIDs = catalog.tracks.first.map { Set([$0.id]) } ?? []
+                self.status = "Loaded \(catalog.tracks.count) tracks. Playback is stopped."
                 self.reloadPersistentState()
             case .failure(let failure):
                 self.libraryScanNotice = wasCancelled
@@ -2671,7 +2674,12 @@ final class PlayerModel: ObservableObject {
         return changed
     }
 
-    nonisolated private static func parseCatalog(_ data: Data) -> Result<[CatalogTrack], RustMusicFailure> {
+    private struct ParsedCatalog: Sendable {
+        let tracks: [CatalogTrack]
+        let trackIDs: Set<Int>
+    }
+
+    nonisolated private static func parseCatalog(_ data: Data) -> Result<ParsedCatalog, RustMusicFailure> {
         let maximumTrackCount = 20_000
         guard data.count <= CatalogValidation.maximumOutputBytes else {
             return .failure(RustMusicFailure(message: "Rust Music catalog exceeded its output limit."))
@@ -2680,6 +2688,7 @@ final class PlayerModel: ObservableObject {
             return .failure(RustMusicFailure(message: "Rust Music returned invalid catalog text."))
         }
         var tracks: [CatalogTrack] = []
+        var trackIDs = Set<Int>()
         let estimatedRows = min(maximumTrackCount, data.count / 96)
         tracks.reserveCapacity(estimatedRows)
         var reportedCount: Int?
@@ -2714,11 +2723,12 @@ final class PlayerModel: ObservableObject {
                 album: album,
                 relativePath: relativePath
             ))
+            trackIDs.insert(index)
         }
         guard reportedCount == tracks.count else {
             return .failure(RustMusicFailure(message: "Rust Music catalog count did not match its rows."))
         }
-        return .success(tracks)
+        return .success(ParsedCatalog(tracks: tracks, trackIDs: trackIDs))
     }
 
     nonisolated private static func decodeHex(_ value: Substring) -> String? {

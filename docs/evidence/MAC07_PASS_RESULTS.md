@@ -1437,3 +1437,31 @@ remain in the audio-backend-owned source tree.
 crates and 32 path-only internal edges, including all 36 native macOS
 AudioQueue tests. The exact 520×360-point live window check and VoiceOver
 speech remain open; VoiceOver was skipped at the operator's direction.
+
+### 2026-11-02 correction: selection summary catalog membership
+
+Correction to the preceding stale-ID follow-up: its first implementation used
+set subtraction against only visible rows and therefore still counted a
+selected ID absent from the catalog as hidden. The associated initial
+regression expectation did not catch that distinction. The current candidate
+passes catalog membership into the helper and reports only selected IDs that
+exist in the catalog but are outside the visible search/page. Catalog IDs are
+built alongside the parsed scan result off the main actor; rendering the
+summary uses set intersection/subtraction and does not rescan the catalog.
+Tests cover visible rows, valid hidden rows, no hidden rows, and an ID absent
+from catalog membership.
+
+After this correction, `sh scripts/build-macos-app.sh` exited **0**, including
+the catalog/helper tests, four synthetic scale profiles, process lifecycle,
+and local bundle signature checks. The 250k synthetic harness reported index
+build 194.389 ms, cached-sort p95 61.186 ms, narrow-search p95 138.578 ms,
+broad-search p95 241.004 ms, bounded 200-row page p95 285.971 ms,
+artist-group index plus page 1,083.390 ms, artist-group narrow-query p95
+436.619 ms, and process peak RSS 332,447,744 bytes. The host was measurably
+slower than earlier runs, so these are recorded as one run, not a performance
+regression claim or interactive UI timings. `sh scripts/offline-gate.sh`
+exited **0** across 17 local crates and 32 path-only edges; all 36 native
+AudioQueue tests passed. The build continues to emit 17 unused AudioQueue
+meter/tap warnings in the audio-backend-owned crate. Live resizing, the exact
+520×360-point minimum, VoiceOver speech, private-corpus parity and hardware
+acceptance remain open.

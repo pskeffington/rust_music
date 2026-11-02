@@ -11,7 +11,7 @@ private enum CatalogTextNormalizer {
     }
 }
 
-struct CatalogTrack: Identifiable, Equatable {
+struct CatalogTrack: Identifiable, Equatable, Sendable {
     let id: Int
     let container: String
     let title: String
@@ -180,9 +180,13 @@ enum CatalogSearch {
 
     static func selectedTrackCountOutsideView(
         _ selectedTrackIDs: Set<Int>,
+        catalogTrackIDs: Set<Int>,
         visibleTrackIDs: Set<Int>
     ) -> Int {
-        selectedTrackIDs.subtracting(visibleTrackIDs).count
+        selectedTrackIDs
+            .intersection(catalogTrackIDs)
+            .subtracting(visibleTrackIDs)
+            .count
     }
 
     static func queryBytes(for searchText: String) -> Data? {
