@@ -593,3 +593,35 @@ This verifies action exposure and destination filtering through the macOS
 accessibility API. It does not verify VoiceOver speech or rotor behavior,
 physical playback, persistence, or other MAC07-03 gates. Overall MAC07-03
 remains in progress.
+
+## Return-key artist and album navigation — PR #9 candidate
+
+The artist/album navigator now documents Return as a keyboard command and
+assigns Return to its Browse Selected button. The shortcut is present only in
+group browsing, the button remains disabled without a selected group or while
+the model is busy, and the Rust Boy visual styling is unchanged.
+
+`sh scripts/build-macos-app.sh` exited **0** on this candidate. The app build,
+strict local bundle signature validation, catalog/search and scale harnesses,
+playlist-selection, operator-window geometry, playback-snapshot, catalog
+bounds, process lifecycle, and shutdown harnesses passed. At 250,000 synthetic
+tracks, title-index build was 76.637 ms, cached-sort p95 32.807 ms,
+narrow-search p95 79.721 ms, broad-search p95 130.813 ms, bounded 200-row
+page p95 119.330 ms, artist-group index plus first page 624.827 ms, and
+artist-query p95 227.799 ms; harness peak RSS was 332,988,416 bytes. These
+measurements are from the catalog harness, not interactive UI latency or
+full-app memory.
+
+Live macOS UI verification loaded two generated metadata-only FLAC entries
+with no audio frames, sharing the album title `Twin Album` across Artist A
+and Artist B. Selecting Artist A and pressing Return switched to TRACKS and
+showed only Alpha Song / Artist A. In ALBUMS mode, selecting `Twin Album,
+Artist B` and pressing Return showed only Beta Song / Artist B, with the
+artist and album filters active. The app remained Ready/stopped with no output
+snapshot; no playback or queue operation occurred. The isolated app and
+fixture were closed and removed.
+
+This verifies Return-key routing via the live macOS accessibility tree for
+artist and album selection, including same-title album disambiguation. It does
+not verify VoiceOver speech/rotor navigation, hardware playback, or all
+keyboard focus arrangements. Overall MAC07-03 remains in progress.

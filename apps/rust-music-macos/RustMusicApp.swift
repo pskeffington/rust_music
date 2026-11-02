@@ -3456,7 +3456,9 @@ private struct PlayerView: View {
                             .background(RustMusicPalette.display)
                             .disabled(model.isTransportBusy || model.isStateBusy)
                             .accessibilityLabel(model.browseMode == .artists ? "Library artists" : "Library albums")
-                            .accessibilityHint("Select a row, then use Browse Selected or the list's matching accessibility action to see its tracks.")
+                            .accessibilityHint(model.browseMode == .artists
+                                ? "Select an artist and press Return, activate Browse Selected Artist, or use the list's matching accessibility action to see its tracks."
+                                : "Select an album and press Return, activate Browse Selected Album, or use the list's matching accessibility action to see its tracks.")
                             .conditionalAccessibilityAction(
                                 model.selectedBrowseGroupID != nil && !model.isStateBusy && !model.isTransportBusy,
                                 named: model.browseMode == .artists ? "Browse Selected Artist" : "Browse Selected Album"
@@ -3469,6 +3471,7 @@ private struct PlayerView: View {
                             Button(model.browseMode == .artists ? "BROWSE SELECTED ARTIST" : "BROWSE SELECTED ALBUM") {
                                 model.openSelectedBrowseGroup()
                             }
+                            .keyboardShortcut(.return, modifiers: [])
                             .disabled(model.selectedBrowseGroupID == nil || model.isTransportBusy || model.isStateBusy)
                             .accessibilityIdentifier("library-open-selected-group")
                         }
