@@ -1367,3 +1367,35 @@ stale, and unavailable-root UI recovery remains unverified. True cross-root
 catalog aggregation, persistent root identities, offline-root reconciliation
 and cross-root queue/playlist records remain follow-up work. MAC07-03 and
 RM-020 remain in progress.
+
+### 2026-11-02 MAC07-03 saved-location label disambiguation
+
+Saved library locations now retain their concise final-folder label when it is
+unique. When folder names collide, the menu adds the shortest distinguishing
+ancestor context. A final rendered-label collision, including one caused by a
+folder name containing the ` ▸ ` separator or by the `ACTIVE · ` marker, falls
+back to full paths. This is display-only: it performs no filesystem existence
+checks, mount probing, scans, or media access.
+
+Source commit: `89b728b163eb97382b0bb0f2afb0826b1a7c01b5`, based on
+`3a0776c9e9954c64ae42d25a554b37c253d4c0df` (`codex/mac07-library-management`).
+`swiftc apps/rust-music-macos/PlaybackUIState.swift
+apps/rust-music-macos/PlaybackUIStateTests.swift -o
+/private/tmp/PlaybackUIStateTests && /private/tmp/PlaybackUIStateTests` exited
+**0**. Cases cover duplicate `Music` basenames on separate roots, a deeper
+third location, unique labels, separator-induced collision, and collision
+with an active label. `sh scripts/build-macos-app.sh` exited **0**, including
+the focused Swift harnesses, build-path guard, strict app signature validation,
+and process lifecycle tests. The 250,000-track synthetic catalog run reported
+79.119 ms title-index build, 38.004 ms cached-sort p95, 82.897 ms narrow-search
+p95, 139.736 ms broad-search p95, 278.998 ms bounded 200-row broad-page p95,
+and 715.207 ms artist-group index plus page. The harness process peak RSS was
+332,103,680 bytes; these synthetic results are not full-app memory or UI
+latency measurements.
+
+Live menu and VoiceOver behavior were **not tested**. This host has the macOS
+Command Line Tools selected but no full Xcode (`xcodebuild` reports that Xcode
+is required); Launch Services could not open the isolated candidate bundle.
+Keep the visual, compact/expanded, and accessibility checks open until a live
+candidate launch is available. This change provides no playback or hardware
+evidence. MAC07-03 and RM-029 remain in progress.
