@@ -67,6 +67,7 @@ struct PlaybackUIStateTests {
         precondition(!deferredReload.takeIfAvailable(isStateBusy: true, isTransportBusy: false))
         precondition(!deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: true))
         precondition(deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: false))
+        precondition(!deferredReload.takeIfAvailable(isStateBusy: false, isTransportBusy: false))
         precondition(!deferredReload.isPending)
 
         precondition(PlaybackUIState.flags(for: 2).playing)
