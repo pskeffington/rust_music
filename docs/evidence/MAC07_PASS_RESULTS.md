@@ -1421,3 +1421,39 @@ and `STANDARD` choices. Selecting `COMPACT` changed the AX value and rendered
 the compact rows while preserving the `40 TRACKS` count and `1–40 of 40` page
 status. `STANDARD` was selected again before ending the QA session. No track
 was played and no persistent user setting was left changed by this check.
+
+### 2026-11-02 exact-head MAC07-03 validation
+
+At source commit `ba1a6cc8756399bace8d6533041aa63fef07785a` on
+`codex/mac07-ui-acceptance`, the primary-agent run of
+`sh scripts/build-macos-app.sh` exited **0**. The local bundle signature
+passed strict verification and the included harnesses passed. The synthetic
+250,000-track catalog run reported index build **77.541 ms**, cached-sort p95
+**33.679 ms**, narrow-search p95 **81.062 ms**, broad-search p95 **133.707 ms**,
+bounded 200-row page p95 **121.971 ms**, artist-group index plus page
+**627.846 ms**, artist-group narrow-query p95 **223.909 ms**, and
+harness-process peak RSS **340,246,528 bytes**. The run also covered 2,000,
+20,000, and 100,000 tracks. These are synthetic catalog harness measurements,
+not interactive UI latency or full-app memory.
+
+`sh scripts/offline-gate.sh` exited **0** with 17 workspace crates, 32
+path-only internal edges, zero registry/Git dependencies, and 36 native macOS
+tests passing. `python3 scripts/check_roadmap_index.py` exited **0**;
+`python3 -m unittest discover -s tests -v` passed **8 tests**; JSON parsing
+and `git diff --check` passed. The build emitted 17 unused AudioQueue
+diagnostic warnings in `rust-music-native`; sink cleanup belongs to the
+separate `audio_backend` scope.
+
+The test-time app source tree was clean. No live 250,000-track UI,
+playback-under-load, DAC, or private-corpus test was run. VoiceOver testing is
+skipped at the user's direction. MAC07-03 remains in progress; this evidence
+does not establish release readiness.
+
+### 2026-11-02 documentation and ref-validator follow-up
+
+After the documentation and ref-validator updates, `python3
+scripts/check_roadmap_index.py` exited **0**, and
+`python3 -m unittest discover -s tests -v` passed **11/11 tests**. JSON
+parsing and `git diff --check` passed. The documentation worktree is dirty;
+the product source remains unchanged. The exact-head validation above retains
+the original 8-test result observed at commit `ba1a6cc`.

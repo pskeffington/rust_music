@@ -22,6 +22,9 @@ EVIDENCE_CLASSES = {
     "independent_pcm_parity", "hardware_measured",
 }
 PRIORITIES = {"P0", "P1", "P2"}
+EXPECTED_ACTIVE_BRANCH = "codex/mac07-ui-acceptance"
+EXPECTED_INTEGRATED_BRANCH = "main"
+EXPECTED_MAIN_HEAD = "cf83cf22dee8ffba0e58e32fe83039c2acde733f"
 REQUIRED_FILES = (
     "AGENTS.md",
     ".codex/config.toml",
@@ -62,12 +65,11 @@ def validate_registry(data: dict, root: Path = ROOT, check_files: bool = True) -
     require(isinstance(data, dict), "top-level index must be a JSON object")
     require(data.get("schema_version") == 1, "unsupported roadmap index schema")
     require(data.get("repository") == "pskeffington/rust_music", "wrong repository")
-    require(data.get("active_development_branch") == "build/native-codecs-g0",
+    require(data.get("active_development_branch") == EXPECTED_ACTIVE_BRANCH,
             "branch changed: review mapping before updating this field")
-    require(data.get("integrated_branch") == "main",
+    require(data.get("integrated_branch") == EXPECTED_INTEGRATED_BRANCH,
             "unexpected integrated branch")
-    require(data.get("verified_main_head") ==
-            "e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b",
+    require(data.get("verified_main_head") == EXPECTED_MAIN_HEAD,
             "verified main head changed: refresh the integration record")
     require(data.get("merged_pr") == 1, "unexpected merged PR reference")
     require(data.get("pr_merge_commit") ==

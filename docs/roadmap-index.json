@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated": "2026-11-01",
+  "updated": "2026-11-02",
   "repository": "pskeffington/rust_music",
-  "active_development_branch": "build/native-codecs-g0",
+  "active_development_branch": "codex/mac07-ui-acceptance",
   "integrated_branch": "main",
-  "verified_main_head": "e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b",
+  "verified_main_head": "cf83cf22dee8ffba0e58e32fe83039c2acde733f",
   "merged_pr": 1,
   "pr_merge_commit": "f8052f28cf187143b54aa15e80779ff3b8db841f",
   "canonical_human_roadmap": "docs/ROADMAP.md",

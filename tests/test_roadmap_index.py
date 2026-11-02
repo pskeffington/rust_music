@@ -22,6 +22,23 @@ class RoadmapIndexTests(unittest.TestCase):
     def test_index_matches_repo_and_toml(self):
         validate_registry(self.valid, ROOT)
 
+    def test_index_records_current_ref_snapshot(self):
+        self.assertEqual(self.valid["active_development_branch"], "codex/mac07-ui-acceptance")
+        self.assertEqual(self.valid["integrated_branch"], "main")
+        self.assertEqual(self.valid["verified_main_head"], "cf83cf22dee8ffba0e58e32fe83039c2acde733f")
+
+    def test_branch_change_requires_mapping_review(self):
+        value = self.mutated()
+        value["active_development_branch"] = "build/native-codecs-g0"
+        with self.assertRaises(InvalidIndex):
+            validate_registry(value, ROOT, check_files=False)
+
+    def test_mainline_head_change_requires_integration_refresh(self):
+        value = self.mutated()
+        value["verified_main_head"] = "e8e5ff8864c8f9dffd8e078cb18bc235ef04ee7b"
+        with self.assertRaises(InvalidIndex):
+            validate_registry(value, ROOT, check_files=False)
+
     def test_unknown_gate_is_rejected(self):
         value = self.mutated()
         value["tasks"][0]["gate"] = "G900"

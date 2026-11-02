@@ -4,6 +4,10 @@
   "project": "pskeffington/rust_music",
   "source": "docs/MAC07_WINAMP_UI_ALIGNMENT.md",
   "branch": "codex/mac07-ui-acceptance",
+  "integrated_branch": "main",
+  "verified_main_head": "cf83cf22dee8ffba0e58e32fe83039c2acde733f",
+  "source_head": "ba1a6cc8756399bace8d6533041aa63fef07785a",
+  "source_worktree_clean": true,
   "baseline_source": "e9cacb1d8d1a3464fd1ba973449767f7152cffd1",
   "execution_rule": "Do not run downstream implementation until preceding pass acceptance is evidenced; independent read-only reviews may proceed",
   "policy": [
