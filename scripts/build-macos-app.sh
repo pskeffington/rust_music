@@ -56,8 +56,13 @@ swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
   apps/rust-music-macos/CatalogValidationTests.swift \
   -o "$ROOT/target/macos/CatalogValidationTests"
 "$ROOT/target/macos/CatalogValidationTests"
+swiftc -module-cache-path "$ROOT/target/swift-module-cache" \
+  apps/rust-music-macos/LibraryPanelLayout.swift \
+  apps/rust-music-macos/LibraryPanelLayoutTests.swift \
+  -o "$ROOT/target/macos/LibraryPanelLayoutTests"
+"$ROOT/target/macos/LibraryPanelLayoutTests"
 swiftc -target "$SWIFT_ARCH-apple-macosx13.0" -module-cache-path "$ROOT/target/swift-module-cache" -O -parse-as-library -framework AppKit -framework SwiftUI \
-  apps/rust-music-macos/OperatorWindowLayout.swift apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/PlaylistSelection.swift apps/rust-music-macos/ProcessTermination.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
+  apps/rust-music-macos/OperatorWindowLayout.swift apps/rust-music-macos/PlaybackUIState.swift apps/rust-music-macos/CatalogValidation.swift apps/rust-music-macos/CatalogSearch.swift apps/rust-music-macos/LibraryPanelLayout.swift apps/rust-music-macos/PlaylistSelection.swift apps/rust-music-macos/ProcessTermination.swift apps/rust-music-macos/RustMusicApp.swift -o "$MACOS/RustMusic"
 codesign --force --deep --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 # The child-process lifecycle harness executes the bundled CLI by its actual

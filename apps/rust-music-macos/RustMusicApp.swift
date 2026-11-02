@@ -2878,12 +2878,15 @@ private struct PlayerView: View {
         PipBoyChassis {
             VStack(spacing: 0) {
                 if kind == .library {
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                        libraryPanel
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    GeometryReader { proxy in
+                        let layout = LibraryPanelLayout(contentHeight: proxy.size.height)
+                        VStack(alignment: .leading, spacing: layout.sectionSpacing) {
+                            header
+                            libraryPanel(layout: layout)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        }
+                        .padding(layout.contentPadding)
                     }
-                    .padding(10)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
@@ -3232,7 +3235,7 @@ private struct PlayerView: View {
             .fixedSize()
     }
 
-    private var libraryPanel: some View {
+    private func libraryPanel(layout: LibraryPanelLayout) -> some View {
         let visibleTracks = model.visibleTracks
         let visibleGroups = model.visibleBrowseGroups
         let rowDensity = LibraryRowDensity(rawValue: libraryRowDensityRawValue) ?? .standard
@@ -3284,7 +3287,7 @@ private struct PlayerView: View {
             emptyState = nil
         }
         return GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: layout.contentSpacing) {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
                         librarySearchField
@@ -3532,7 +3535,7 @@ private struct PlayerView: View {
                         }
                     }
                 }
-                .frame(minHeight: 96, maxHeight: .infinity)
+                .frame(minHeight: layout.minimumResultsHeight, maxHeight: .infinity)
 
                 HStack(spacing: 8) {
                     Button("PREV PAGE") { model.moveCatalogPage(by: -1) }
@@ -3563,7 +3566,10 @@ private struct PlayerView: View {
         } label: {
             Text("LIBRARY")
         }
-        .groupBoxStyle(RustMusicGroupBoxStyle())
+        .groupBoxStyle(RustMusicGroupBoxStyle(
+            spacing: layout.isCompact ? 4 : 8,
+            padding: layout.groupBoxPadding
+        ))
     }
 
     private var playlistPanel: some View {
@@ -3882,15 +3888,18 @@ private struct RustMusicButtonStyle: ButtonStyle {
 }
 
 private struct RustMusicGroupBoxStyle: GroupBoxStyle {
+    var spacing: CGFloat = 8
+    var padding: CGFloat = 10
+
     func makeBody(configuration: Configuration) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: spacing) {
             configuration.label
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .tracking(1.15)
                 .foregroundStyle(RustMusicPalette.phosphor)
             configuration.content
         }
-        .padding(10)
+        .padding(padding)
         .background(RustMusicPalette.surface, in: RoundedRectangle(cornerRadius: 6))
         .overlay {
             RoundedRectangle(cornerRadius: 6)
