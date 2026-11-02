@@ -465,3 +465,33 @@ Real imports remain limited to 20,000 tracks. The app currently running on the
 desktop was left untouched, so live same-title album navigation, filter
 clearing, persistence, VoiceOver, layout fit, and playback under search remain
 unverified.
+
+## Live Artist and Album browsing — PR #9 candidate
+
+The macOS bundle built from PR source `9b018eb` was opened from the isolated
+checkout while the pre-existing Rust Music process remained open. The
+candidate started at Player / Ready / No Track with no library and no playback
+snapshot. An explicitly selected temporary catalog contained three generated
+metadata-only FLACs: two tracks named under the same album title by Artist One
+and Artist Two, and one with blank artist/album tags. No audio frames were
+included.
+
+In Media Library, the BROWSE menu exposed TRACKS, ARTISTS, and ALBUMS. ARTISTS
+showed Artist One, Artist Two, and Unknown Artist; choosing Unknown Artist
+opened exactly the blank-tag track. CLEAR BROWSE FILTERS restored all three
+tracks. ALBUMS showed separate `Twin Album` rows for Artist One and Artist Two,
+plus Unknown Album / Unknown Artist. Choosing Artist Two's album opened only
+`Second Twin`. Searching `First` within that group showed zero tracks;
+searching `Second` showed the one matching track and retained the active artist
+and album filters. The Player remained stopped with no output snapshot through
+the check. The candidate was quit; CUA inventory confirmed the original
+Rust Music process was still running. The generated fixture directory was
+removed.
+
+CUA reported that the candidate bundle changed during one search interaction.
+I re-read the full accessibility tree before continuing; the same candidate
+window still exposed the browse controls and retained the expected fixture
+state. This is live accessibility-tree interaction evidence from the launched
+candidate, not VoiceOver speech, playback, or a bundle-digest-bound UI test.
+VoiceOver, persistence across relaunch, minimum-size layout, and playback under
+search remain unverified.
