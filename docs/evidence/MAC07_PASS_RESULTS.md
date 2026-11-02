@@ -1415,3 +1415,9 @@ It does not test the minimum supported window frame, keyboard traversal in this
 run, VoiceOver speech, actual media, audio output or release readiness. The
 earlier launch limitation remains valid for direct launch from the shell; the
 desktop launcher is the working launch path. MAC07-03 remains in progress.
+
+In the same candidate session, the ROWS menu exposed the complete `COMPACT`
+and `STANDARD` choices. Selecting `COMPACT` changed the AX value and rendered
+the compact rows while preserving the `40 TRACKS` count and `1–40 of 40` page
+status. `STANDARD` was selected again before ending the QA session. No track
+was played and no persistent user setting was left changed by this check.
