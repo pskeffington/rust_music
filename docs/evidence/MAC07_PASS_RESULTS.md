@@ -1344,3 +1344,18 @@ were emitted and no playback or queue action was invoked. This is live window
 routing/focus and stopped-state evidence for this candidate; it does not
 measure AppKit-point frames, verify saved positions across restart, prove
 VoiceOver rotor navigation or audible playback, or close MAC07-03.
+
+### 2026-11-02 MAC07-03 Equalizer reachability and rotor presentation
+
+On source `87e141c`, the Equalizer's 10-band control stack is top-aligned and
+its band list scrolls in short windows. The macOS build and local signature
+validation passed. In a fresh isolated app, the compact 620×429-pixel capture
+showed the header and DSP-unavailable status; scrolling the band list to 1.0
+revealed 16 kHz, and the accessibility tree exposed all ten disabled bands.
+At 2560×1333 screenshot pixels, all ten bands were visible together. These
+capture dimensions are not AppKit-point measurements. No track or audio was
+loaded; minimum-size enforcement and saved-frame restart remain open.
+
+The operator confirmed that VoiceOver's Control–Option–U rotor contains the
+`Library Results` category and the visible track. Rotor navigation, list
+scrolling from the rotor, and spoken output remain unverified.

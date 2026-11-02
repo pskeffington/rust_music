@@ -743,3 +743,42 @@ through VoiceOver keyboard commands did not expose rotor UI through the CUA
 observation surface, so actual rotor presentation, navigation, scrolling, and
 speech remain unverified. The prior direct native accessibility-action
 invocation above is separate evidence and does not establish rotor operation.
+
+## Operator confirmation of Library Results rotor presentation — 2026-11-02
+
+Follow-up: the operator used VoiceOver in the isolated candidate and confirmed
+that Control–Option–U opened the rotor with a `Library Results` section
+containing the visible track. This supersedes the preceding uncertainty about
+rotor presentation. It verifies presentation and entry inclusion only; rotor
+navigation to the row, list scrolling, and spoken output have not been
+confirmed. Playback remained stopped.
+
+## Compact and expanded Equalizer layout — source `87e141c`
+
+`sh scripts/build-macos-app.sh` exited 0 on the Equalizer layout change. The
+strict local app signature check passed. Catalog correctness/scale, playlist
+selection, operator-window geometry/docking, playback snapshot, catalog
+bounds, and process lifecycle/shutdown harnesses passed. The build emitted
+17 existing unused AudioQueue diagnostics warnings.
+
+The 250,000-track synthetic catalog run reported title-index build **141.386
+ms**, cached-sort p95 **59.193 ms**, narrow-search p95 **337.921 ms**,
+broad-search p95 **217.676 ms**, bounded 200-row page p95 **239.242 ms**,
+artist-group index/page build **1,083.492 ms**, artist-query p95 **402.368
+ms**, searchable payload **18,500,000 bytes**, and harness peak RSS
+**326,189,056 bytes**. Corresponding p95 timings at 2,000 / 20,000 / 100,000
+tracks were: cached sort **0.087 / 4.611 / 28.055 ms**; narrow search
+**1.047 / 10.691 / 80.962 ms**; broad search **1.441 / 17.176 / 86.657 ms**;
+bounded page **0.977 / 21.969 / 90.708 ms**. These are catalog harness
+measurements, not interactive UI latency or full-app memory.
+
+A fresh isolated app with no library loaded showed the Equalizer at a compact
+**620×429 screenshot pixels**. The title and unavailable-DSP message stayed
+visible. Its scroll area reached scrollbar value 1 and displayed the 16 kHz
+band; the accessibility tree exposed all ten disabled sliders. At expanded
+**2560×1333 screenshot pixels**, all ten bands were visible together at the
+top of the window. The unavailable-DSP explanation and disabled state remained
+accurate. Screenshot pixels are not AppKit points. No track was loaded and no
+playback occurred during the Equalizer check. This does not prove minimum
+point-size enforcement, saved-frame restoration, VoiceOver speech, or DSP
+behavior.
