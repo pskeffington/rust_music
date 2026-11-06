@@ -1,5 +1,10 @@
 # Rust Music — Codex repository instructions
 
+## ACTIVE AGENT REFRESH — 2026-11-06
+
+Before the next engineering pass, follow [the audio agent skills refresh](docs/AUDIO_AGENT_SKILLS_REFRESH_2026-11-06.md). This adds explicit playback, UI, library, DSP, performance, platform and independent-validation responsibilities without replacing existing pinned agent_skills routing or release gates. This is task doctrine, not proof of tests or hardware acceptance.
+
+
 ## ACTIVE MAC-07 — WINAMP FUNCTIONAL ALIGNMENT (2026-11-01)
 
 The evidence ledger records operator-confirmed audible real-FLAC playback and a multi-file queue transition in the rebuilt GUI on System Default. This confirms that supplied album/session only; CLI route parity from the engineering shell, playback jitter, device recovery, layout, accessibility, and release gates remain open. Continue [MAC-07 UI alignment](docs/MAC07_WINAMP_UI_ALIGNMENT.md) in numbered pass order. Treat Winamp as a reference for organization and controls, not copied assets. Host integrator is sole SwiftUI writer. Do not infer broad reliability or production readiness from the observed playback session; preserve native decoder behavior and local work.
