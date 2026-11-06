@@ -46,16 +46,20 @@ The single source of machine-routing facts is [roadmap-index.json](roadmap-index
 
 Use [engineering handoff — 2026-10-30](ENGINEERING_HANDOFF_2026-10-30.md) to verify branch selection, evidence provenance, and exact next-agent assignments before launching Codex. `main` was README/LICENSE-only at inspection; do not treat it as the engineering checkout. Preserve stable RM task IDs and explicit prerequisite blocks.
 
-## Codex kickoff prompt
+## Codex kickoff prompt — current handoff (2026-11-06)
+
+Read [the executable pass-2 packet](CODEX_AUDIO_PASS2_EXECUTION.md) after the read-only checkout/PR preflight and the verified agent_skills pin. Use the three-lane agent assignment, preserve the MAC07 dependencies and evidence distinctions, and start with RM-028 route-truth classification. Earlier example prompts below this dated priority are not authorization to reopen or hold merged PR #1. Do not substitute the historical `build/native-codecs-g0` branch label for inspected current HEAD.
 
 ```text
-Read AGENTS.md and docs/roadmap-index.json. Select the highest-priority
-planned task whose prerequisites are complete; verify the current status
-before starting. As of 2026-10-29, RM-001, RM-002 and RM-008 through RM-010 are
-done; verify remaining host/hardware tasks before choosing work. Preserve local edits, use one writer per overlapping
-scope, request a read-only safety review for product changes, record exact
-commands/exit status, update the roadmap only for evidence actually observed,
-and keep PR #1 draft and unmerged.
+Read AGENTS.md, docs/CODEX_AUDIO_PASS2_EXECUTION.md,
+docs/mac07-pass-index.json and docs/evidence/MAC07_PASS_RESULTS.md.
+Inspect current HEAD, dirty work and live PR state without mutation.
+Pin and load reachable agent_skills contracts. Assign no more than three
+non-overlapping agent lanes; host_integrator alone writes SwiftUI.
+Classify RM-028 same-file GUI/CLI route evidence before defect edits.
+Proceed only on unblocked work; record exact tests, exit codes and human
+hearing separately from callbacks/decoded frames. Open a draft PR for
+reviewable changes, not a release claim.
 ```
 
 ## Maintaining the index
